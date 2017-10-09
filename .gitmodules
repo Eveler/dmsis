@@ -1,0 +1,6 @@
+[submodule "ladon"]
+	path = ladon
+	url = https://bitbucket.org/jakobsg/ladon.git
+[submodule "ladon-repo"]
+	path = ladon-repo
+	url = https://bitbucket.org/jakobsg/ladon.git
