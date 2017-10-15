@@ -1,3 +1,6 @@
 [submodule "ladon-repo"]
 	path = ladon-repo
 	url = https://bitbucket.org/jakobsg/ladon.git
+[submodule "spyne-repo"]
+	path = spyne-repo
+	url = https://github.com/arskom/spyne.git
