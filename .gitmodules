@@ -4,3 +4,6 @@
 [submodule "spyne-repo"]
 	path = spyne-repo
 	url = https://github.com/arskom/spyne.git
+[submodule "soapfish-repo"]
+	path = soapfish-repo
+	url = https://github.com/soapteam/soapfish.git
