@@ -13,3 +13,6 @@
 [submodule "jinja2-repo"]
 	path = jinja2-repo
 	url = https://github.com/pallets/jinja.git
+[submodule "requests-repo"]
+	path = requests-repo
+	url = https://github.com/requests/requests.git
