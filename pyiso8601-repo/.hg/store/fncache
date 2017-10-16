@@ -1,0 +1,16 @@
+data/iso8601/__init__.py.i
+data/setup.py.i
+data/MANIFEST.in.i
+data/iso8601/iso8601.py.i
+data/docs/Makefile.i
+data/.hgtags.i
+data/README.i
+data/.hgignore.i
+data/docs/make.bat.i
+data/docs/index.rst.i
+data/docs/conf.py.i
+data/README.rst.i
+data/iso8601/test_iso8601.py.i
+data/LICENSE.i
+data/dev-requirements.txt.i
+data/tox.ini.i

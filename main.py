@@ -41,6 +41,20 @@ class Calculator(object):
         return a + b
 
 
-# if __name__ == '__main__':
-#     # hello.say_hello("Cython")
-#     hellop.say_hello("Python")
+if __name__ == '__main__':
+    #     # hello.say_hello("Cython")
+    #     hellop.say_hello("Python")
+    from soapfish import xsd
+
+
+    class Airport(xsd.ComplexType):
+        type = xsd.Element(xsd.String)
+        code = xsd.Element(xsd.String)
+
+
+    airport = Airport()
+    airport.type = 'IATA'
+    airport.code = 'WAW'
+
+    print(airport.xml('takeoff_airport'))
+    pass
