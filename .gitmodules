@@ -7,3 +7,6 @@
 [submodule "soapfish-repo"]
 	path = soapfish-repo
 	url = https://github.com/soapteam/soapfish.git
+[submodule "lxml-repo"]
+	path = lxml-repo
+	url = https://github.com/lxml/lxml.git
