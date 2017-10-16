@@ -10,3 +10,6 @@
 [submodule "lxml-repo"]
 	path = lxml-repo
 	url = https://github.com/lxml/lxml.git
+[submodule "jinja2-repo"]
+	path = jinja2-repo
+	url = https://github.com/pallets/jinja.git
