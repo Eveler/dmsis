@@ -19,3 +19,6 @@
 [submodule "six-repo"]
 	path = six-repo
 	url = https://github.com/benjaminp/six.git
+[submodule "markupsafe-repo"]
+	path = markupsafe-repo
+	url = https://github.com/pallets/markupsafe.git
