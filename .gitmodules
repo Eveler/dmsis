@@ -16,3 +16,6 @@
 [submodule "requests-repo"]
 	path = requests-repo
 	url = https://github.com/requests/requests.git
+[submodule "six-repo"]
+	path = six-repo
+	url = https://github.com/benjaminp/six.git
