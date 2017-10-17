@@ -1,1 +1,1 @@
-/home/mike/devel/python/dmsis/six-repo/six.py
+six-repo/six.py
