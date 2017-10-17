@@ -25,3 +25,6 @@
 [submodule "urllib3-repo"]
 	path = urllib3-repo
 	url = git://github.com/shazow/urllib3.git
+[submodule "idna-repo"]
+	path = idna-repo
+	url = https://github.com/kjd/idna.git
