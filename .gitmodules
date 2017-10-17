@@ -22,3 +22,6 @@
 [submodule "markupsafe-repo"]
 	path = markupsafe-repo
 	url = https://github.com/pallets/markupsafe.git
+[submodule "urllib3-repo"]
+	path = urllib3-repo
+	url = git://github.com/shazow/urllib3.git
