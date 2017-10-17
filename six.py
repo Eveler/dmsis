@@ -1,1 +1,1 @@
-six-repo/six.py
+3dparty/six-repo/six.py
