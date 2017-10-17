@@ -28,3 +28,30 @@
 [submodule "idna-repo"]
 	path = idna-repo
 	url = https://github.com/kjd/idna.git
+[submodule "3dparty/idna-repo"]
+	path = 3dparty/idna-repo
+	url = https://github.com/kjd/idna.git
+[submodule "3dparty/jinja2-repo"]
+	path = 3dparty/jinja2-repo
+	url = https://github.com/pallets/jinja.git
+[submodule "3dparty/ladon-repo"]
+	path = 3dparty/ladon-repo
+	url = https://bitbucket.org/jakobsg/ladon.git
+[submodule "3dparty/markupsafe-repo"]
+	path = 3dparty/markupsafe-repo
+	url = https://github.com/pallets/markupsafe.git
+[submodule "3dparty/requests-repo"]
+	path = 3dparty/requests-repo
+	url = https://github.com/requests/requests.git
+[submodule "3dparty/six-repo"]
+	path = 3dparty/six-repo
+	url = https://github.com/benjaminp/six.git
+[submodule "3dparty/soapfish-repo"]
+	path = 3dparty/soapfish-repo
+	url = https://github.com/soapteam/soapfish.git
+[submodule "3dparty/spyne-repo"]
+	path = 3dparty/spyne-repo
+	url = https://github.com/arskom/spyne.git
+[submodule "3dparty/urllib3-repo"]
+	path = 3dparty/urllib3-repo
+	url = https://github.com/shazow/urllib3.git
