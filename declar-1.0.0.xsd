@@ -1,0 +1,471 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- edited with XMLSpy v2008 sp1 (http://www.altova.com) by i (EMBRACE) -->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:vc="http://www.w3.org/2007/XMLSchema-versioning" xmlns:ns1="augo/smev/uslugi/1.0.0" targetNamespace="augo/smev/uslugi/1.0.0" elementFormDefault="qualified" attributeFormDefault="unqualified" vc:minVersion="1.1">
+	<xs:element name="declar">
+		<xs:annotation>
+			<xs:documentation>Информация по обращению заявителя</xs:documentation>
+		</xs:annotation>
+		<xs:complexType>
+			<xs:sequence>
+				<xs:element name="declar_number" type="xs:string">
+					<xs:annotation>
+						<xs:documentation>№ дела (обращения)</xs:documentation>
+					</xs:annotation>
+				</xs:element>
+				<xs:element name="service" type="xs:string">
+					<xs:annotation>
+						<xs:documentation>Код (номер) услуги</xs:documentation>
+					</xs:annotation>
+				</xs:element>
+				<xs:element name="register_date" type="xs:date">
+					<xs:annotation>
+						<xs:documentation>Дата регистрации запроса</xs:documentation>
+					</xs:annotation>
+				</xs:element>
+				<xs:element name="end_date" type="xs:date">
+					<xs:annotation>
+						<xs:documentation>Плановый срок предоставления услуги</xs:documentation>
+					</xs:annotation>
+				</xs:element>
+				<xs:element name="object_address" type="ns1:Address" minOccurs="0">
+					<xs:annotation>
+						<xs:documentation>Место нахождения объекта услуги</xs:documentation>
+					</xs:annotation>
+				</xs:element>
+				<xs:element name="AppliedDocument" type="ns1:AppliedDocument" maxOccurs="unbounded">
+					<xs:annotation>
+						<xs:documentation>Приложенный документ</xs:documentation>
+					</xs:annotation>
+				</xs:element>
+				<xs:choice maxOccurs="unbounded">
+					<xs:element name="legal_entity" type="ns1:LegalEntity" minOccurs="0">
+						<xs:annotation>
+							<xs:documentation>Заявитель - ЮЛ/ИП</xs:documentation>
+						</xs:annotation>
+					</xs:element>
+					<xs:element name="person" type="ns1:Individual" minOccurs="0">
+						<xs:annotation>
+							<xs:documentation>Заявитель - ФЛ</xs:documentation>
+						</xs:annotation>
+					</xs:element>
+				</xs:choice>
+				<xs:element name="confidant" type="ns1:Individual" minOccurs="0">
+					<xs:annotation>
+						<xs:documentation>Доверенное лицо</xs:documentation>
+					</xs:annotation>
+				</xs:element>
+				<xs:element name="Param" minOccurs="0" maxOccurs="unbounded">
+					<xs:annotation>
+						<xs:documentation>Дополнительный параметр</xs:documentation>
+					</xs:annotation>
+					<xs:complexType>
+						<xs:attribute name="type" use="required">
+							<xs:annotation>
+								<xs:documentation>тип значения параметра: Boolean или Integer или Double или Date или DateTime или String</xs:documentation>
+							</xs:annotation>
+						</xs:attribute>
+						<xs:attribute name="id" use="required">
+							<xs:annotation>
+								<xs:documentation>внутренний идентификатор параметра (только цифры и латинсуие символы, начинается с символа)</xs:documentation>
+							</xs:annotation>
+						</xs:attribute>
+						<xs:attribute name="label">
+							<xs:annotation>
+								<xs:documentation>читаемое человеком наименование параметра</xs:documentation>
+							</xs:annotation>
+						</xs:attribute>
+						<xs:attribute name="rowNumber">
+							<xs:annotation>
+								<xs:documentation>если значение параметра - массив, количество строк массива</xs:documentation>
+							</xs:annotation>
+						</xs:attribute>
+						<xs:attribute name="colNumber">
+							<xs:annotation>
+								<xs:documentation>если значение параметра - массив, количество столбцов массива</xs:documentation>
+							</xs:annotation>
+						</xs:attribute>
+						<xs:attribute name="rowDelimiter">
+							<xs:annotation>
+								<xs:documentation>символ - разделитель строк массива</xs:documentation>
+							</xs:annotation>
+						</xs:attribute>
+						<xs:attribute name="colDelimiter">
+							<xs:annotation>
+								<xs:documentation>символ - разделитель колонок массива</xs:documentation>
+							</xs:annotation>
+						</xs:attribute>
+					</xs:complexType>
+				</xs:element>
+			</xs:sequence>
+		</xs:complexType>
+	</xs:element>
+	<xs:simpleType name="AgentType">
+		<xs:annotation>
+			<xs:documentation>Тип заявителя</xs:documentation>
+		</xs:annotation>
+		<xs:restriction base="xs:string">
+			<xs:enumeration value="0">
+				<xs:annotation>
+					<xs:documentation>Юридическое лицо/Индивидуальный предприниматель</xs:documentation>
+				</xs:annotation>
+			</xs:enumeration>
+			<xs:enumeration value="1">
+				<xs:annotation>
+					<xs:documentation>Физическое лицо</xs:documentation>
+				</xs:annotation>
+			</xs:enumeration>
+		</xs:restriction>
+	</xs:simpleType>
+	<xs:simpleType name="Sex">
+		<xs:annotation>
+			<xs:documentation>Пол</xs:documentation>
+		</xs:annotation>
+		<xs:restriction base="xs:string">
+			<xs:enumeration value="Муж"/>
+			<xs:enumeration value="Жен"/>
+			<xs:enumeration value=""/>
+		</xs:restriction>
+	</xs:simpleType>
+	<xs:complexType name="Address">
+		<xs:annotation>
+			<xs:documentation>Адрес</xs:documentation>
+		</xs:annotation>
+		<xs:sequence>
+			<xs:element name="Postal_Code" type="ns1:s6" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>Почтовый индекс</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="Region" type="xs:string" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>Регион</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="District" type="xs:string" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>Район</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="City" type="xs:string" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>Муниципальное образование</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="Urban_District" type="xs:string" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>Городской район</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="Soviet_Village" type="xs:string" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>Сельсовет</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="Locality" type="xs:string" default="Уссурийск">
+				<xs:annotation>
+					<xs:documentation>Населенный пункт</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:choice>
+				<xs:sequence minOccurs="0">
+					<xs:element name="Street" type="xs:string">
+						<xs:annotation>
+							<xs:documentation>Улица</xs:documentation>
+						</xs:annotation>
+					</xs:element>
+					<xs:element name="House" type="xs:string">
+						<xs:annotation>
+							<xs:documentation>Дом</xs:documentation>
+						</xs:annotation>
+					</xs:element>
+				</xs:sequence>
+				<xs:element name="Reference_point" type="xs:string" minOccurs="0">
+					<xs:annotation>
+						<xs:documentation>Ориентир</xs:documentation>
+					</xs:annotation>
+				</xs:element>
+			</xs:choice>
+			<xs:element name="Housing" type="xs:string" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>Корпус</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="Building" type="xs:string" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>Строение</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="Apartment" type="xs:string" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>Квартира</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+		</xs:sequence>
+	</xs:complexType>
+	<xs:simpleType name="s6">
+		<xs:annotation>
+			<xs:documentation>строка с ограничением длины до 6 знаков</xs:documentation>
+		</xs:annotation>
+		<xs:restriction base="xs:string">
+			<xs:maxLength value="6"/>
+		</xs:restriction>
+	</xs:simpleType>
+	<xs:simpleType name="s10">
+		<xs:annotation>
+			<xs:documentation>строка с ограничением длины до 10 знаков</xs:documentation>
+		</xs:annotation>
+		<xs:restriction base="xs:string">
+			<xs:maxLength value="10"/>
+		</xs:restriction>
+	</xs:simpleType>
+	<xs:simpleType name="s50">
+		<xs:annotation>
+			<xs:documentation>строка с ограничением длины до 50 знаков</xs:documentation>
+		</xs:annotation>
+		<xs:restriction base="xs:string">
+			<xs:maxLength value="50"/>
+		</xs:restriction>
+	</xs:simpleType>
+	<xs:simpleType name="s120">
+		<xs:annotation>
+			<xs:documentation>строка с ограничением длины до 120 знаков</xs:documentation>
+		</xs:annotation>
+		<xs:restriction base="xs:string">
+			<xs:maxLength value="120"/>
+		</xs:restriction>
+	</xs:simpleType>
+	<xs:simpleType name="s1024">
+		<xs:annotation>
+			<xs:documentation>строка с ограничением длины до 1024 знаков</xs:documentation>
+		</xs:annotation>
+		<xs:restriction base="xs:string">
+			<xs:maxLength value="1024"/>
+		</xs:restriction>
+	</xs:simpleType>
+	<xs:complexType name="AppliedDocument">
+		<xs:annotation>
+			<xs:documentation>Приложенный документ</xs:documentation>
+		</xs:annotation>
+		<xs:sequence>
+			<xs:element name="title" type="ns1:s1024">
+				<xs:annotation>
+					<xs:documentation>Наименование документа</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="number" type="ns1:s50">
+				<xs:annotation>
+					<xs:documentation>Номер документа</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="date" type="xs:date">
+				<xs:annotation>
+					<xs:documentation>Дата документа</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="valid_until" type="xs:date" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>Действителен до</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="file_name" type="xs:string" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>Имя файла документа</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="url" type="xs:string">
+				<xs:annotation>
+					<xs:documentation>Прямая ссылка на файл. Поддерживаются только пртоколы HTTP, FTP</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="url_valid_until" type="xs:dateTime" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>Срок действия ссылки на файл, до</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+		</xs:sequence>
+	</xs:complexType>
+	<xs:complexType name="LegalEntity">
+		<xs:annotation>
+			<xs:documentation>Юридическое лицо/Индивидуальный предприниматель</xs:documentation>
+		</xs:annotation>
+		<xs:sequence>
+			<xs:element name="name" type="xs:string">
+				<xs:annotation>
+					<xs:documentation>Краткое наименование ЮЛ</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="full_name" type="xs:string" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>Полное наименование ЮЛ</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="inn" type="xs:string" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>ИНН</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="kpp" type="xs:string" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>КПП</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="address" type="ns1:Address">
+				<xs:annotation>
+					<xs:documentation>Юридический адресс</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="ogrn" type="xs:string" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>ОГРН</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="taxRegDoc" type="xs:string" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>Данные документа о постановке заявителя на учет в налоговом органе</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="govRegDoc" type="xs:string" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>Номер документа, подтверждающего факт внесения сведений в единый государственный реестр</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="govRegDate" type="xs:date" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>Дата государственной регистрации юридического лица</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="phone" type="xs:string" minOccurs="0" maxOccurs="unbounded">
+				<xs:annotation>
+					<xs:documentation>телефон</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="email" type="xs:string" minOccurs="0" maxOccurs="unbounded">
+				<xs:annotation>
+					<xs:documentation>Адрес электронной почты</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="bossFio" type="xs:string" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>Фамилия И.О. руководителя</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="buhFio" type="xs:string" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>Фамилия И.О. главного бухгалтера</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="bank" type="xs:string" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>Наименование банка</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="bankAccount" type="xs:string" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>Банковский счёт</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="lastCtrlDate" type="xs:date" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>Дата проведения последней плановой проверки</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="opf" type="xs:string" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>Организационно-правовая форма</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="govRegOgv" type="xs:string" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>Регистрирующий государственный орган</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="person" type="ns1:Individual" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>Представитель юридического лица</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+		</xs:sequence>
+	</xs:complexType>
+	<xs:complexType name="Individual">
+		<xs:annotation>
+			<xs:documentation>Физическое лицо</xs:documentation>
+		</xs:annotation>
+		<xs:sequence>
+			<xs:element name="surname" type="xs:string">
+				<xs:annotation>
+					<xs:documentation>Фамилия</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="first_name" type="xs:string">
+				<xs:annotation>
+					<xs:documentation>Имя</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="patronymic" type="xs:string" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>Отчество</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="address" type="ns1:Address">
+				<xs:annotation>
+					<xs:documentation>Адрес регистрации</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="fact_address" type="ns1:Address" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>Адрес фактического проживания</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="email" type="xs:string" minOccurs="0" maxOccurs="unbounded">
+				<xs:annotation>
+					<xs:documentation>Адрес электронной почты</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="birthdate" type="xs:date" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>Дата рождения</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="passport_serial" type="xs:string" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>Серия паспорта</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="passport_number" type="xs:string" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>№ паспорта</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="passport_agency" type="xs:string" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>Кем выдан паспорт</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="passport_date" type="xs:date" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>Дата выдачи паспорта</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="phone" type="xs:string" minOccurs="0" maxOccurs="unbounded">
+				<xs:annotation>
+					<xs:documentation>телефон</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="inn" type="xs:string" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>ИНН</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="sex" type="ns1:Sex" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>Пол</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="snils" type="xs:string" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>СНИЛС</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+		</xs:sequence>
+	</xs:complexType>
+</xs:schema>
