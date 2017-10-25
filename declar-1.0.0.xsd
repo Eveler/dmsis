@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- edited with XMLSpy v2008 sp1 (http://www.altova.com) by i (EMBRACE) -->
-<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:vc="http://www.w3.org/2007/XMLSchema-versioning" xmlns:ns1="augo/smev/uslugi/1.0.0" targetNamespace="augo/smev/uslugi/1.0.0" elementFormDefault="qualified" attributeFormDefault="unqualified" vc:minVersion="1.1">
+<!-- edited with XMLSpy v2011 rel. 2 (http://www.altova.com) by TeaM DJiNN (TeaM DJiNN) -->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:vc="http://www.w3.org/2007/XMLSchema-versioning" xmlns:ns1="urn://augo/smev/uslugi/1.0.0" targetNamespace="urn://augo/smev/uslugi/1.0.0" elementFormDefault="qualified" attributeFormDefault="unqualified" vc:minVersion="1.1">
 	<xs:element name="declar">
 		<xs:annotation>
 			<xs:documentation>Информация по обращению заявителя</xs:documentation>
@@ -59,41 +59,45 @@
 						<xs:documentation>Дополнительный параметр</xs:documentation>
 					</xs:annotation>
 					<xs:complexType>
-						<xs:attribute name="type" use="required">
-							<xs:annotation>
-								<xs:documentation>тип значения параметра: Boolean или Integer или Double или Date или DateTime или String</xs:documentation>
-							</xs:annotation>
-						</xs:attribute>
-						<xs:attribute name="id" use="required">
-							<xs:annotation>
-								<xs:documentation>внутренний идентификатор параметра (только цифры и латинсуие символы, начинается с символа)</xs:documentation>
-							</xs:annotation>
-						</xs:attribute>
-						<xs:attribute name="label">
-							<xs:annotation>
-								<xs:documentation>читаемое человеком наименование параметра</xs:documentation>
-							</xs:annotation>
-						</xs:attribute>
-						<xs:attribute name="rowNumber">
-							<xs:annotation>
-								<xs:documentation>если значение параметра - массив, количество строк массива</xs:documentation>
-							</xs:annotation>
-						</xs:attribute>
-						<xs:attribute name="colNumber">
-							<xs:annotation>
-								<xs:documentation>если значение параметра - массив, количество столбцов массива</xs:documentation>
-							</xs:annotation>
-						</xs:attribute>
-						<xs:attribute name="rowDelimiter">
-							<xs:annotation>
-								<xs:documentation>символ - разделитель строк массива</xs:documentation>
-							</xs:annotation>
-						</xs:attribute>
-						<xs:attribute name="colDelimiter">
-							<xs:annotation>
-								<xs:documentation>символ - разделитель колонок массива</xs:documentation>
-							</xs:annotation>
-						</xs:attribute>
+						<xs:simpleContent>
+							<xs:extension base="xs:string">
+								<xs:attribute name="type" use="required">
+									<xs:annotation>
+										<xs:documentation>тип значения параметра: Boolean или Integer или Double или Date или DateTime или String</xs:documentation>
+									</xs:annotation>
+								</xs:attribute>
+								<xs:attribute name="id" use="required">
+									<xs:annotation>
+										<xs:documentation>внутренний идентификатор параметра (только цифры и латинсуие символы, начинается с символа)</xs:documentation>
+									</xs:annotation>
+								</xs:attribute>
+								<xs:attribute name="label">
+									<xs:annotation>
+										<xs:documentation>читаемое человеком наименование параметра</xs:documentation>
+									</xs:annotation>
+								</xs:attribute>
+								<xs:attribute name="rowNumber">
+									<xs:annotation>
+										<xs:documentation>если значение параметра - массив, количество строк массива</xs:documentation>
+									</xs:annotation>
+								</xs:attribute>
+								<xs:attribute name="colNumber">
+									<xs:annotation>
+										<xs:documentation>если значение параметра - массив, количество столбцов массива</xs:documentation>
+									</xs:annotation>
+								</xs:attribute>
+								<xs:attribute name="rowDelimiter">
+									<xs:annotation>
+										<xs:documentation>символ - разделитель строк массива</xs:documentation>
+									</xs:annotation>
+								</xs:attribute>
+								<xs:attribute name="colDelimiter">
+									<xs:annotation>
+										<xs:documentation>символ - разделитель колонок массива</xs:documentation>
+									</xs:annotation>
+								</xs:attribute>
+							</xs:extension>
+						</xs:simpleContent>
 					</xs:complexType>
 				</xs:element>
 			</xs:sequence>
@@ -464,6 +468,67 @@
 			<xs:element name="snils" type="xs:string" minOccurs="0">
 				<xs:annotation>
 					<xs:documentation>СНИЛС</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+		</xs:sequence>
+	</xs:complexType>
+	<xs:complexType name="requestResponse">
+		<xs:annotation>
+			<xs:documentation>Ответ на запрос</xs:documentation>
+		</xs:annotation>
+		<xs:sequence>
+			<xs:element name="declar_number" type="xs:string">
+				<xs:annotation>
+					<xs:documentation>№ дела (обращения)</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="register_date" type="xs:date">
+				<xs:annotation>
+					<xs:documentation>Дата регистрации запроса</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="result">
+				<xs:annotation>
+					<xs:documentation>Результат регистрации запроса</xs:documentation>
+				</xs:annotation>
+				<xs:simpleType>
+					<xs:restriction base="xs:string">
+						<xs:enumeration value="ACCEPTED">
+							<xs:annotation>
+								<xs:documentation>Принято в работу</xs:documentation>
+							</xs:annotation>
+						</xs:enumeration>
+						<xs:enumeration value="INTERMEDIATE">
+							<xs:annotation>
+								<xs:documentation>Промежуточный ответ</xs:documentation>
+							</xs:annotation>
+						</xs:enumeration>
+						<xs:enumeration value="INFO">
+							<xs:annotation>
+								<xs:documentation>Информация об изменении статуса обработки запроса</xs:documentation>
+							</xs:annotation>
+						</xs:enumeration>
+						<xs:enumeration value="ERROR">
+							<xs:annotation>
+								<xs:documentation>Ошибка обработки запроса</xs:documentation>
+							</xs:annotation>
+						</xs:enumeration>
+						<xs:enumeration value="FINAL">
+							<xs:annotation>
+								<xs:documentation>Окончательный результат</xs:documentation>
+							</xs:annotation>
+						</xs:enumeration>
+					</xs:restriction>
+				</xs:simpleType>
+			</xs:element>
+			<xs:element name="text" type="xs:string" minOccurs="0">
+				<xs:annotation>
+					<xs:documentation>Сообщение пользователю</xs:documentation>
+				</xs:annotation>
+			</xs:element>
+			<xs:element name="AppliedDocument" type="ns1:AppliedDocument" minOccurs="0" maxOccurs="unbounded">
+				<xs:annotation>
+					<xs:documentation>Документ для выдачи заявителю</xs:documentation>
 				</xs:annotation>
 			</xs:element>
 		</xs:sequence>
