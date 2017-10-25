@@ -1,12 +1,11 @@
 # -*- coding: utf-8 -*-
 from datetime import datetime
-import logging
 from xml.dom.minidom import Document
 
-from suds.client import Client
+# from suds.client import Client
+from soapfish import wsdl2py
 
-
-__author__ = 'Savenko'
+__author__ = 'Eveler'
 
 
 class DocumentRequisites:
@@ -27,20 +26,21 @@ class HumanRequisites:
 
 
 class IntegrationServices:
-    def __init__(self, cfg):
-        do_write = False
-        if not cfg.has_section("directum"):
-            cfg.add_section("directum")
-            do_write = True
-        if not cfg.has_option("directum", "wsdl"):
-            cfg.set("directum", "wsdl", "http://192.168.1.5:8082/IntegrationService.svc?singleWsdl")
-            do_write = True
-
-        if do_write:
-            with open("./integration.ini", "w") as configfile:
-                cfg.write(configfile)
-                configfile.close()
-        self.proxy = Client(cfg.get("directum", "wsdl"))
+    def __init__(self, wsdl):
+        # do_write = False
+        # if not cfg.has_section("directum"):
+        #     cfg.add_section("directum")
+        #     do_write = True
+        # if not cfg.has_option("directum", "wsdl"):
+        #     cfg.set("directum", "wsdl", "http://192.168.1.5:8082/IntegrationService.svc?singleWsdl")
+        #     do_write = True
+        #
+        # if do_write:
+        #     with open("./integration.ini", "w") as configfile:
+        #         cfg.write(configfile)
+        #         configfile.close()
+        # self.proxy = Client(cfg.get("directum", "wsdl"))
+        self.srv = wsdl2py.generate_code_from_wsdl(wsdl, 'client')
 
     def run_script(self, script_name, params):
         keys_values = self.proxy.factory.create('ns2:ArrayOfKeyValueOfstringstring')
@@ -82,95 +82,18 @@ class IntegrationServices:
         requisite.appendChild(text)
         section.appendChild(requisite)
 
-        # if requisites.org_directum_id:
-        #     # "Подразделение-корреспондент"
-        #     requisite = xml_package.createElement("Requisite")
-        #     requisite.setAttribute("Name", u"Подразделение2")
-        #     requisite.setAttribute("Type", "Reference")
-        #     requisite.setAttribute("ReferenceName", u"ПОД")
-        #     text = xml_package.createTextNode('106759')  # ID записи "Управление градостроительства"
-        #     requisite.appendChild(text)
-        #     section.appendChild(requisite)
-        #
-        #     # "Наша организация"
-        #     requisite = xml_package.createElement("Requisite")
-        #     requisite.setAttribute("Name", "OurOrg2")
-        #     requisite.setAttribute("Type", "Reference")
-        #     requisite.setAttribute("ReferenceName", u"НОР")
-        #     text = xml_package.createTextNode('38838')  # ID записи "Администрация Уссурийского городского округа"
-        #     requisite.appendChild(text)
-        #     section.appendChild(requisite)
-        #
-        #     # "Организация-корреспондент"
-        #     requisite = xml_package.createElement("Requisite")
-        #     requisite.setAttribute("Name", u"Организация")
-        #     requisite.setAttribute("Type", "Reference")
-        #     requisite.setAttribute("ReferenceName", u"ОРГ")
-        #     text = xml_package.createTextNode(requisites.org_directum_id)
-        #     requisite.appendChild(text)
-        #     section.appendChild(requisite)
-        #
-        #     # "Содержание документа"
-        #     requisite = xml_package.createElement("Requisite")
-        #     requisite.setAttribute("Name", "ISBEDocContent")
-        #     requisite.setAttribute("Type", "String")
-        #     text = xml_package.createTextNode(requisites.name)
-        #     requisite.appendChild(text)
-        #     section.appendChild(requisite)
-        #
-        #     # "Корреспондент"
-        #     requisite = xml_package.createElement("Requisite")
-        #     requisite.setAttribute("Name", u"Дополнение2")
-        #     requisite.setAttribute("Type", "String")
-        #     text = xml_package.createTextNode(requisites.org_directum_id)
-        #     requisite.appendChild(text)
-        #     section.appendChild(requisite)
-        # elif requisites.human_name:
-        if requisites.human_name:
-            # "Содержание документа"
-            requisite = xml_package.createElement("Requisite")
-            requisite.setAttribute("Name", "ISBEDocNote")
-            requisite.setAttribute("Type", "String")
-            text = xml_package.createTextNode(requisites.name)
-            requisite.appendChild(text)
-            section.appendChild(requisite)
-
-            # "Рег. №"
-            requisite = xml_package.createElement("Requisite")
-            requisite.setAttribute("Name", u"Дополнение2")
-            requisite.setAttribute("Type", "String")
-            text = xml_package.createTextNode(requisites.number)
-            requisite.appendChild(text)
-            section.appendChild(requisite)
-
-            # "Дата регистрации"
-            requisite = xml_package.createElement("Requisite")
-            requisite.setAttribute("Name", "Date2")
-            requisite.setAttribute("Type", "Date")
-            text = xml_package.createTextNode(requisites.date.strftime('%d.%m.%Y'))
-            requisite.appendChild(text)
-            section.appendChild(requisite)
-        else:
-            # "№ ведущего документа"
-            requisite = xml_package.createElement("Requisite")
-            requisite.setAttribute("Name", "NumberEDoc")
-            requisite.setAttribute("Type", "Date")
-            text = xml_package.createTextNode(requisites.number)
-            requisite.appendChild(text)
-            section.appendChild(requisite)
+        # "№ ведущего документа"
+        requisite = xml_package.createElement("Requisite")
+        requisite.setAttribute("Name", "NumberEDoc")
+        requisite.setAttribute("Type", "Date")
+        text = xml_package.createTextNode(requisites.number)
+        requisite.appendChild(text)
+        section.appendChild(requisite)
 
         obj = xml_package.createElement("Object")
         obj.setAttribute("Type", "EDocument")  # Задаем атрибут "Тип"
-        # if requisites.org_directum_id:
-        #     obj.setAttribute("TKED", u"ПСВ_new")  # Задаем атрибут "Тип карточки электронного документа"
-        #     obj.setAttribute("VED", u"Г000035")  # Задаем атрибут "Вид электронного документа"
-        # elif requisites.human_name:
-        if requisites.human_name:
-            obj.setAttribute("TKED", u"ТКД_ОГ")  # Задаем атрибут "Тип карточки электронного документа"
-            obj.setAttribute("VED", u"ВЭД_ОГ")  # Задаем атрибут "Вид электронного документа"
-        else:
-            obj.setAttribute("TKED", u"ТКД_ПРОЧИЕ")  # Задаем атрибут "Тип карточки электронного документа"
-            obj.setAttribute("VED", u"ПРОЧЕЕ")  # Задаем атрибут "Вид электронного документа"
+        obj.setAttribute("TKED", u"ТКД_ПРОЧИЕ")  # Задаем атрибут "Тип карточки электронного документа"
+        obj.setAttribute("VED", u"ПРОЧЕЕ")  # Задаем атрибут "Вид электронного документа"
         obj.setAttribute("Name", requisites.name)  # Задаем атрибут "Наименование документа"
         obj.setAttribute("Editor", editor)  # Задаем атрибут "Код приложения-редактора"
         obj.appendChild(section)
