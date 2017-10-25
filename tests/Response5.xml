@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ns1:requestResponse xsi:schemaLocation="urn://augo/smev/uslugi/1.0.0 declar-1.0.0.xsd" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:ns1="urn://augo/smev/uslugi/1.0.0">
+                           <ns1:declar_number>23156/564/5611Д</ns1:declar_number>
+                           <ns1:register_date>2008-09-29</ns1:register_date>
+                           <ns1:result>FINAL</ns1:result>
+                          <ns1:AppliedDocument>
+                            <ns1:title>Постановление</ns1:title>
+                            <ns1:number>1263-НПА</ns1:number>
+                            <ns1:date>2008-10-10</ns1:date>
+                            <ns1:url>https://123.45.67.89/download/AE4567BC</ns1:url>
+                            <ns1:url_valid_until>2008-10-15T01:41:17.783+04:00</ns1:url_valid_until>
+                          </ns1:AppliedDocument>
+</ns1:requestResponse>

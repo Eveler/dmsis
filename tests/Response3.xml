@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ns1:requestResponse xsi:schemaLocation="urn://augo/smev/uslugi/1.0.0 declar-1.0.0.xsd" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:ns1="urn://augo/smev/uslugi/1.0.0">
+                           <ns1:declar_number>23156/564/5611Д</ns1:declar_number>
+                           <ns1:register_date>2008-09-29</ns1:register_date>
+                           <ns1:result>INFO</ns1:result>
+                          	<ns1:text>Решение отправлено на согласование</ns1:text>
+</ns1:requestResponse>
