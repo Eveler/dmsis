@@ -34,3 +34,6 @@
 [submodule "3dparty/cached-property"]
 	path = 3dparty/cached-property
 	url = https://github.com/pydanny/cached-property.git
+[submodule "3dparty/isodate"]
+	path = 3dparty/isodate
+	url = https://github.com/gweis/isodate.git
