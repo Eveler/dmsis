@@ -37,3 +37,6 @@
 [submodule "3dparty/isodate"]
 	path = 3dparty/isodate
 	url = https://github.com/gweis/isodate.git
+[submodule "3dparty/pytz"]
+	path = 3dparty/pytz
+	url = https://git.launchpad.net/pytz
