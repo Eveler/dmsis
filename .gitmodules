@@ -40,3 +40,6 @@
 [submodule "3dparty/pytz"]
 	path = 3dparty/pytz
 	url = https://git.launchpad.net/pytz
+[submodule "3dparty/requests_toolbelt-repo"]
+	path = 3dparty/requests_toolbelt-repo
+	url = https://github.com/requests/toolbelt.git
