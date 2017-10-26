@@ -31,3 +31,6 @@
 [submodule "3dparty/defusedxml"]
 	path = 3dparty/defusedxml
 	url = https://github.com/tiran/defusedxml.git
+[submodule "3dparty/cached-property"]
+	path = 3dparty/cached-property
+	url = https://github.com/pydanny/cached-property.git
