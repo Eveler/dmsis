@@ -25,3 +25,6 @@
 [submodule "3dparty/urllib3-repo"]
 	path = 3dparty/urllib3-repo
 	url = https://github.com/shazow/urllib3.git
+[submodule "3dparty/zeep-repo"]
+	path = 3dparty/zeep-repo
+	url = https://github.com/mvantellingen/python-zeep.git

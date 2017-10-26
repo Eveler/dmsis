@@ -218,3 +218,9 @@ class IntegrationServices:
         if res:
             raise Exception(res)
         return res
+
+
+if __name__ == '__main__':
+    from zeep import Client
+    client = Client("http://snadb:8082/IntegrationService.svc?singleWsdl")
+    print(client)
