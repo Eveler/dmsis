@@ -2,8 +2,6 @@
 from datetime import datetime
 from xml.dom.minidom import Document
 
-# from suds.client import Client
-from soapfish import wsdl2py
 
 __author__ = 'Eveler'
 
@@ -222,5 +220,27 @@ class IntegrationServices:
 
 if __name__ == '__main__':
     from zeep import Client
-    client = Client("http://snadb:8082/IntegrationService.svc?singleWsdl")
-    print(client)
+    wsdl = "http://servdir1:8083/IntegrationService.svc?singleWsdl"
+    client = Client(wsdl)
+    print(client.service.GetReferenceFormInfo("ДПУ"), end="\n\n\n")
+
+    search_pak = """
+        <Search ReferenceName="РАБ" Type="Reference">
+           <Select/>
+             <!--<Requisite Name="Наименование"/>
+           </Select>-->
+           <Where>
+             <And>
+             <!--<Or>-->
+               <!--<Like Requisite="Подразделение" Value="%админ%"/>-->
+               <Like Requisite="Наименование" Value="%Сав%"/>
+             <!--</Or>-->
+               <Eq Requisite="Состояние" Value="Действующая"/>
+             </And>
+           </Where>
+           <OrderBy>
+             <Requisite Ascending="True" Name="Наименование"/>
+           </OrderBy>
+         </Search>
+    """
+    print(client.service.Search(search_pak))
