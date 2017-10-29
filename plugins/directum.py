@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 from datetime import datetime
 from xml.dom.minidom import Document
+from xml.etree.ElementTree import fromstring
 
+from zeep import Client
 
 __author__ = 'Eveler'
 
@@ -38,10 +40,11 @@ class IntegrationServices:
         #         cfg.write(configfile)
         #         configfile.close()
         # self.proxy = Client(cfg.get("directum", "wsdl"))
-        self.srv = wsdl2py.generate_code_from_wsdl(wsdl, 'client')
+        self.proxy = Client(wsdl)
 
     def run_script(self, script_name, params):
-        keys_values = self.proxy.factory.create('ns2:ArrayOfKeyValueOfstringstring')
+        keys_values = self.proxy.factory.create(
+            'ns2:ArrayOfKeyValueOfstringstring')
         for key, value in params:
             param = {'Key': key, 'Value': value}
             keys_values.KeyValueOfstringstring.append(param)
@@ -90,10 +93,14 @@ class IntegrationServices:
 
         obj = xml_package.createElement("Object")
         obj.setAttribute("Type", "EDocument")  # Задаем атрибут "Тип"
-        obj.setAttribute("TKED", u"ТКД_ПРОЧИЕ")  # Задаем атрибут "Тип карточки электронного документа"
-        obj.setAttribute("VED", u"ПРОЧЕЕ")  # Задаем атрибут "Вид электронного документа"
-        obj.setAttribute("Name", requisites.name)  # Задаем атрибут "Наименование документа"
-        obj.setAttribute("Editor", editor)  # Задаем атрибут "Код приложения-редактора"
+        obj.setAttribute("TKED",
+                         u"ТКД_ПРОЧИЕ")  # Задаем атрибут "Тип карточки электронного документа"
+        obj.setAttribute("VED",
+                         u"ПРОЧЕЕ")  # Задаем атрибут "Вид электронного документа"
+        obj.setAttribute("Name",
+                         requisites.name)  # Задаем атрибут "Наименование документа"
+        obj.setAttribute("Editor",
+                         editor)  # Задаем атрибут "Код приложения-редактора"
         obj.appendChild(section)
 
         dataexchangepackage = xml_package.createElement("DataExchangePackage")
@@ -107,7 +114,8 @@ class IntegrationServices:
 
         document = self.proxy.factory.create('ns2:ArrayOfbase64Binary')
         document.base64Binary = base64_encode(data)[0]
-        res = self.proxy.service.EDocumentsCreate(XMLPackage=package, Documents=document)
+        res = self.proxy.service.EDocumentsCreate(XMLPackage=package,
+                                                  Documents=document)
         if res.string[0][0] == "1":
             raise Exception(res.string[0][2:])
         return res.string[0][2:]
@@ -199,7 +207,8 @@ class IntegrationServices:
 
         obj = xml_package.createElement("Object")
         obj.setAttribute("Type", "Reference")  # Задаем атрибут "Тип"
-        obj.setAttribute("Name", u'ПРС')  # Задаем атрибут "Наименование документа"
+        obj.setAttribute("Name",
+                         u'ПРС')  # Задаем атрибут "Наименование документа"
         obj.appendChild(rec)
 
         dataexchangepackage = xml_package.createElement("DataExchangePackage")
@@ -209,7 +218,8 @@ class IntegrationServices:
 
         package = xml_package.toxml(encoding='utf-8').decode('utf-8')
 
-        res = self.proxy.service.ReferencesUpdate(XMLPackage=package, ISCode='', FullSync=True)
+        res = self.proxy.service.ReferencesUpdate(XMLPackage=package, ISCode='',
+                                                  FullSync=True)
         params = [('Param', human.id),
                   ('ReferName', u'ПРС')]
         res = self.run_script('CheckDuplicateByCode', params)
@@ -217,30 +227,54 @@ class IntegrationServices:
             raise Exception(res)
         return res
 
+    # FIXME: Math criteria
+    def search_ref(self, ref_name, criteria={}):
+        """
+        Call search on reference :ref_name:
+        :param ref_name: Name of directum reference
+        :param criteria:
+        :return:
+        """
+        search_pak = Document()
+        search = search_pak.createElement('Search')
+        search.setAttribute('Type', 'Reference')
+        search.setAttribute('ReferenceName', ref_name)
+
+        select = search_pak.createElement('Select')
+        search.appendChild(select)
+
+        where = search_pak.createElement('Where')
+
+        e_and = search_pak.createElement('And')
+        for req, val in criteria.items():
+            if '%' in val:
+                like = search_pak.createElement('Like')
+                like.setAttribute('Requisite', req)
+                like.setAttribute('Value', val)
+                e_and.appendChild(like)
+            else:
+                eq = search_pak.createElement('Eq')
+                eq.setAttribute('Requisite', req)
+                eq.setAttribute('Value', val)
+                e_and.appendChild(eq)
+        where.appendChild(e_and)
+
+        search.appendChild(where)
+
+        order = search_pak.createElement('OrderBy')
+        search.appendChild(order)
+
+        search_pak.appendChild(search)
+
+        xml_doc = search_pak.toxml(encoding='utf-8')
+        xml_doc = fromstring(self.proxy.service.Search(xml_doc))
+        return [{req.get('Name'): req.text for req in elem.iter('Requisite')}
+                for elem in xml_doc.iter('Record')]
+
 
 if __name__ == '__main__':
-    from zeep import Client
     wsdl = "http://servdir1:8083/IntegrationService.svc?singleWsdl"
-    client = Client(wsdl)
-    print(client.service.GetReferenceFormInfo("ДПУ"), end="\n\n\n")
-
-    search_pak = """
-        <Search ReferenceName="РАБ" Type="Reference">
-           <Select/>
-             <!--<Requisite Name="Наименование"/>
-           </Select>-->
-           <Where>
-             <And>
-             <!--<Or>-->
-               <!--<Like Requisite="Подразделение" Value="%админ%"/>-->
-               <Like Requisite="Наименование" Value="%Сав%"/>
-             <!--</Or>-->
-               <Eq Requisite="Состояние" Value="Действующая"/>
-             </And>
-           </Where>
-           <OrderBy>
-             <Requisite Ascending="True" Name="Наименование"/>
-           </OrderBy>
-         </Search>
-    """
-    print(client.service.Search(search_pak))
+    dis = IntegrationServices(wsdl)
+    res = dis.search_ref('РАБ', {'Наименование': "%Сав%"})
+    for i in res:
+        print(i.get('ИД'))
