@@ -26,6 +26,9 @@ class HumanRequisites:
 
 
 class IntegrationServices:
+    REF = 0
+    DOC = 1
+
     def __init__(self, wsdl):
         # do_write = False
         # if not cfg.has_section("directum"):
@@ -109,6 +112,7 @@ class IntegrationServices:
         xml_package.appendChild(dataexchangepackage)
 
         package = xml_package.toxml(encoding='utf-8').decode('utf-8')
+        xml_package.unlink()
 
         from encodings.base64_codec import base64_encode
 
@@ -217,6 +221,7 @@ class IntegrationServices:
         xml_package.appendChild(dataexchangepackage)
 
         package = xml_package.toxml(encoding='utf-8').decode('utf-8')
+        xml_package.unlink()
 
         res = self.proxy.service.ReferencesUpdate(XMLPackage=package, ISCode='',
                                                   FullSync=True)
@@ -227,37 +232,39 @@ class IntegrationServices:
             raise Exception(res)
         return res
 
-    # FIXME: Math criteria
-    def search_ref(self, ref_name, criteria={}):
+    def search(self, code, criteria, tp=REF):
         """
-        Call search on reference :ref_name:
-        :param ref_name: Name of directum reference
-        :param criteria:
-        :return:
+        Call search
+
+        :param str code: Name of directum object
+
+        :param str criteria: Criteria like SQL WHERE clause: 'par1=val1 and (par2=val2 or par3 like val3)'
+
+        :param int tp: If equal to `IntegrationServices.REF` search on directum reference else on document
+
+        :return: list of dict
         """
         search_pak = Document()
         search = search_pak.createElement('Search')
-        search.setAttribute('Type', 'Reference')
-        search.setAttribute('ReferenceName', ref_name)
+        if tp:
+            search.setAttribute('Type', 'EDocument')
+            search.setAttribute('CardType', code)
+        else:
+            search.setAttribute('Type', 'Reference')
+            search.setAttribute('ReferenceName', code)
 
         select = search_pak.createElement('Select')
         search.appendChild(select)
 
         where = search_pak.createElement('Where')
 
-        e_and = search_pak.createElement('And')
-        for req, val in criteria.items():
-            if '%' in val:
-                like = search_pak.createElement('Like')
-                like.setAttribute('Requisite', req)
-                like.setAttribute('Value', val)
-                e_and.appendChild(like)
-            else:
-                eq = search_pak.createElement('Eq')
-                eq.setAttribute('Requisite', req)
-                eq.setAttribute('Value', val)
-                e_and.appendChild(eq)
-        where.appendChild(e_and)
+        elem = self.__search_crit_parser(criteria)
+        if elem.tagName != 'And' and not tp:
+            e_and = search_pak.createElement('And')
+            e_and.appendChild(elem)
+            where.appendChild(e_and)
+        else:
+            where.appendChild(elem)
 
         search.appendChild(where)
 
@@ -267,14 +274,114 @@ class IntegrationServices:
         search_pak.appendChild(search)
 
         xml_doc = search_pak.toxml(encoding='utf-8')
-        xml_doc = fromstring(self.proxy.service.Search(xml_doc))
-        return [{req.get('Name'): req.text for req in elem.iter('Requisite')}
-                for elem in xml_doc.iter('Record')]
+        search_pak.unlink()
+        res = self.proxy.service.Search(xml_doc)
+        xml_doc = fromstring(res)
+        if tp:
+            return [{req: elem.get(req)
+                     for req in ('Editor', 'Extension', 'Type', 'Name', 'ID',
+                                 'VED', 'TKED')}
+                    for elem in xml_doc.iter('Object')]
+        else:
+            return [{req.get('Name'): req.text for req in elem.iter('Requisite')}
+                    for elem in xml_doc.iter('Record')]
+
+    def __search_crit_parser(self, criteria):
+        """
+        Recursively parses `criteria` to XML Element
+
+        :param str criteria: Criteria like SQL WHERE clause
+
+        :return: xml.dom.minidom.Element
+        """
+
+        def get_val(crt, idx):
+            v = crt[idx:-1] if crt.endswith(')') else criteria[idx:]
+            # Remove string quotes
+            if v[0] == "'" and v.endswith("'"):
+                v = v[1:-1]
+            return v
+
+        doc = Document()
+        # if criteria[0] == '(' and criteria.endswith(')'):
+        #     criteria = criteria[1:-1]
+        if '(' in criteria:
+            idx = criteria.index('(')
+            idx2 = criteria.index(')')
+            cnt = criteria.count('(', idx + 1, idx2)
+            while cnt:
+                idx2 = criteria.index(')', __end=idx2 - 1)
+                cnt = criteria.count('(', idx + 1, idx2)
+            quoted = criteria[idx:criteria.index(')') + 1]
+            criteria = criteria.replace(quoted, '').strip()
+            elem = self.__search_crit_parser(criteria)
+            elem.appendChild(self.__search_crit_parser(quoted[1:-1].strip()))
+            doc.unlink()
+            return elem
+        if 'and' in criteria.lower():
+            if 'AND' in criteria:
+                first, second = criteria.split('AND', 1)
+            else:
+                first, second = criteria.split('and', 1)
+            first, second = first.strip(), second.strip()
+            elem = doc.createElement('And')
+            if first:
+                elem.appendChild(self.__search_crit_parser(first))
+            if second:
+                elem.appendChild(self.__search_crit_parser(second))
+            doc.unlink()
+            return elem
+        if 'or' in criteria.lower():
+            if 'OR' in criteria:
+                first, second = criteria.split('OR', 1)
+            else:
+                first, second = criteria.split('or', 1)
+            first, second = first.strip(), second.strip()
+            elem = doc.createElement('Or')
+            if first:
+                elem.appendChild(self.__search_crit_parser(first))
+            if second:
+                elem.appendChild(self.__search_crit_parser(second))
+            doc.unlink()
+            return elem
+        if 'like' in criteria.lower():
+            if 'LIKE' in criteria.lower():
+                idx = criteria.index('LIKE')
+            else:
+                idx = criteria.index('like')
+            elem = doc.createElement('Like')
+            elem.setAttribute('Requisite', criteria[:idx - 1].strip())
+            elem.setAttribute('Value', get_val(criteria, idx + 5))
+            doc.unlink()
+            return elem
+        if '=' in criteria:
+            idx = criteria.index('=')
+            elem = doc.createElement('Eq')
+            elem.setAttribute('Requisite', criteria[:idx].strip())
+            elem.setAttribute('Value', get_val(criteria, idx + 1))
+            doc.unlink()
+            return elem
+        if '<>' in criteria:
+            idx = criteria.index('<>')
+            elem = doc.createElement('NEq')
+            elem.setAttribute('Requisite', criteria[:idx].strip())
+            elem.setAttribute('Value', get_val(criteria, idx + 2))
+            doc.unlink()
+            return elem
 
 
 if __name__ == '__main__':
     wsdl = "http://servdir1:8083/IntegrationService.svc?singleWsdl"
     dis = IntegrationServices(wsdl)
-    res = dis.search_ref('РАБ', {'Наименование': "%Сав%"})
+    res = dis.search(
+        'РАБ', "Наименование like '%Сав%' and Состояние='Действующая'")
+    print('count:', len(res))
     for i in res:
         print(i.get('ИД'))
+
+    # res = dis.search('ТКД_ПРОЧИЕ', "ИД=1508559", tp=IntegrationServices.DOC)
+    res = dis.search('ТКД_ПРОЧИЕ', "Дата4='13.07.2014'",
+                     tp=IntegrationServices.DOC)
+    print('count:', len(res))
+    for i in res:
+        print(i.get('ID'))
