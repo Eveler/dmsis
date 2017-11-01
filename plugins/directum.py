@@ -263,19 +263,41 @@ class IntegrationServices:
         if len(res):
             # Добавляем отсутствующие документы
             declar_id = res[0]['ИДЗапГлавРазд']
+            doc_ids = []
             for doc in declar.AppliedDocument:
-                res = self.search(
-                    'ТКД_ПРОЧИЕ',
-                    "ISBEDocName like '%%%s%%' and NumberEDoc='%s' "
-                    "and Дата4='%s'" %
-                    (doc.title, doc.number, doc.date.strftime('%d.%m.%Y')))
+                if doc.number:
+                    s_str = "ISBEDocName like '%%%s%%' and NumberEDoc='%s' " \
+                            "and Дата4='%s'" % \
+                            (doc.title, doc.number,
+                             doc.date.strftime('%d.%m.%Y'))
+                else:
+                    s_str = "ISBEDocName like '%%%s%%' and " \
+                            "(NumberEDoc='' or NumberEDoc is null) " \
+                            "and Дата4='%s'" % \
+                            (doc.title, doc.date.strftime('%d.%m.%Y'))
+                res = self.search('ТКД_ПРОЧИЕ', s_str, tp=self.DOC)
                 if not len(res):
                     doc_data = doc_getter(doc.url, doc.file_name) \
                         if doc_getter else ('txt', '')
                     res = self.add_doc(doc, doc[1], doc_data[0])
-        return res
+                    # bind document with declar
+                    params = [('ID', declar_id), ('DocID', res)]
+                    self.run_script('BindEDocDPbyID', params)
+                    doc_ids.append(str(res))
+            # Send notification about new docs
+            if doc_ids:
+                params = [('ID', declar_id),
+                          ('Doc_IDs', ';'.join(doc_ids))]
+                self.run_script('notification_add_docs', params)
+            return res
 
         # Add new
+        # Search for applicant in Directum
+        # If not exists add new
+        # Individual
+        res = self.search('ПРС', "")
+        # LegalEntity
+
         xml_package = Document()
 
         section = xml_package.createElement("Section")
@@ -610,6 +632,40 @@ class IntegrationServices:
                 elem.appendChild(self.__search_crit_parser(second))
             doc.unlink()
             return elem
+        if 'is null' in criteria.lower():
+            if 'IS NULL' in criteria:
+                first, second = criteria.split('IS NULL', 1)
+            elif 'Is null' in criteria:
+                first, second = criteria.split('Is null', 1)
+            elif 'is Null' in criteria:
+                first, second = criteria.split('is Null', 1)
+            elif 'Is Null' in criteria:
+                first, second = criteria.split('Is Null', 1)
+            else:
+                first, second = criteria.split('is null', 1)
+            first, second = first.strip(), second.strip()
+            elem = doc.createElement('IsNull')
+            elem.setAttribute('Requisite', first)
+            doc.unlink()
+            return elem
+        if 'is not null' in criteria.lower():
+            if 'IS NOT NULL' in criteria:
+                first, second = criteria.split('IS NOT NULL', 1)
+            elif 'Is not null' in criteria:
+                first, second = criteria.split('Is not null', 1)
+            elif 'is not Null' in criteria:
+                first, second = criteria.split('is not Null', 1)
+            elif 'Is not Null' in criteria:
+                first, second = criteria.split('Is not Null', 1)
+            elif 'Is Not Null' in criteria:
+                first, second = criteria.split('Is Not Null', 1)
+            else:
+                first, second = criteria.split('is not null', 1)
+            first, second = first.strip(), second.strip()
+            elem = doc.createElement('IsNotNull')
+            elem.setAttribute('Requisite', first)
+            doc.unlink()
+            return elem
         for oper in opers.keys():
             if oper in criteria.lower():
                 idx = criteria.lower().index(oper)
@@ -622,14 +678,18 @@ class IntegrationServices:
 
 
 if __name__ == '__main__':
-    from declar import Declar
-    from soapfish import xsd
+    from declar import Declar, AppliedDocument
 
     d = Declar()
     d.declar_number = '111111'
-    dt = xsd.Date()
+    doc = AppliedDocument()
+    doc.number = ''
+    doc.date = date(2014, 9, 3)
+    doc.title = 'Адресная справка №11109 от 03.09.2014'
+    d.AppliedDocument.append(doc)
     d.register_date = date(2014, 8, 8)
     wsdl = "http://servdir1:8083/IntegrationService.svc?singleWsdl"
     dis = IntegrationServices(wsdl)
     res = dis.add_declar(d)
-    print(res[0]['ИДЗапГлавРазд'])
+    if res:
+        print(res[0])
