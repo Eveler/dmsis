@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import logging
 from datetime import date, datetime
 from xml.dom.minidom import Document
 from xml.etree.ElementTree import fromstring
@@ -126,13 +127,13 @@ class IntegrationServices:
         section = xml_package.createElement("Section")
         section.setAttribute("Index", "0")
 
-        # "Код"
-        requisite = xml_package.createElement("Requisite")
-        requisite.setAttribute("Name", u"Код")
-        requisite.setAttribute("Type", "String")
-        text = xml_package.createTextNode(human.id)
-        requisite.appendChild(text)
-        section.appendChild(requisite)
+        # # "Код"
+        # requisite = xml_package.createElement("Requisite")
+        # requisite.setAttribute("Name", u"Код")
+        # requisite.setAttribute("Type", "String")
+        # text = xml_package.createTextNode(human.id)
+        # requisite.appendChild(text)
+        # section.appendChild(requisite)
 
         # "Фамилия"
         requisite = xml_package.createElement("Requisite")
@@ -146,7 +147,7 @@ class IntegrationServices:
         requisite = xml_package.createElement("Requisite")
         requisite.setAttribute("Name", u"Дополнение2")
         requisite.setAttribute("Type", "String")
-        text = xml_package.createTextNode(human.firstname)
+        text = xml_package.createTextNode(human.first_name)
         requisite.appendChild(text)
         section.appendChild(requisite)
 
@@ -154,23 +155,24 @@ class IntegrationServices:
         requisite = xml_package.createElement("Requisite")
         requisite.setAttribute("Name", u"Дополнение3")
         requisite.setAttribute("Type", "String")
-        text = xml_package.createTextNode(human.lastname)
+        text = xml_package.createTextNode(human.patronymic)
         requisite.appendChild(text)
         section.appendChild(requisite)
 
         # "Адрес проживания"
-        requisite = xml_package.createElement("Requisite")
-        requisite.setAttribute("Name", u"Примечание")
-        requisite.setAttribute("Type", "String")
-        text = xml_package.createTextNode(human.addr)
-        requisite.appendChild(text)
-        section.appendChild(requisite)
+        if human.fact_address:
+            requisite = xml_package.createElement("Requisite")
+            requisite.setAttribute("Name", u"Примечание")
+            requisite.setAttribute("Type", "String")
+            text = xml_package.createTextNode(human.fact_address)
+            requisite.appendChild(text)
+            section.appendChild(requisite)
 
         # "Адрес регистрации"
         requisite = xml_package.createElement("Requisite")
         requisite.setAttribute("Name", u"Расписание")
         requisite.setAttribute("Type", "String")
-        text = xml_package.createTextNode(human.addr)
+        text = xml_package.createTextNode(self.__address_2_str(human.address))
         requisite.appendChild(text)
         section.appendChild(requisite)
 
@@ -186,7 +188,7 @@ class IntegrationServices:
         requisite = xml_package.createElement("Requisite")
         requisite.setAttribute("Name", u"Строка2")
         requisite.setAttribute("Type", "String")
-        text = xml_package.createTextNode(human.mail)
+        text = xml_package.createTextNode(human.email)
         requisite.appendChild(text)
         section.appendChild(requisite)
 
@@ -194,10 +196,11 @@ class IntegrationServices:
         requisite = xml_package.createElement("Requisite")
         requisite.setAttribute("Name", u"Дата")
         requisite.setAttribute("Type", "String")
-        text = xml_package.createTextNode(human.birthday)
+        text = xml_package.createTextNode(human.birthdate)
         requisite.appendChild(text)
         section.appendChild(requisite)
 
+        # Запись
         rec = xml_package.createElement("Record")
         rec.setAttribute("ID", '')
         rec.setAttribute("Action", "Change")
@@ -245,10 +248,84 @@ class IntegrationServices:
         # requisite.appendChild(text)
         # section.appendChild(requisite)
 
-    def add_declar(self, declar, doc_getter=None):
+        #  "Наименование"
+        requisite = xml_package.createElement("Requisite")
+        requisite.setAttribute("Name", u"Наименование")
+        requisite.setAttribute("Type", "String")
+        text = xml_package.createTextNode(
+            entity.name if len(entity.name) < 50 else entity.name[:49])
+        requisite.appendChild(text)
+        section.appendChild(requisite)
+
+        #  "Юрид. наименование"
+        requisite = xml_package.createElement("Requisite")
+        requisite.setAttribute("Name", u"LongString")
+        requisite.setAttribute("Type", "String")
+        text = xml_package.createTextNode(
+            entity.full_name
+            if len(entity.full_name) < 1024 else entity.full_name[:1023])
+        requisite.appendChild(text)
+        section.appendChild(requisite)
+
+        #  "ИНН"
+        requisite = xml_package.createElement("Requisite")
+        requisite.setAttribute("Name", u"ИНН")
+        requisite.setAttribute("Type", "String")
+        text = xml_package.createTextNode(
+            entity.inn if len(entity.inn) < 15 else entity.inn[:14])
+        requisite.appendChild(text)
+        section.appendChild(requisite)
+
+        #  "КПП"
+        requisite = xml_package.createElement("Requisite")
+        requisite.setAttribute("Name", u"Ед_Изм")
+        requisite.setAttribute("Type", "String")
+        text = xml_package.createTextNode(
+            entity.kpp if len(entity.kpp) < 10 else entity.kpp[:9])
+        requisite.appendChild(text)
+        section.appendChild(requisite)
+
+        #  "Юридический адрес"
+        requisite = xml_package.createElement("Requisite")
+        requisite.setAttribute("Name", u"Содержание2")
+        requisite.setAttribute("Type", "String")
+        addr = self.__address_2_str(entity.address)
+        text = xml_package.createTextNode(
+            addr if len(addr) < 255 else addr[:254])
+        requisite.appendChild(text)
+        section.appendChild(requisite)
+
+        # Запись
+        rec = xml_package.createElement("Record")
+        rec.setAttribute("ID", '')
+        rec.setAttribute("Action", "Change")
+        rec.appendChild(section)
+
+        # Запись справочника
+        obj = xml_package.createElement("Object")
+        obj.setAttribute("Type", "Reference")  # Задаем атрибут "Тип"
+        obj.setAttribute("Name", u'ОРГ')  # Организации
+        obj.appendChild(rec)
+
+        dataexchangepackage = xml_package.createElement("DataExchangePackage")
+        dataexchangepackage.appendChild(obj)
+
+        xml_package.appendChild(dataexchangepackage)
+
+        package = xml_package.toxml(encoding='utf-8').decode('utf-8')
+        xml_package.unlink()
+
+        res = self.proxy.service.ReferencesUpdate(XMLPackage=package, ISCode='',
+                                                  FullSync=True)
+        return res
+
+    def add_declar(self, declar, doc_getter=None, subdivision=106759,
+                   reg_place=108279):
         """
         Saves `declar` to Directum reference 'ДПУ' and binds `docs` to it. Creates appropriate records for 'ПРС' and 'ОРГ' if needed. If record already exists simply add not existing documents
 
+        :param reg_place:
+        :param subdivision:
         :param doc_getter:
         :param declar:
 
@@ -292,16 +369,79 @@ class IntegrationServices:
             return res
 
         # Add new
-        # Search for applicant in Directum
-        # If not exists add new
-        # Individual
-        res = self.search('ПРС', "")
-        # LegalEntity
-
         xml_package = Document()
 
         section = xml_package.createElement("Section")
         section.setAttribute("Index", "0")
+
+        # Search for applicant in Directum
+        # If not exists add new
+        # Individual
+        if len(declar.person) > 0:
+            section7 = xml_package.createElement('Section')
+            section7.setAttribute('Index', '7')
+            number = 1
+            for person in declar.person:
+                res = self.search('ПРС', "Дополнение='%s' and Дополнение2='%s' "
+                                         "and Дополнение3='%s' "
+                                         "and Расписание='%s'"
+                                         " and Состояние='Действующая'" %
+                                  (person.surname, person.first_name,
+                                   person.patronymic,
+                                   person.address.Locality + ', ' +
+                                   person.address.Housing))
+                if res:
+                    person_id = res[0].get('ИД')
+                else:
+                    res = self.add_individual(person)
+                    person_id = res
+                # "Заявитель ФЛ"
+                rec = xml_package.createElement('Record')
+                rec.setAttribute("ID", str(number))
+                number += 1
+                rec.setAttribute("Action", "Change")
+                sec = xml_package.createElement("Section")
+                sec.SetAttribute("Index", "0")
+                requisite = xml_package.createElement("Requisite")
+                requisite.setAttribute("Name", "CitizenT7")
+                requisite.setAttribute("Type", "Reference")
+                requisite.setAttribute("ReferenceName", u"ПРС")
+                text = xml_package.createTextNode(person_id)
+                requisite.appendChild(text)
+                sec.appendChild(requisite)
+                rec.appendChild(sec)
+                section7.appendChild(rec)
+
+        # LegalEntity
+        if len(declar.legal_entity):
+            section6 = xml_package.createElement('Section')
+            section6.setAttribute('Index', '6')
+            number = 1
+            for ent in declar.legal_entity:
+                res = self.search('ОРГ', "Наименование='%s'"
+                                         " and Состояние='Действующая'" %
+                                  ent.name)
+                if res:
+                    ent_id = res[0].get('ИД')
+                else:
+                    res = self.add_legal_entity(ent)
+                    ent_id = res
+                # "Заявитель ЮЛ"
+                rec = xml_package.createElement('Record')
+                rec.setAttribute("ID", str(number))
+                number += 1
+                rec.setAttribute("Action", "Change")
+                sec = xml_package.createElement("Section")
+                sec.SetAttribute("Index", "0")
+                requisite = xml_package.createElement("Requisite")
+                requisite.setAttribute("Name", "OrgT6")
+                requisite.setAttribute("Type", "Reference")
+                requisite.setAttribute("ReferenceName", u"ОРГ")
+                text = xml_package.createTextNode(ent_id)
+                requisite.appendChild(text)
+                sec.appendChild(requisite)
+                rec.appendChild(sec)
+                section6.appendChild(rec)
 
         # # "Код"
         # requisite = xml_package.createElement("Requisite")
@@ -335,11 +475,94 @@ class IntegrationServices:
         requisite.appendChild(text)
         section.appendChild(requisite)
 
+        #  "Способ доставки"
+        requisite = xml_package.createElement("Requisite")
+        requisite.setAttribute("Name", u"СпособДост")
+        requisite.setAttribute("Type", "Reference")
+        requisite.setAttribute("ReferenceName", u"СДК")
+        text = xml_package.createTextNode("826965")
+        requisite.appendChild(text)
+        section.appendChild(requisite)
+
+        #  "Адресат"
+        requisite = xml_package.createElement("Requisite")
+        requisite.setAttribute("Name", u"Подразделение")
+        requisite.setAttribute("Type", "Reference")
+        requisite.setAttribute("ReferenceName", u"ПОД")
+        text = xml_package.createTextNode(subdivision)
+        requisite.appendChild(text)
+        section.appendChild(requisite)
+
+        #  "Место регистрации"
+        requisite = xml_package.createElement("Requisite")
+        requisite.setAttribute("Name", u"МестоРег")
+        requisite.setAttribute("Type", "Reference")
+        requisite.setAttribute("ReferenceName", u"МРГ")
+        text = xml_package.createTextNode(reg_place)
+        requisite.appendChild(text)
+        section.appendChild(requisite)
+
+        #  "Статус оказания устуги"
+        requisite = xml_package.createElement("Requisite")
+        requisite.setAttribute("Name", u"ServiceState")
+        requisite.setAttribute("Type", u"Признак")
+        text = xml_package.createTextNode("Инициализация")
+        requisite.appendChild(text)
+        section.appendChild(requisite)
+
+        #  "Наша организация"
+        requisite = xml_package.createElement("Requisite")
+        requisite.setAttribute("Name", u"НашаОрг")
+        requisite.setAttribute("Type", "Reference")
+        requisite.setAttribute("ReferenceName", u"НОР")
+        text = xml_package.createTextNode("38838")
+        requisite.appendChild(text)
+        section.appendChild(requisite)
+
+        #  "Вид услуги"
+        requisite = xml_package.createElement("Requisite")
+        requisite.setAttribute("Name", u"ServiceCode")
+        requisite.setAttribute("Type", "Reference")
+        requisite.setAttribute("ReferenceName", u"ВМУ")
+        res = self.search('ВМУ', "Наименование like '%%%s%%'"
+                                 " or LongString like '%%%s%%" %
+                          (declar.service, declar.service))
+        if not len(res):
+            raise Exception("Услуга не найдена")
+        text = xml_package.createTextNode(res[0]['ИД'])
+        requisite.appendChild(text)
+        section.appendChild(requisite)
+
+        #  "Местонахождение объекта"
+        section9 = xml_package.createElement("Section")
+        section9.setAttribute("Index", "9")
+        rec = xml_package.createElement("Record")
+        rec.setAttribute("ID", "1")
+        rec.setAttribute("Action", "Change")
+        sec = xml_package.createElement("Section")
+        sec.setAttribute("Index", "0")
+        requisite = xml_package.createElement("Requisite")
+        requisite.setAttribute("Name", "LongStringT9")
+        requisite.setAttribute("Type", "String")
+        text = xml_package.createTextNode(
+            declar.object_address
+            if len(declar.object_address) < 1024
+            else declar.object_address[:1023])
+        requisite.appendChild(text)
+        sec.appendChild(requisite)
+        rec.appendChild(sec)
+        section9.appendChild(rec)
+
         # Запись
         rec = xml_package.createElement("Record")
         rec.setAttribute("ID", '')  # ИД
         rec.setAttribute("Action", "Change")
         rec.appendChild(section)
+        if len(declar.person):
+            rec.appendChild(section7)
+        if len(declar.legal_entity):
+            rec.appendChild(section6)
+        rec.appendChild(section9)
 
         # Объект
         obj = xml_package.createElement("Object")
@@ -352,155 +575,9 @@ class IntegrationServices:
 
         xml_package.appendChild(dataexchangepackage)
 
-        # 						//Формируем xml пакет по делу
-        # 						//Заносим данные по реквизиту "Способ доставки"
-        # 						XmlElement recvizitElement7 = xmlDoc.CreateElement("Requisite");//Создаем подэллемент "Реквизит"
-        # 						recvizitElement7.SetAttribute("Name", "СпособДост");
-        # 						recvizitElement7.SetAttribute("Type", "Reference");
-        # 						recvizitElement7.SetAttribute("ReferenceName", "СДК");
-        # 						recvizitElement7.InnerText = "826965";
-        # 						//Заносим данные по реквизиту "Адресат"
-        # 						XmlElement recvizitElement6 = xmlDoc.CreateElement("Requisite");//Создаем подэллемент "Реквизит"
-        # 						recvizitElement6.SetAttribute("Name", "Подразделение");
-        # 						recvizitElement6.SetAttribute("Type", "Reference");
-        # 						recvizitElement6.SetAttribute("ReferenceName", "ПОД");
-        # 						recvizitElement6.InnerText = "106759";
-        # 						//Заносим данные по реквизиту "Место регистрации"
-        # 						XmlElement recvizitElement5 = xmlDoc.CreateElement("Requisite");//Создаем подэллемент "Реквизит"
-        # 						recvizitElement5.SetAttribute("Name", "МестоРег");
-        # 						recvizitElement5.SetAttribute("Type", "Reference");
-        # 						recvizitElement5.SetAttribute("ReferenceName", "МРГ");
-        # 						recvizitElement5.InnerText = "108279";
-        # 						//Заносим данные по реквизиту "Статус оказания устуги"
-        # 						XmlElement recvizitElement8 = xmlDoc.CreateElement("Requisite");//Создаем подэллемент "Реквизит"
-        # 						recvizitElement8.SetAttribute("Name", "ServiceState");
-        # 						recvizitElement8.SetAttribute("Type", "Признак");
-        # 						DateTime datein = DateTime.Parse(declar_datein);
-        # //						if(archived || datein.Year < 2014){
-        # 						if(archived || datein < DateTime.Parse("30.06.2015")){
-        # 							recvizitElement8.InnerText = "Предоставлена";
-        # 							if(declar_enddate != string.Empty){
-        # 								XmlElement enddate = xmlDoc.CreateElement("Requisite");
-        # 								enddate.SetAttribute("Name", "Дата5");
-        # 								enddate.SetAttribute("Type", "String");
-        # 								enddate.InnerText = declar_enddate;
-        # 								sectionElement.AppendChild(enddate);
-        # 							}
-        # 						}
-        # 						else recvizitElement8.InnerText = "Инициализация";
-        # 						//Заносим данные по реквизиту "Вид услуги"
-        # 						XmlElement recvizitElement9 = xmlDoc.CreateElement("Requisite");//Создаем подэллемент "Реквизит"
-        # 						recvizitElement9.SetAttribute("Name", "ServiceCode");
-        # 						recvizitElement9.SetAttribute("Type", "Reference");
-        # 						recvizitElement9.SetAttribute("ReferenceName", "ВМУ");
-        # 						recvizitElement9.InnerText = directum_srvID;
-        # 						//Заносим данные по реквизиту "Наша организация"
-        # 						XmlElement recvizitElement10 = xmlDoc.CreateElement("Requisite");//Создаем подэллемент "Реквизит"
-        # 						recvizitElement10.SetAttribute("Name", "НашаОрг");
-        # 						recvizitElement10.SetAttribute("Type", "Reference");
-        # 						recvizitElement10.SetAttribute("ReferenceName", "НОР");
-        # 						recvizitElement10.InnerText = "38838";
-
-        #
-        # 						//Создаем секцию для адреса объекта
-        # 						XmlElement sectionElementObj = xmlDoc.CreateElement("Section");//Создаем подэллемент "Секция"
-        # 						sectionElementObj.SetAttribute("Index", "9");//Задаем атрибут "Индекс"
-        # 						XmlElement recordElementObj = xmlDoc.CreateElement("Record");//Создаем подэллемент запись
-        # 						recordElementObj.SetAttribute("ID", "1");//Задаем атрибут "ID"
-        # 						recordElementObj.SetAttribute("Action", "Change");//Задаем атрибут "Действие"
-        # 						XmlElement sectionElementObj0 = xmlDoc.CreateElement("Section");//Создаем подэллемент "Секция"
-        # 						sectionElementObj0.SetAttribute("Index", "0");//Задаем атрибут "Индекс"
-        # 						//Заносим данные по реквизиту "Местоположение объекта"
-        # 						XmlElement recvizitElementObj = xmlDoc.CreateElement("Requisite");//Создаем подэллемент "Реквизит"
-        # 						recvizitElementObj.SetAttribute("Name", "LongStringT9");
-        # 						recvizitElementObj.SetAttribute("Type", "String");
-        # 						recvizitElementObj.InnerText = object_addr.Length > 1023 ? object_addr.Substring(0, 1023) : object_addr;
-        # 						sectionElementObj0.AppendChild(recvizitElementObj);
-        # 						recordElementObj.AppendChild(sectionElementObj0);
-        # 						sectionElementObj.AppendChild(recordElementObj);
-        #
-        # 						sectionElement.AppendChild(recvizitElement1);
-        # 						sectionElement.AppendChild(recvizitElement2);
-        # 						sectionElement.AppendChild(recvizitElement3);
-        # 						sectionElement.AppendChild(recvizitElement4);
-        # 						sectionElement.AppendChild(recvizitElement5);
-        # 						sectionElement.AppendChild(recvizitElement6);
-        # 						sectionElement.AppendChild(recvizitElement7);
-        # 						sectionElement.AppendChild(recvizitElement8);
-        # 						sectionElement.AppendChild(recvizitElement9);
-        # 						sectionElement.AppendChild(recvizitElement10);
-        # 						recordElement.AppendChild(sectionElement);
-        # 						recordElement.AppendChild(sectionElementObj);
-        #
-        # 						//Создаем секцию для заявителей-физ.лиц
-        # 						XmlElement sectionElementFiz = xmlDoc.CreateElement("Section");//Создаем подэллемент "Секция"
-        # 						sectionElementFiz.SetAttribute("Index", "7");//Задаем атрибут "Индекс"
-        # 						bool haveFiz=false;//Признак начилия заявителей физ. лиц
-        #
-        # 						//Создаем секцию для заявителей - юр.лиц
-        # 						XmlElement sectionElementUr = xmlDoc.CreateElement("Section");//Создаем подэллемент "Секция"
-        # 						sectionElementUr.SetAttribute("Index", "6");//Задаем атрибут "Индекс"
-        # 						bool haveUr=false;//Признак наличия заявителей юр. лиц
-        # 						//Заносим в xml файл данные о заявителях
-        # 						for(int zayavNum=0; zayavNum<zayavDirID.Length; zayavNum++)//Перебираем массив идентификаторов заявителей
-        # 						{
-        # 							if (zayavType[zayavNum]==0)//Если заявитель - физ. лицо
-        # 							{
-        # 								XmlElement recordElementFizZay = xmlDoc.CreateElement("Record");//Создаем подэллемент запись
-        # 								recordElementFizZay.SetAttribute("ID", Convert.ToString(zayavNum+1));//Задаем атрибут "ID"
-        # 								recordElementFizZay.SetAttribute("Action", "Change");//Задаем атрибут "Действие"
-        # 								XmlElement sectionElementFizZay0 = xmlDoc.CreateElement("Section");//Создаем подэллемент "Секция"
-        # 								sectionElementFizZay0.SetAttribute("Index", "0");//Задаем атрибут "Индекс"
-        # 								//Заносим данные по реквизиту "Гражданин"
-        # 								XmlElement recvizitElementFizZay = xmlDoc.CreateElement("Requisite");//Создаем подэллемент "Реквизит"
-        # 								recvizitElementFizZay.SetAttribute("Name", "CitizenT7");
-        # 								recvizitElementFizZay.SetAttribute("Type", "Reference");
-        # 								recvizitElementFizZay.SetAttribute("ReferenceName", "ПРС");
-        # 								recvizitElementFizZay.InnerText = zayavDirID[zayavNum];
-        # 								sectionElementFizZay0.AppendChild(recvizitElementFizZay);
-        # 								recordElementFizZay.AppendChild(sectionElementFizZay0);
-        # 								sectionElementFiz.AppendChild(recordElementFizZay);
-        # 								haveFiz=true;//Фиксируем наличие заявителя физ. лица
-        # 							}
-        # 							else//Если заявитель - юридическое лицо
-        # 							{
-        # 								XmlElement recordElementURZay = xmlDoc.CreateElement("Record");//Создаем подэллемент запись
-        # 								recordElementURZay.SetAttribute("ID", Convert.ToString(zayavNum+1));//Задаем атрибут "ID"
-        # 								recordElementURZay.SetAttribute("Action", "Change");//Задаем атрибут "Действие"
-        # 								XmlElement sectionElementURZay0 = xmlDoc.CreateElement("Section");//Создаем подэллемент "Секция"
-        # 								sectionElementURZay0.SetAttribute("Index", "0");//Задаем атрибут "Индекс"
-        # 								//Заносим данные по реквизиту "Гражданин"
-        # 								XmlElement recvizitElementURZay = xmlDoc.CreateElement("Requisite");//Создаем подэллемент "Реквизит"
-        # 								recvizitElementURZay.SetAttribute("Name", "OrgT6");
-        # 								recvizitElementURZay.SetAttribute("Type", "Reference");
-        # 								recvizitElementURZay.SetAttribute("ReferenceName", "ОРГ");
-        # 								recvizitElementURZay.InnerText = zayavDirID[zayavNum];
-        # 								sectionElementURZay0.AppendChild(recvizitElementURZay);
-        # 								recordElementURZay.AppendChild(sectionElementURZay0);
-        # 								sectionElementUr.AppendChild(recordElementURZay);
-        # 								haveUr=true;//Фиксируем наличие заявителя юр. лица
-        # 							}
-        # 						}
-        #
-        # 						if(haveFiz==true)//Если есть заявители - физические лица
-        # 						{
-        # 							recordElement.AppendChild(sectionElementFiz);//Добавялем секцию к xml файлу
-        # 						}
-        # 						if(haveUr==true)//Еслие есть заявители - юридические лица
-        # 						{
-        # 							recordElement.AppendChild(sectionElementUr);//Добавляем секцию к файлу
-        # 						}
-        # 						objectElement.AppendChild(recordElement);
-        # 						dataExchangePackageElement.AppendChild(objectElement);
-        # 						xmlDoc.AppendChild(dataExchangePackageElement);
-        # 						//Заносим данные по реквизиту "Услуга платная"
-        # 						XmlElement recvizitElement4 = xmlDoc.CreateElement("Requisite");//Создаем подэллемент "Реквизит"
-        # 						recvizitElement4.SetAttribute("Name", "ДаНет");
-        # 						recvizitElement4.SetAttribute("Type", "Признак");
-        # 						recvizitElement4.InnerText = "Нет";
-
         package = xml_package.toxml(encoding='utf-8').decode('utf-8')
         xml_package.unlink()
+        return package
 
         res = self.proxy.service.ReferencesUpdate(XMLPackage=package, ISCode='',
                                                   FullSync=True)
@@ -553,6 +630,7 @@ class IntegrationServices:
         search_pak.appendChild(search)
 
         xml_doc = search_pak.toxml(encoding='utf-8')
+        logging.debug(xml_doc.decode())
         search_pak.unlink()
         res = self.proxy.service.Search(xml_doc)
         xml_doc = fromstring(res)
@@ -676,20 +754,59 @@ class IntegrationServices:
                 doc.unlink()
                 return elem
 
+    def __address_2_str(self, addr):
+        """
+        Converts `declar.Address` to str
+
+        :param addr: `declar.Address`
+
+        :return: str
+        """
+        res = ''
+        if addr.Postal_Code:
+            res = addr.Postal_Code
+        if addr.Region:
+            res += ', ' + addr.Region if res else addr.Region
+        if addr.District:
+            res += ', ' + addr.District if res else addr.District
+        if addr.City:
+            res += ', ' + addr.City if res else addr.City
+        if addr.Urban_District:
+            res += ', ' + addr.Urban_District if res else addr.Urban_District
+        if addr.Soviet_Village:
+            res += ', ' + addr.Soviet_Village if res else addr.Soviet_Village
+        res += ', ' + addr.Locality if res else addr.Locality
+        if addr.Street:
+            res += ', ' + addr.Street
+        if addr.House:
+            res += ', ' + addr.House
+        if addr.Housing:
+            res += ', ' + addr.Housing
+        if addr.Building:
+            res += ', ' + addr.Building
+        if addr.Apartment:
+            res += ', ' + addr.Apartment
+        if addr.Reference_point:
+            res += ', ' + addr.Reference_point
+        return res
+
 
 if __name__ == '__main__':
-    from declar import Declar, AppliedDocument
+    from declar import Declar, Individual, Address
 
     d = Declar()
-    d.declar_number = '111111'
-    doc = AppliedDocument()
-    doc.number = ''
-    doc.date = date(2014, 9, 3)
-    doc.title = 'Адресная справка №11109 от 03.09.2014'
-    d.AppliedDocument.append(doc)
+    d.declar_number = '1111111'
+    i = Individual()
+    i.surname = 'Бендер'
+    i.first_name = 'Остап'
+    i.patronymic = 'Ибрагимович'
+    a = Address()
+    a.Locality = 'ул. Бонивура'
+    a.Housing = '7а рег'
+    i.address = a
+    d.person.append(i)
     d.register_date = date(2014, 8, 8)
     wsdl = "http://servdir1:8083/IntegrationService.svc?singleWsdl"
     dis = IntegrationServices(wsdl)
     res = dis.add_declar(d)
-    if res:
-        print(res[0])
+    print(res)

@@ -51,9 +51,12 @@ class Address(xsd.ComplexType):
     Urban_District = xsd.Element(xsd.String, minOccurs=0)
     Soviet_Village = xsd.Element(xsd.String, minOccurs=0)
     Locality = xsd.Element(xsd.String)
+    Street = xsd.Element(xsd.String, minOccurs=0)
+    House = xsd.Element(xsd.String, minOccurs=0)
     Housing = xsd.Element(xsd.String, minOccurs=0)
     Building = xsd.Element(xsd.String, minOccurs=0)
     Apartment = xsd.Element(xsd.String, minOccurs=0)
+    Reference_point = xsd.Element(xsd.String, minOccurs=0)
 
     @classmethod
     def create(cls, Locality):
@@ -169,6 +172,8 @@ class Declar(xsd.ComplexType):
     end_date = xsd.Element(xsd.Date)
     object_address = xsd.Element(Address, minOccurs=0)
     AppliedDocument = xsd.ListElement(AppliedDocument, tagname='AppliedDocument', maxOccurs=xsd.UNBOUNDED)
+    legal_entity = xsd.ListElement(LegalEntity, minOccurs=0, tagname='legal_entity', maxOccurs=xsd.UNBOUNDED)
+    person = xsd.ListElement(Individual, minOccurs=0, tagname='legal_entity', maxOccurs=xsd.UNBOUNDED)
     confidant = xsd.Element(Individual, minOccurs=0)
 
     @classmethod
