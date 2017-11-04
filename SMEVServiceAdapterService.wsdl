@@ -1,0 +1,145 @@
+<definitions xmlns:wsu="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd" xmlns:wsp="http://www.w3.org/ns/ws-policy" xmlns:wsp1_2="http://schemas.xmlsoap.org/ws/2004/09/policy" xmlns:wsam="http://www.w3.org/2007/05/addressing/metadata" xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/" xmlns:tns="urn://x-artefacts-smev-gov-ru/services/service-adapter" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns="http://schemas.xmlsoap.org/wsdl/" targetNamespace="urn://x-artefacts-smev-gov-ru/services/service-adapter" name="SMEVServiceAdapterService">
+<wsp:Policy wsu:Id="SMEVServiceAdapterEndpointBinding_MTOM_Policy">
+<ns1:OptimizedMimeSerialization xmlns:ns1="http://schemas.xmlsoap.org/ws/2004/09/policy/optimizedmimeserialization" wsp:Optional="true"/>
+</wsp:Policy>
+<types>
+<xsd:schema>
+<xsd:import namespace="urn://x-artefacts-smev-gov-ru/services/service-adapter/types/faults" schemaLocation="http://localhost:7575/ws?xsd=1"/>
+</xsd:schema>
+<xsd:schema>
+<xsd:import namespace="urn://x-artefacts-smev-gov-ru/services/service-adapter/types" schemaLocation="http://localhost:7575/ws?xsd=2"/>
+</xsd:schema>
+</types>
+<message name="SendSyncRequest">
+<part xmlns:ns2="urn://x-artefacts-smev-gov-ru/services/service-adapter/types" name="parameters" element="ns2:SyncRequest"/>
+</message>
+<message name="SendSyncRequestResponse">
+<part xmlns:ns3="urn://x-artefacts-smev-gov-ru/services/service-adapter/types" name="parameters" element="ns3:SyncResponse"/>
+</message>
+<message name="SyncFault">
+<part xmlns:ns4="urn://x-artefacts-smev-gov-ru/services/service-adapter/types/faults" name="fault" element="ns4:SyncFault"/>
+</message>
+<message name="SystemFault">
+<part xmlns:ns5="urn://x-artefacts-smev-gov-ru/services/service-adapter/types/faults" name="fault" element="ns5:SystemFault"/>
+</message>
+<message name="ValidationFault">
+<part xmlns:ns6="urn://x-artefacts-smev-gov-ru/services/service-adapter/types/faults" name="fault" element="ns6:ValidationFault"/>
+</message>
+<message name="Get">
+<part xmlns:ns7="urn://x-artefacts-smev-gov-ru/services/service-adapter/types" name="parameters" element="ns7:MessageQuery"/>
+</message>
+<message name="GetResponse">
+<part xmlns:ns8="urn://x-artefacts-smev-gov-ru/services/service-adapter/types" name="parameters" element="ns8:QueryResult"/>
+</message>
+<message name="Find">
+<part xmlns:ns9="urn://x-artefacts-smev-gov-ru/services/service-adapter/types" name="parameters" element="ns9:FindMessageQuery"/>
+</message>
+<message name="FindResponse">
+<part xmlns:ns10="urn://x-artefacts-smev-gov-ru/services/service-adapter/types" name="parameters" element="ns10:QueryResultList"/>
+</message>
+<message name="Send">
+<part xmlns:ns11="urn://x-artefacts-smev-gov-ru/services/service-adapter/types" name="parameters" element="ns11:ClientMessage"/>
+</message>
+<message name="SendResponse">
+<part xmlns:ns12="urn://x-artefacts-smev-gov-ru/services/service-adapter/types" name="parameters" element="ns12:MessageResult"/>
+</message>
+<portType name="SMEVServiceAdapterPortType">
+<operation name="SendSyncRequest">
+<input wsam:Action="urn:SendSync" message="tns:SendSyncRequest"/>
+<output wsam:Action="urn://x-artefacts-smev-gov-ru/services/service-adapter:SMEVServiceAdapterPortType:SendSyncRequestResponse" message="tns:SendSyncRequestResponse"/>
+<fault message="tns:SyncFault" name="SyncFault" wsam:Action="urn://x-artefacts-smev-gov-ru/services/service-adapter:SMEVServiceAdapterPortType:SendSyncRequest:Fault:SyncFault"/>
+<fault message="tns:SystemFault" name="SystemFault" wsam:Action="urn://x-artefacts-smev-gov-ru/services/service-adapter:SMEVServiceAdapterPortType:SendSyncRequest:Fault:SystemFault"/>
+<fault message="tns:ValidationFault" name="ValidationFault" wsam:Action="urn://x-artefacts-smev-gov-ru/services/service-adapter:SMEVServiceAdapterPortType:SendSyncRequest:Fault:ValidationFault"/>
+</operation>
+<operation name="Get">
+<input wsam:Action="urn:Get" message="tns:Get"/>
+<output wsam:Action="urn://x-artefacts-smev-gov-ru/services/service-adapter:SMEVServiceAdapterPortType:GetResponse" message="tns:GetResponse"/>
+<fault message="tns:SystemFault" name="SystemFault" wsam:Action="urn://x-artefacts-smev-gov-ru/services/service-adapter:SMEVServiceAdapterPortType:Get:Fault:SystemFault"/>
+<fault message="tns:ValidationFault" name="ValidationFault" wsam:Action="urn://x-artefacts-smev-gov-ru/services/service-adapter:SMEVServiceAdapterPortType:Get:Fault:ValidationFault"/>
+</operation>
+<operation name="Find">
+<input wsam:Action="urn:Find" message="tns:Find"/>
+<output wsam:Action="urn://x-artefacts-smev-gov-ru/services/service-adapter:SMEVServiceAdapterPortType:FindResponse" message="tns:FindResponse"/>
+<fault message="tns:SystemFault" name="SystemFault" wsam:Action="urn://x-artefacts-smev-gov-ru/services/service-adapter:SMEVServiceAdapterPortType:Find:Fault:SystemFault"/>
+<fault message="tns:ValidationFault" name="ValidationFault" wsam:Action="urn://x-artefacts-smev-gov-ru/services/service-adapter:SMEVServiceAdapterPortType:Find:Fault:ValidationFault"/>
+</operation>
+<operation name="Send">
+<input wsam:Action="urn:Send" message="tns:Send"/>
+<output wsam:Action="urn://x-artefacts-smev-gov-ru/services/service-adapter:SMEVServiceAdapterPortType:SendResponse" message="tns:SendResponse"/>
+<fault message="tns:SystemFault" name="SystemFault" wsam:Action="urn://x-artefacts-smev-gov-ru/services/service-adapter:SMEVServiceAdapterPortType:Send:Fault:SystemFault"/>
+<fault message="tns:ValidationFault" name="ValidationFault" wsam:Action="urn://x-artefacts-smev-gov-ru/services/service-adapter:SMEVServiceAdapterPortType:Send:Fault:ValidationFault"/>
+</operation>
+</portType>
+<binding name="SMEVServiceAdapterEndpointBinding" type="tns:SMEVServiceAdapterPortType">
+<wsp:PolicyReference URI="#SMEVServiceAdapterEndpointBinding_MTOM_Policy"/>
+<soap:binding transport="http://schemas.xmlsoap.org/soap/http" style="document"/>
+<operation name="SendSyncRequest">
+<soap:operation soapAction="urn:SendSync"/>
+<input>
+<soap:body use="literal"/>
+</input>
+<output>
+<soap:body use="literal"/>
+</output>
+<fault name="SyncFault">
+<soap:fault name="SyncFault" use="literal"/>
+</fault>
+<fault name="SystemFault">
+<soap:fault name="SystemFault" use="literal"/>
+</fault>
+<fault name="ValidationFault">
+<soap:fault name="ValidationFault" use="literal"/>
+</fault>
+</operation>
+<operation name="Get">
+<soap:operation soapAction="urn:Get"/>
+<input>
+<soap:body use="literal"/>
+</input>
+<output>
+<soap:body use="literal"/>
+</output>
+<fault name="SystemFault">
+<soap:fault name="SystemFault" use="literal"/>
+</fault>
+<fault name="ValidationFault">
+<soap:fault name="ValidationFault" use="literal"/>
+</fault>
+</operation>
+<operation name="Find">
+<soap:operation soapAction="urn:Find"/>
+<input>
+<soap:body use="literal"/>
+</input>
+<output>
+<soap:body use="literal"/>
+</output>
+<fault name="SystemFault">
+<soap:fault name="SystemFault" use="literal"/>
+</fault>
+<fault name="ValidationFault">
+<soap:fault name="ValidationFault" use="literal"/>
+</fault>
+</operation>
+<operation name="Send">
+<soap:operation soapAction="urn:Send"/>
+<input>
+<soap:body use="literal"/>
+</input>
+<output>
+<soap:body use="literal"/>
+</output>
+<fault name="SystemFault">
+<soap:fault name="SystemFault" use="literal"/>
+</fault>
+<fault name="ValidationFault">
+<soap:fault name="ValidationFault" use="literal"/>
+</fault>
+</operation>
+</binding>
+<service name="SMEVServiceAdapterService">
+<port name="SMEVServiceAdapterEndpoint" binding="tns:SMEVServiceAdapterEndpointBinding">
+<soap:address location="http://localhost:7575/ws"/>
+</port>
+</service>
+</definitions>

@@ -58,6 +58,16 @@ if __name__ == '__main__':
 
     print(airport.xml('takeoff_airport', pretty_print=True))
 
+    # from soapfish.xsd2py import generate_code_from_xsd
+    # open('declar.py', 'wb').write(generate_code_from_xsd(open('declar-1.0.0.xsd', 'rb').read()))
+
+    # from soapfish.wsdl2py import generate_code_from_wsdl
+    # with open('SMEVServiceAdapterService.py', 'wb') as out, \
+    #         open('SMEVServiceAdapterService.wsdl', 'rb') as inf:
+    #     out.write(generate_code_from_wsdl(
+    #         inf.read(), 'SMEVServiceAdapterService'))
+
     from soapfish.xsd2py import generate_code_from_xsd
-    open('declar.py', 'wb').write(generate_code_from_xsd(open('declar-1.0.0.xsd', 'rb').read()))
-    pass
+    with open('smev_service_adapter.py', 'wb') as out, \
+            open('smev-service-adapter.xsd', 'rb') as inf:
+        out.write(generate_code_from_xsd(inf.read()))
