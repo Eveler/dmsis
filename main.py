@@ -38,11 +38,15 @@
 #         @rtype: The result of the addition
 #         """
 #         return a + b
+import logging
 
 import requests
 from smev import Adapter
 
 if __name__ == '__main__':
+    logging.basicConfig(level=logging.DEBUG)
+    logging.getLogger('zeep.xsd').setLevel(logging.INFO)
+    logging.getLogger('zeep.wsdl').setLevel(logging.INFO)
     #     # hello.say_hello("Cython")
     #     hellop.say_hello("Python")
 
@@ -81,8 +85,8 @@ if __name__ == '__main__':
     #         "http://smev3-d.test.gosuslugi.ru:7500/smev/v1.2/ws?wsdl").content,
     #                                       'SMEVMessageExchangeService'))
 
-    a = Adapter(history=True)
-    a.proxy.wsdl.dump()
+    a = Adapter()
+    logging.debug(a.dump())
     print(a.get_request())
     # print(a.history.last_received)
     # print('*'*40)
