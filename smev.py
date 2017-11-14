@@ -63,7 +63,8 @@ class Adapter:
         # mts = self.proxy.get_type('ns1:GetRequestRequest')()
         # mts.NamespaceURI = 'urn://augo/smev/uslugi/1.0.0'
         # mts.RootElementLocalName = 'declar'
-        sign = Signature('C:\\Users\\Администратор\\Desktop\\Подписи\\Малышева ЭП-ОВ\\le-33b9d.000\\primary.key', 'C:\\Users\\Администратор\\Desktop\\Подписи\\Малышева ЭП-ОВ\\Малышева О.В. (ЭП-ОВ).cer')
+        sign = Signature('certs/ЭП-ОВ/le-33b9d.000/primary.key',
+                         'certs/ЭП-ОВ/Малышева О.В. (ЭП-ОВ).cer')
         res = self.proxy.service.GetRequest(
             {'NamespaceURI': uri,
              'Timestamp': datetime.now()}, sign)
