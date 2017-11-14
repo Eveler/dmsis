@@ -46,3 +46,6 @@
 [submodule "3dparty/py_cpcsp"]
 	path = 3dparty/py_cpcsp
 	url = https://github.com/kuznetsovin/py_cpcsp.git
+[submodule "3dparty/xmlsec-repo"]
+	path = 3dparty/xmlsec-repo
+	url = https://github.com/mehcode/python-xmlsec.git

@@ -6,7 +6,6 @@ from xml.etree.ElementTree import fromstring
 
 from zeep import Client
 
-__author__ = 'Eveler'
 
 
 class DocumentRequisites:

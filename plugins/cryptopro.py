@@ -1,9 +1,8 @@
 # -*- encoding: utf-8 -*-
 
-# Author: Savenko Mike
 from sys import platform
-
-from comtypes.client import CreateObject
+import pythoncom
+from win32com.client import Dispatch
 
 if 'win32' not in platform:
     raise Exception('This is for Windows only')
@@ -15,4 +14,9 @@ class Crypto:
 
 
 if __name__ == '__main__':
-    oSigner = CreateObject('CAdESCOM.About')
+    pythoncom.CoInitialize()
+    # oSigner = CreateObject('CAdESCOM.About')
+    # o = Dispatch('CAPICOM.Algorithm')
+    o = Dispatch('CAdESCOM.About')
+    # o = Dispatch('Excel.Application')
+    print(o)
