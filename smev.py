@@ -5,7 +5,6 @@ from datetime import datetime
 
 from zeep.client import Client
 from zeep.plugins import HistoryPlugin
-from zeep.wsse.signature import Signature
 
 
 class Adapter:
@@ -60,11 +59,10 @@ class Adapter:
         return res
 
     def get_request(self, uri='urn://augo/smev/uslugi/1.0.0'):
-        # mts = self.proxy.get_type('ns1:GetRequestRequest')()
-        # mts.NamespaceURI = 'urn://augo/smev/uslugi/1.0.0'
         # mts.RootElementLocalName = 'declar'
-        sign = Signature('certs/ЭП-ОВ/le-33b9d.000/primary.key',
-                         'certs/ЭП-ОВ/Малышева О.В. (ЭП-ОВ).cer')
+        # sign = Signature('certs/ЭП-ОВ/le-33b9d.000/primary.key',
+        #                  'certs/ЭП-ОВ/Малышева О.В. (ЭП-ОВ).cer')
+         
         res = self.proxy.service.GetRequest(
             {'NamespaceURI': uri,
              'Timestamp': datetime.now()}, sign)
