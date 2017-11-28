@@ -42,8 +42,7 @@ import logging
 from os import environ, putenv
 
 import requests
-from smev1 import Adapter
-from smev2 import Adapter as Adapter2
+from smev import Adapter
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(levelname)s:%(module)s:%(name)s:%(lineno)d: %(message)s')
@@ -70,8 +69,6 @@ if __name__ == '__main__':
     # logging.debug(a.dump())
     print(a.get_request('urn://augo/smev/uslugi/1.0.0', 'declar'))
 
-    a = Adapter2()
-    print(a.get_request('urn://augo/smev/uslugi/1.0.0', 'declar'))
     # print(a.history.last_received)
     # print('*'*40)
     # print(a.history.last_sent)

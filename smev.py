@@ -153,7 +153,7 @@ class Adapter:
         declar = Declar.parsexml(
             etree.tostring(xml.find('.//{urn://augo/smev/uslugi/1.0.0}declar')))
 
-        if 'RefAttachmentHeaderList' in res:
+        if b'RefAttachmentHeaderList' in res:
             files = {}
             attach_head_list = objectify.fromstring(
                 self.__xml_part(res, b'RefAttachmentHeaderList'))
