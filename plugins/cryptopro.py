@@ -6,9 +6,6 @@ import tempfile
 from encodings.base64_codec import base64_encode
 from sys import platform
 
-import pythoncom
-from win32com.client import Dispatch
-
 if 'win32' not in platform:
     raise Exception('This is for Windows only')
 
@@ -35,6 +32,8 @@ class Crypto:
         self.serial = cert_sn.replace(' ', '')
 
         if use_com:
+            import pythoncom
+            from win32com.client import Dispatch
             pythoncom.CoInitialize()
             self.signed_xml = Dispatch('CAdESCOM.SignedXML')
 
