@@ -52,3 +52,6 @@
 [submodule "3dparty/lxml-repo"]
 	path = 3dparty/lxml-repo
 	url = https://git.launchpad.net/lxml
+[submodule "3dparty/cryptography-repo"]
+	path = 3dparty/cryptography-repo
+	url = https://github.com/pyca/cryptography.git

@@ -39,39 +39,17 @@
 #         """
 #         return a + b
 import logging
+from os import environ, putenv
 
 import requests
-from smev import Adapter
+from smev1 import Adapter
+from smev2 import Adapter as Adapter2
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(levelname)s:%(module)s:%(name)s:%(lineno)d: %(message)s')
     logging.getLogger('zeep.xsd').setLevel(logging.INFO)
     logging.getLogger('zeep.wsdl').setLevel(logging.INFO)
-    #     # hello.say_hello("Cython")
-    #     hellop.say_hello("Python")
-
-    # from soapfish import xsd
-    #
-    #
-    # class Airport(xsd.ComplexType):
-    #     type = xsd.Element(xsd.String)
-    #     code = xsd.Element(xsd.String)
-    #
-    #
-    # airport = Airport()
-    # airport.type = 'IATA'
-    # airport.code = 'WAW'
-    #
-    # print(airport.xml('takeoff_airport', pretty_print=True))
-
-    # from soapfish.xsd2py import generate_code_from_xsd
-    # open('declar.py', 'wb').write(generate_code_from_xsd(open('declar-1.0.0.xsd', 'rb').read()))
-
-    # from soapfish.wsdl2py import generate_code_from_wsdl
-    # with open('SMEVServiceAdapterService.py', 'wb') as out, \
-    #         open('SMEVServiceAdapterService.wsdl', 'rb') as inf:
-    #     out.write(generate_code_from_wsdl(
-    #         inf.read(), 'SMEVServiceAdapterService'))
+    logging.getLogger('urllib3').setLevel(logging.INFO)
 
     # from soapfish.xsd2py import generate_code_from_xsd
     # with open('smev_service_adapter.py', 'wb') as out, \
@@ -85,9 +63,15 @@ if __name__ == '__main__':
     #         "http://smev3-d.test.gosuslugi.ru:7500/smev/v1.2/ws?wsdl").content,
     #                                       'SMEVMessageExchangeService'))
 
+    environ['OPENSSL_CONF'] = 'cryptography/hazmat/bindings/openssl.cfg'
+    putenv('OPENSSL_CONF', 'cryptography/hazmat/bindings/openssl.cfg')
+
     a = Adapter()
-    logging.debug(a.dump())
-    print(a.get_request())
+    # logging.debug(a.dump())
+    print(a.get_request('urn://augo/smev/uslugi/1.0.0', 'declar'))
+
+    a = Adapter2()
+    print(a.get_request('urn://augo/smev/uslugi/1.0.0', 'declar'))
     # print(a.history.last_received)
     # print('*'*40)
     # print(a.history.last_sent)

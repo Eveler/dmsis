@@ -7,24 +7,6 @@ from xml.etree.ElementTree import fromstring
 from zeep import Client
 
 
-
-class DocumentRequisites:
-    name = ''
-    number = ''
-    date = None
-    isinstance(date, datetime)
-    org_directum_id = ''
-    human_name = ''
-
-    def __init__(self):
-        pass
-
-
-class HumanRequisites:
-    def __init__(self):
-        pass
-
-
 class IntegrationServices:
     REF = 0
     DOC = 1
@@ -49,7 +31,6 @@ class IntegrationServices:
 
     # TODO: Refactor
     def add_doc(self, requisites, data_format, data):
-        isinstance(requisites, DocumentRequisites)
         editor = "EDOTXT"
         data_format = data_format.upper()
         if data_format == "PDF":
@@ -118,10 +99,7 @@ class IntegrationServices:
             raise Exception(res.string[0][2:])
         return res.string[0][2:]
 
-    # TODO: Refactor
     def add_individual(self, human):
-        isinstance(human, HumanRequisites)
-
         xml_package = Document()
 
         section = xml_package.createElement("Section")

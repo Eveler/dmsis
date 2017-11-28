@@ -1,0 +1,171 @@
+<S:Envelope xmlns:S="http://schemas.xmlsoap.org/soap/envelope/">
+   <S:Body>
+      <ns2:GetRequestResponse xmlns="urn://x-artefacts-smev-gov-ru/services/message-exchange/types/basic/1.1" xmlns:ns2="urn://x-artefacts-smev-gov-ru/services/message-exchange/types/1.1" xmlns:ns3="urn://x-artefacts-smev-gov-ru/services/message-exchange/types/faults/1.1">
+         <ns2:RequestMessage>
+            <ns2:Request Id="SIGNED_BY_SMEV">
+               <ns2:SenderProvidedRequestData Id="SIGNED_BY_CONSUMER">
+                  <ns2:MessageID>0e8cfc01-5e81-11e4-a9ff-d4c9eff07b77</ns2:MessageID>
+                  <MessagePrimaryContent>
+                    <ns1:declar xmlns:ns1="urn://augo/smev/uslugi/1.0.0">
+                        <ns1:declar_number>23156/564/5611Д</ns1:declar_number>
+                        <ns1:service>13.2</ns1:service>
+                        <ns1:register_date>2008-09-29</ns1:register_date>
+                        <ns1:end_date>2014-09-19</ns1:end_date>
+                        <ns1:AppliedDocument>
+                            <ns1:title>Заявление</ns1:title>
+                            <ns1:number>б/н</ns1:number>
+                            <ns1:date>2008-09-29</ns1:date>
+                            <ns1:url>https://12.345.67.89/download/AE4567BC</ns1:url>
+                            <ns1:url_valid_until>2008-09-30T17:41:17.783+04:00</ns1:url_valid_until>
+                        </ns1:AppliedDocument>
+                        <ns1:legal_entity>
+                            <ns1:name>Краткое наименование</ns1:name>
+                            <ns1:full_name>Полное наименование</ns1:full_name>
+                            <ns1:inn>25110201</ns1:inn>
+                            <ns1:kpp>251136652</ns1:kpp>
+                            <ns1:address>
+                                <ns1:Postal_Code>692500</ns1:Postal_Code>
+                                <ns1:Region>Приморский край</ns1:Region>
+                                <ns1:Locality>г.Уссурийск</ns1:Locality>
+                                <ns1:Street>ул.Ленина</ns1:Street>
+                                <ns1:House>101</ns1:House>
+                            </ns1:address>
+                            <ns1:ogrn>566214</ns1:ogrn>
+                            <ns1:phone>8 (4234) 319-303</ns1:phone>
+                            <ns1:email>ioib@adm-ussuriisk.ru</ns1:email>
+                            <ns1:bossFio>Фамилия Имя Отчество</ns1:bossFio>
+                            <ns1:buhFio>Фамилия Имя Отчество</ns1:buhFio>
+                            <ns1:bank>Отделение №1 по ПК в г.Владивосток</ns1:bank>
+                            <ns1:bankAccount>52300000000446</ns1:bankAccount>
+                            <ns1:person>
+                                <ns1:surname>Фамилия</ns1:surname>
+                                <ns1:first_name>Имя</ns1:first_name>
+                                <ns1:patronymic>Отчество</ns1:patronymic>
+                                <ns1:address>
+                                    <ns1:Locality>г.Уссурийск</ns1:Locality>
+                                    <ns1:Street>пр.Блюхера</ns1:Street>
+                                    <ns1:House>1Б</ns1:House>
+                                    <ns1:Apartment>26</ns1:Apartment>
+                                </ns1:address>
+                                <ns1:phone>89241234567</ns1:phone>
+                            </ns1:person>
+                        </ns1:legal_entity>
+                        <ns1:person>
+                            <ns1:surname>Бендер</ns1:surname>
+                            <ns1:first_name>Остап</ns1:first_name>
+                            <ns1:patronymic>Ибрагимович</ns1:patronymic>
+                            <ns1:address>
+                                <ns1:Locality>г.Уссурийск</ns1:Locality>
+                                <ns1:Street>ул.Некрасова</ns1:Street>
+                                <ns1:House>91</ns1:House>
+                                <ns1:Housing>А</ns1:Housing>
+                                <ns1:Apartment>34</ns1:Apartment>
+                            </ns1:address>
+                            <ns1:passport_serial>0502</ns1:passport_serial>
+                            <ns1:passport_number>554654</ns1:passport_number>
+                            <ns1:passport_agency>РОВД г.Уссурийск</ns1:passport_agency>
+                            <ns1:passport_date>2019-08-19</ns1:passport_date>
+                            <ns1:phone>89021234567</ns1:phone>
+                            <ns1:sex>Муж</ns1:sex>
+                        </ns1:person>
+                        <ns1:confidant>
+                            <ns1:surname>Фамилия</ns1:surname>
+                            <ns1:first_name>Имя</ns1:first_name>
+                            <ns1:address>
+                                <ns1:Locality>г.Уссурийск</ns1:Locality>
+                                <ns1:Street>ул.Ленина</ns1:Street>
+                                <ns1:House>95</ns1:House>
+                                <ns1:Housing>Б</ns1:Housing>
+                                <ns1:Apartment>59</ns1:Apartment>
+                            </ns1:address>
+                            <ns1:phone>89141234567</ns1:phone>
+                        </ns1:confidant>
+                        <ns1:Param type="String" id="object_type" label="Вид объекта услуги">Значение</ns1:Param>
+                    </ns1:declar>
+                  </MessagePrimaryContent>
+                  <RefAttachmentHeaderList>
+                     <RefAttachmentHeader>
+                        <uuid>04a5bc90-5e81-11e4-a9ff-d4c9eff07b77</uuid>
+                        <Hash>VpT3sc999CJI8TVYX35ZZfXpc/dCWO5e1MgoUg8YiJA=</Hash>
+                        <MimeType>image/jpeg</MimeType>
+                        <SignaturePKCS7>
+                           <xop:Include href="cid:41f0fe5e-3e73-4f4a-bf67-793b5d3369b2@example.jaxws.sun.com" xmlns:xop="http://www.w3.org/2004/08/xop/include"/>
+                        </SignaturePKCS7>
+                     </RefAttachmentHeader>
+                  </RefAttachmentHeaderList>
+               </ns2:SenderProvidedRequestData>
+               <ns2:MessageMetadata>
+                  <ns2:MessageType>REQUEST</ns2:MessageType>
+                  <ns2:Sender>
+                     <ns2:Mnemonic>OV_2</ns2:Mnemonic>
+                     <ns2:HumanReadableName>Я_ИС_РОИВ1</ns2:HumanReadableName>
+                  </ns2:Sender>
+                  <ns2:SendingTimestamp>2014-10-28T13:01:52.208+04:00</ns2:SendingTimestamp>
+                  <ns2:Recipient>
+                     <ns2:Mnemonic>mtfoiv1</ns2:Mnemonic>
+                     <ns2:HumanReadableName>МТ_ИС_ФОИВ1</ns2:HumanReadableName>
+                  </ns2:Recipient>
+                  <ns2:SupplementaryData>
+                     <ns2:DetectedContentTypeName>МТ_ВС_ФОИВ1</ns2:DetectedContentTypeName>
+                     <ns2:InteractionType>NotDetected</ns2:InteractionType>
+                  </ns2:SupplementaryData>
+                  <ns2:DeliveryTimestamp>2014-10-28T13:07:35.734+04:00</ns2:DeliveryTimestamp>
+               </ns2:MessageMetadata>
+               <FSAttachmentsList>
+                  <FSAttachment>
+                     <uuid>04a5bc90-5e81-11e4-a9ff-d4c9eff07b77</uuid>
+                     <UserName>RuhSKQ8eNGYKDWgByyjVBTLQLx8K8A</UserName>
+                     <Password>rFHmjM5N5fkIM7Aiy2Oyie1BgEDXxm</Password>
+                     <FileName>sample10M.tmp</FileName>
+                  </FSAttachment>
+               </FSAttachmentsList>
+               <ns2:ReplyTo>3219|x-artefacts-gibdd-gov-ru_breach_root_1.0_BreachRequest|0e8cfc01-5e81-11e4-a9ff-d4c9eff07b77</ns2:ReplyTo>
+               <ns2:SenderInformationSystemSignature>
+                  <ds:Signature xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
+                     <ds:SignedInfo>
+                        <ds:CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/>
+                        <ds:SignatureMethod Algorithm="http://www.w3.org/2001/04/xmldsig-more#gostr34102001-gostr3411"/>
+                        <ds:Reference URI="#SIGNED_BY_CONSUMER">
+                           <ds:Transforms>
+                              <ds:Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/>
+                              <ds:Transform Algorithm="urn://smev-gov-ru/xmldsig/transform"/>
+                           </ds:Transforms>
+                           <ds:DigestMethod Algorithm="http://www.w3.org/2001/04/xmldsig-more#gostr3411"/>
+                           <ds:DigestValue>/DPA0DgJFJHxKstBeu187qabD/YQY0wsQNfDFfki95s=</ds:DigestValue>
+                        </ds:Reference>
+                     </ds:SignedInfo>
+                     <ds:SignatureValue>3pzUPIp++9A6YZjYiwUI52UqZfyz68fan427UipbLWH0Ea27d6FHq3QmZPZL+j8wCZiLVTXk4WiNdolIFyxmLQ==</ds:SignatureValue>
+                     <ds:KeyInfo>
+                        <ds:X509Data>
+                           <ds:X509Certificate>MIIBhzCCATagAwIBAgIFAMFdkFQwCAYGKoUDAgIDMC0xEDAOBgNVBAsTB1NZU1RFTTExDDAKBgNVBAoTA09WMjELMAkGA1UEBhMCUlUwHhcNMTQwMjIxMTMzNDMyWhcNMTUwMjIxMTMzNDMyWjAtMRAwDgYDVQQLEwdTWVNURU0xMQwwCgYDVQQKEwNPVjIxCzAJBgNVBAYTAlJVMGMwHAYGKoUDAgITMBIGByqFAwICJAAGByqFAwICHgEDQwAEQLjcuMDezt3MrljIr+54Cy64Gvgy8uuGgTpjvlrDAkiGdTL/m9EDDJvMARnMjzSb1JTxovUWfTV8j2bns+KZXNyjOzA5MA4GA1UdDwEB/wQEAwID6DATBgNVHSUEDDAKBggrBgEFBQcDAjASBgNVHRMBAf8ECDAGAQH/AgEFMAgGBiqFAwICAwNBAMVRmhKGKFtRbBlGLl++KtOAvm96C5wnj+6L/wMYpw7Gd7WBM21Zqh9wu+3eZotglDsJMEYbKgiLRprSxKz+DHs=</ds:X509Certificate>
+                        </ds:X509Data>
+                     </ds:KeyInfo>
+                  </ds:Signature>
+               </ns2:SenderInformationSystemSignature>
+            </ns2:Request>
+            <ns2:SMEVSignature>
+               <ds:Signature xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
+                  <ds:SignedInfo>
+                     <ds:CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/>
+                     <ds:SignatureMethod Algorithm="http://www.w3.org/2001/04/xmldsig-more#gostr34102001-gostr3411"/>
+                     <ds:Reference URI="#SIGNED_BY_SMEV">
+                        <ds:Transforms>
+                           <ds:Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/>
+                           <ds:Transform Algorithm="urn://smev-gov-ru/xmldsig/transform"/>
+                        </ds:Transforms>
+                        <ds:DigestMethod Algorithm="http://www.w3.org/2001/04/xmldsig-more#gostr3411"/>
+                        <ds:DigestValue>iM3n4+pc1vwnbpm8A8SNAaZyI4hFERT3+pVeb1HEe8I=</ds:DigestValue>
+                     </ds:Reference>
+                  </ds:SignedInfo>
+                  <ds:SignatureValue>bz8nNwEEMl3uoxhIwT7NXC+62K++YQTcfhZuVrIhy27cglkUBZ2JnebfWPNMHX7PXLn/+eEkv0aAPZptMKIXyw==</ds:SignatureValue>
+                  <ds:KeyInfo>
+                     <ds:X509Data>
+                        <ds:X509Certificate>MIIBozCCAVKgAwIBAgIFAMWImyYwCAYGKoUDAgIDMDYxGDAWBgNVBAsTD0NsaWVudENvbm5lY3RvcjENMAsGA1UEChMEU01FVjELMAkGA1UEBhMCUlUwHhcNMTQwMjE4MDU1MzU1WhcNMTUwMjE4MDU1MzU1WjA2MRgwFgYDVQQLEw9DbGllbnRDb25uZWN0b3IxDTALBgNVBAoTBFNNRVYxCzAJBgNVBAYTAlJVMGMwHAYGKoUDAgITMBIGByqFAwICJAAGByqFAwICHgEDQwAEQJCa1MMgJZn4H66ixt5crBZ8JGlNILbYQJwZdvlvPnXB/5EiFx+j8x6xhwUR2zJMk3Vv4fh+FyaV0ADzY7SF2GqjRTBDMA4GA1UdDwEB/wQEAwID6DAdBgNVHSUEFjAUBggrBgEFBQcDAgYIKwYBBQUHAwEwEgYDVR0TAQH/BAgwBgEB/wIBBTAIBgYqhQMCAgMDQQBca4YCB+42EH5gHwrsBdbpHhZZ5gzanx57u4CQG26txZn49mR/6XmPkXqAE4gN9JwwpIuG61ZVPTRjpYOAGISK</ds:X509Certificate>
+                     </ds:X509Data>
+                  </ds:KeyInfo>
+               </ds:Signature>
+            </ns2:SMEVSignature>
+         </ns2:RequestMessage>
+      </ns2:GetRequestResponse>
+   </S:Body>
+</S:Envelope>
