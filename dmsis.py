@@ -7,6 +7,7 @@
 # SendResponse if status changed
 import logging
 
+from plugins.directum import IntegrationServices
 from smev import Adapter
 
 
@@ -16,7 +17,12 @@ class Integration:
             self.parse_config(config_path)
         else:
             self.mail_addr = ''
-        self.smev = Adapter()
+            self.smev_wsdl = "http://smev3-d.test.gosuslugi.ru:7500/smev/v1.2/ws?wsdl"
+            self.smev_ftp = "ftp://smev3-d.test.gosuslugi.ru/"
+            self.directum_wsdl = "http://snadb:8082/IntegrationService.svc?singleWsdl"
+
+        self.smev = Adapter(self.smev_wsdl, self.smev_ftp)
+        self.directum = IntegrationServices(self.directum_wsdl)
 
     def parse_config(self, config_path):
         """
@@ -81,6 +87,25 @@ class Integration:
                 cfg.set('main', 'mail_server', '192.168.1.6')
             self.mail_server = cfg.get('main', 'mail_server')
 
+            if not cfg.has_section("smev"):
+                do_write = True
+                cfg.set(
+                    'smev', 'wsdl', "http://172.20.3.12:7500/smev/v1.2/ws?wsdl")
+                cfg.set('smev', 'ftp', "ftp://172.20.3.12/")
+            self.smev_wsdl = cfg.get('smev', 'wsdl')
+            self.smev_ftp = cfg.get('smev', 'ftp')
+
+            if not cfg.has_section("directum"):
+                cfg.set(
+                    'directum', 'wsdl',
+                    "http://servdir1:8083/IntegrationService.svc?singleWsdl")
+            self.directum_wsdl = cfg.get('directum', 'wsdl')
+
+            if not cfg.has_section("service"):
+                do_write = True
+                cfg.set('service', 'repeat_every', 300)
+            self.repeat_every = cfg.getint('service', 'repeat_every')
+
             if do_write:
                 for fn in lst:
                     with open(fn, "w") as configfile:
@@ -100,7 +125,7 @@ class Integration:
         logging.error(e.message)
         etype, value, tb = exc_info()
         trace = ''.join(format_exception(etype, value, tb))
-        msg = "\n" + "*" * 70 + "\n%s: %s\n%s\n" + "*" * 70  % \
+        msg = "\n" + "*" * 70 + "\n%s: %s\n%s\n" + "*" * 70 % \
                                                    (etype, value, trace)
         logging.error(msg)
 
@@ -116,3 +141,7 @@ class Integration:
             s = smtplib.SMTP(self.mail_server)
             s.sendmail(from_addr, [self.mail_addr], message.as_string())
             s.quit()
+
+
+if __name__ == '__main__':
+    i = Integration(False)
