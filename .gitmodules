@@ -43,18 +43,9 @@
 [submodule "3dparty/requests_toolbelt-repo"]
 	path = 3dparty/requests_toolbelt-repo
 	url = https://github.com/requests/toolbelt.git
-[submodule "3dparty/py_cpcsp"]
-	path = 3dparty/py_cpcsp
-	url = https://github.com/kuznetsovin/py_cpcsp.git
-[submodule "3dparty/xmlsec-repo"]
-	path = 3dparty/xmlsec-repo
-	url = https://github.com/mehcode/python-xmlsec
 [submodule "3dparty/lxml-repo"]
 	path = 3dparty/lxml-repo
 	url = https://git.launchpad.net/lxml
-[submodule "3dparty/cryptography-repo"]
-	path = 3dparty/cryptography-repo
-	url = https://github.com/pyca/cryptography.git
 [submodule "3dparty/sqlalchemy"]
 	path = 3dparty/sqlalchemy
 	url = https://bitbucket.org/zzzeek/sqlalchemy.git
