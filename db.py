@@ -23,7 +23,7 @@ class Db:
     def __init__(self, dbstr='sqlite:///dmsis.db'):
         self.engine = create_engine(dbstr,
                                     echo=(logging.root.level == logging.DEBUG))
-        Base.metadata.create_all(self.engine)
+        Base.metadata.create_all(self.engine, checkfirst=True)
         self.session = sessionmaker(bind=self.engine)()
 
     def add_update(self, uuid, declar_num, reply_to, status=None):
@@ -32,10 +32,10 @@ class Db:
             r.declar_num = declar_num
             r.reply_to = reply_to
             if status:
-                r.status = status
+                r.last_status = status
         else:
             r = Requests(uuid=uuid, declar_num=declar_num, reply_to=reply_to,
-                         status=status)
+                         last_status=status)
             self.session.add(r)
         self.session.commit()
 
@@ -50,11 +50,11 @@ class Db:
 
         if uuid:
             r = self.session.query(Requests).filter_by(uuid=uuid).first()
-            r.status = status
+            r.last_status = status
         elif declar_num:
             r = self.session.query(Requests).filter_by(
                 declar_num=declar_num).first()
-            r.status = status
+            r.last_status = status
         self.session.commit()
 
     def delete(self, uuid):
@@ -78,7 +78,8 @@ class Db:
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
     db = Db()
-    db.add_update('gdfgdsgdfg-fdgfsdf-dfgdfsg', '85473h59394')
+    db.add_update('gdfgdsgdfg-fdgfsdf-dfgdfsg', '85473h59394',
+                  'gdfgdsgdfg-fdgfsdf-dfgdfsg')
     res = db.all()
     print('*' * 80)
     for r in res:

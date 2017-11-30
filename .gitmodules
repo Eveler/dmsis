@@ -55,3 +55,9 @@
 [submodule "3dparty/cryptography-repo"]
 	path = 3dparty/cryptography-repo
 	url = https://github.com/pyca/cryptography.git
+[submodule "3dparty/sqlalchemy"]
+	path = 3dparty/sqlalchemy
+	url = https://bitbucket.org/zzzeek/sqlalchemy.git
+[submodule "3dparty/twisted"]
+	path = 3dparty/twisted
+	url = https://github.com/twisted/twisted.git
