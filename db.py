@@ -15,6 +15,7 @@ class Requests(Base):
     id = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
     uuid = Column(String, nullable=False, index=True)
     declar_num = Column(String, nullable=False, index=True)
+    reply_to = Column(String)
     last_status = Column(String)
 
 
@@ -25,9 +26,17 @@ class Db:
         Base.metadata.create_all(self.engine)
         self.session = sessionmaker(bind=self.engine)()
 
-    def add(self, uuid, declar_num, status):
-        r = Requests(uuid=uuid, declar_num=declar_num, status=status)
-        self.session.add(r)
+    def add_update(self, uuid, declar_num, reply_to, status=None):
+        r = self.session.query(Requests).filter(Requests.uuid == uuid).first()
+        if r:
+            r.declar_num = declar_num
+            r.reply_to = reply_to
+            if status:
+                r.status = status
+        else:
+            r = Requests(uuid=uuid, declar_num=declar_num, reply_to=reply_to,
+                         status=status)
+            self.session.add(r)
         self.session.commit()
 
     def all(self):
@@ -36,6 +45,8 @@ class Db:
     def change_status(self, status, uuid, declar_num):
         if not status:
             raise Exception('status необходимо указать')
+        if not uuid:
+            raise Exception('uuid необходимо указать')
 
         if uuid:
             r = self.session.query(Requests).filter_by(uuid=uuid).first()
@@ -46,17 +57,28 @@ class Db:
             r.status = status
         self.session.commit()
 
+    def delete(self, uuid):
+        if not uuid:
+            raise Exception('Необходимо указать UUID запроса')
+
+        r = self.session.query(Requests).filter_by(uuid=uuid).first()
+        self.session.delete(r)
+        self.session.commit()
+
     def _clear(self):
         for req in self.all():
             self.session.delete(req)
         self.session.commit()
         self.session.execute('VACUUM FULL')
 
+    def __del__(self):
+        self.session.execute('VACUUM FULL')
+
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
     db = Db()
-    db.add('gdfgdsgdfg-fdgfsdf-dfgdfsg', '85473h59394')
+    db.add_update('gdfgdsgdfg-fdgfsdf-dfgdfsg', '85473h59394')
     res = db.all()
     print('*' * 80)
     for r in res:

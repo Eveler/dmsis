@@ -1,9 +1,9 @@
 # -*- encoding: utf-8 -*-
-from datetime import datetime
 import ftplib
 import logging
 import tempfile
-from os import close, remove
+from datetime import datetime
+from os import close, write
 from urllib.parse import urlparse
 
 from lxml import etree, objectify
@@ -15,20 +15,6 @@ from zeep.plugins import HistoryPlugin
 
 
 class Adapter:
-    # xml_template = '<Signature xmlns="http://www.w3.org/2000/09/xmldsig#">' \
-    #                '<SignedInfo>' \
-    #                '<CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/>' \
-    #                '<SignatureMethod Algorithm="http://www.w3.org/2001/04/xmldsig-more#gostr34102001-gostr3411"/>' \
-    #                '<Reference URI="">' \
-    #                '<Transforms>' \
-    #                '<Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/>' \
-    #                '<Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/>' \
-    #                '</Transforms>' \
-    #                '<DigestMethod Algorithm="http://www.w3.org/2001/04/xmldsig-more#gostr3411"/>' \
-    #                '<DigestValue></DigestValue></Reference></SignedInfo>' \
-    #                '<SignatureValue></SignatureValue><KeyInfo><X509Data>' \
-    #                '<X509Certificate></X509Certificate></X509Data></KeyInfo>' \
-    #                '</Signature>'
     xml_template = '<ds:Signature ' \
                    'xmlns:ds="http://www.w3.org/2000/09/xmldsig#">' \
                    '<ds:SignedInfo>' \
@@ -53,11 +39,14 @@ class Adapter:
     def __init__(self,
                  wsdl="http://smev3-d.test.gosuslugi.ru:7500/smev/v1.2/ws?wsdl",
                  ftp_addr="ftp://smev3-d.test.gosuslugi.ru/",
-                 history=False):
+                 history=False, method='sharp', serial=None, container=None):
         self.log = logging.getLogger('smev.adapter')
         self.log.setLevel(logging.root.level)
         self.ftp_addr = ftp_addr
         self.crypto = Crypto()
+        self.crypto.serial = serial
+        self.crypto.container = container
+        self.method = method
 
         if history:
             self.history = HistoryPlugin()
@@ -111,99 +100,130 @@ class Adapter:
         if (uri and not local_name) or (not uri and local_name):
             raise Exception(
                 'uri и local_name необходимо указывать одновременно')
-        # timestamp = datetime.now()
-        # node = self.proxy.create_message(
-        #     self.proxy.service, 'GetRequest',
-        #     {'NamespaceURI': uri, 'RootElementLocalName': local_name,
-        #      'Timestamp': timestamp, 'NodeID': node_id},
-        #     CallerInformationSystemSignature=etree.Element('Signature'))
-        # node[0][0][0].set('Id', 'SIGNED_BY_CALLER')
-        # node_str = etree.tostring(node)
-        # self.log.debug(node_str)
-        #
-        # # COM variant
-        # # res = self.crypto.sign_com(
-        # #     self.__xml_part(node_str, b'ns1:MessageTypeSelector').decode(),
-        # #     Crypto.CADESCOM_XML_SIGNATURE_TYPE_ENVELOPED)
-        # # res = self.__xml_part(res, 'Signature')
-        # # res = res.replace('URI=""', 'URI="#SIGNED_BY_CALLER"')
-        #
-        # # CSP variant
-        # # self.crypto.container = "049fc71a-1ff0-4e06-8714-03303ae34afd"
-        # # res = self.crypto.sign_csp(
-        # #     self.__xml_part(node_str, b'ns1:MessageTypeSelector'))
-        #
-        # # Sharp variant
+
+        timestamp = datetime.now()
+        node = self.proxy.create_message(
+            self.proxy.service, 'GetRequest',
+            {'NamespaceURI': uri, 'RootElementLocalName': local_name,
+             'Timestamp': timestamp, 'NodeID': node_id},
+            CallerInformationSystemSignature=etree.Element('Signature'))
+        node[0][0][0].set('Id', 'SIGNED_BY_CALLER')
+        node_str = etree.tostring(node)
+        self.log.debug(node_str)
+
+        res = self.__call_sign(
+            self.__xml_part(node_str, b'ns1:MessageTypeSelector'))
+        # COM variant
+        # res = self.crypto.sign_com(
+        #     self.__xml_part(node_str, b'ns1:MessageTypeSelector').decode())
+        # res = self.__xml_part(res, 'Signature')
+        # res = res.replace('URI=""', 'URI="#SIGNED_BY_CALLER"')
+
+        # CSP variant
+        # self.crypto.container = "049fc71a-1ff0-4e06-8714-03303ae34afd"
+        # res = self.crypto.sign_csp(
+        #     self.__xml_part(node_str, b'ns1:MessageTypeSelector'))
+
+        # Sharp variant
         # self.crypto.serial = '008E BDC8 291F 0003 81E7 11E1 AF7A 5ED3 27'
         # res = self.crypto.sign_sharp(
         #     self.__xml_part(node_str, b'ns1:MessageTypeSelector'))
-        #
-        # res = node_str.decode().replace('<Signature/>', res)
-        #
-        # res = self.__send('GetRequest', res)
+
+        res = node_str.decode().replace('<Signature/>', res)
+
+        res = self.__send('GetRequest', res)
         # # res = self.proxy.service.GetRequest(
         # #     {'NamespaceURI': uri, 'RootElementLocalName': local_name,
         # #      'Timestamp': timestamp, 'NodeID': node_id},
         # #     CallerInformationSystemSignature=etree.fromstring(res))
 
-        # if 'MessagePrimaryContent' in res:
-        res = open('tests/GetRequestResponseAttachFTP.xml', 'rb').read()
-        xml = etree.fromstring(res)
+        declar, uuid, reply_to = None, None, None
 
-        declar = Declar.parsexml(
-            etree.tostring(xml.find('.//{urn://augo/smev/uslugi/1.0.0}declar')))
+        if b'MessagePrimaryContent' in res:
+            # res = open('tests/GetRequestResponseAttachFTP.xml', 'rb').read()
+            xml = etree.fromstring(res)
 
-        if b'RefAttachmentHeaderList' in res:
-            files = {}
-            attach_head_list = objectify.fromstring(
-                self.__xml_part(res, b'RefAttachmentHeaderList'))
-            for head in attach_head_list.getchildren():
-                files[head.uuid] = {'MimeType': head.MimeType}
-            attach_list = objectify.fromstring(
-                self.__xml_part(res, b'FSAttachmentsList'))
-            for attach in attach_list.getchildren():
-                files[attach.uuid]['UserName'] = attach.UserName
-                files[attach.uuid]['Password'] = attach.Password
-                files[attach.uuid]['FileName'] = attach.FileName
-            for uuid, file in files.items():
-                res = self.__load_file(uuid, file['UserName'], file['Password'],
-                                       file['FileName'])
-                # TODO: Rename file if extension is not reflect MIME type
-                declar.files.append(res)
+            declar = Declar.parsexml(
+                etree.tostring(xml.find('.//{urn://augo/smev/uslugi/1.0.0}declar')))
 
-        # tm = etree.Element('AckTargetMessage', Id='SIGNED_BY_CALLER',
-        #                    accepted='true')
-        # tm.text = '0e8cfc01-5e81-11e4-a9ff-d4c9eff07b77'
-        # node = self.proxy.create_message(self.proxy.service, 'Ack', tm,
-        #                                  CallerInformationSystemSignature=etree.Element(
-        #                                      'Signature'))
-        # node[0][0][0].set('Id', 'SIGNED_BY_CALLER')
-        # node[0][0][0].set('accepted', 'true')
-        # node[0][0][0].text = '0e8cfc01-5e81-11e4-a9ff-d4c9eff07b77'
-        # node_str = etree.tostring(node)
-        # self.log.debug(node_str)
-        # res = self.crypto.sign_sharp(
-        #     self.__xml_part(node_str, b'ns1:AckTargetMessage'))
-        # res = node_str.decode().replace('<Signature/>', res)
-        # res = self.__send('Ack', res)
+            if b'RefAttachmentHeaderList' in res:
+                files = {}
+                attach_head_list = objectify.fromstring(
+                    self.__xml_part(res, b'RefAttachmentHeaderList'))
+                for head in attach_head_list.getchildren():
+                    files[head.uuid] = {'MimeType': head.MimeType}
+                attach_list = objectify.fromstring(
+                    self.__xml_part(res, b'FSAttachmentsList'))
+                for attach in attach_list.getchildren():
+                    files[attach.uuid]['UserName'] = str(attach.UserName)
+                    files[attach.uuid]['Password'] = str(attach.Password)
+                    files[attach.uuid]['FileName'] = str(attach.FileName)
+                for uuid, file in files.items():
+                    file_name = file['FileName']
+                    from os import path
+                    fn, ext = path.splitext(file_name)
+                    res = self.__load_file(uuid, file['UserName'],
+                                           file['Password'],
+                                           file['FileName'])
+                    if isinstance(res, (str, bytes)):
+                        from mimetypes import guess_extension
+                        new_ext = guess_extension(file_name).lower()
+                        ext = ext.lower()
+                        if ext != new_ext:
+                            file_name = fn + new_ext
+                    else:
+                        res, e = res
+                        file_name = fn + '.txt'
+                    declar.files.append({res: file_name})
 
-        return declar
+            uuid = xml.find(
+                './/{urn://x-artefacts-smev-gov-ru/services/message-exchange/'
+                'types/1.2}MessageID').text
+            reply_to = xml.find(
+                './/{urn://x-artefacts-smev-gov-ru/services/message-exchange/'
+                'types/1.2}ReplyTo').text
+
+            tm = etree.Element('AckTargetMessage', Id='SIGNED_BY_CALLER',
+                               accepted='true')
+            tm.text = uuid
+            node = self.proxy.create_message(self.proxy.service, 'Ack', tm,
+                                             CallerInformationSystemSignature=etree.Element(
+                                                 'Signature'))
+            node[0][0][0].set('Id', 'SIGNED_BY_CALLER')
+            node[0][0][0].set('accepted', 'true')
+            node[0][0][0].text = uuid
+            node_str = etree.tostring(node)
+            self.log.debug(node_str)
+            res = self.__call_sign(
+                self.__xml_part(node_str, b'ns1:AckTargetMessage'))
+            res = node_str.decode().replace('<Signature/>', res)
+            res = self.__send('Ack', res)
+            self.log.debug(res)
+
+        return declar, uuid, reply_to
+
+    def __call_sign(self, xml):
+        method_name = 'sign_' + self.method
+        self.log.debug('Calling Crypto.%s' % method_name)
+        method = getattr(self.crypto, method_name)
+        return method(xml)
 
     def __load_file(self, uuid, user, passwd, file_name):
         addr = urlparse(self.ftp_addr).netloc
-        with ftplib.FTP(addr, user, passwd) as con:
-            con.cwd(uuid)
-            if file_name[0] == '/':
-                file_name = file_name[1:]
-            f, file_path = tempfile.mkstemp()
-            close(f)
-            try:
+        f, file_path = tempfile.mkstemp()
+        try:
+            with ftplib.FTP(addr, user, passwd) as con:
+                con.cwd(uuid)
+                if file_name[0] == '/':
+                    file_name = file_name[1:]
+                close(f)
                 with open(file_path, 'wb') as f:
                     con.retrbinary('RETR ' + file_name, f.write)
-            except ftplib.all_errors as e:
-                self.log.error(e)
-                remove(file_path)
-                return ""
+        except ftplib.all_errors as e:
+            self.log.error(str(e))
+            write(f, str(e).encode('cp1251'))
+            close(f)
+            return file_path, e
         return file_path
 
     def __send(self, operation, msg):

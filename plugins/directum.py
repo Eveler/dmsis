@@ -15,7 +15,7 @@ class IntegrationServices:
         self.log = logging.getLogger('directum')
         self.proxy = Client(wsdl)
 
-    def run_script(self, script_name, params):
+    def run_script(self, script_name, params={}):
         """
         Executes Directum script `script_name` with parameters `params`
         :param str script_name: Name of the script
@@ -76,7 +76,7 @@ class IntegrationServices:
         obj.setAttribute("VED",
                          u"ПРОЧЕЕ")  # Задаем атрибут "Вид электронного документа"
         obj.setAttribute("Name",
-                         requisites.name)  # Задаем атрибут "Наименование документа"
+                         requisites.title)  # Задаем атрибут "Наименование документа"
         obj.setAttribute("Editor",
                          editor)  # Задаем атрибут "Код приложения-редактора"
         obj.appendChild(section)
@@ -89,15 +89,16 @@ class IntegrationServices:
         package = xml_package.toxml(encoding='utf-8').decode('utf-8')
         xml_package.unlink()
 
-        from encodings.base64_codec import base64_encode
-
         document = self.proxy.get_type('ns2:ArrayOfbase64Binary')()
-        document.base64Binary = base64_encode(data)[0]
+        # from encodings.base64_codec import base64_encode
+        # document.base64Binary = base64_encode(data)[0]
+        document.base64Binary = data
         res = self.proxy.service.EDocumentsCreate(XMLPackage=package,
                                                   Documents=document)
-        if res.string[0][0] == "1":
-            raise Exception(res.string[0][2:])
-        return res.string[0][2:]
+        self.log.debug('res = %s' % res)
+        if res[0][:1] == "1":
+            raise Exception(res[0][2:])
+        return res[0][2:]
 
     def add_individual(self, human):
         xml_package = Document()
@@ -112,6 +113,16 @@ class IntegrationServices:
         # text = xml_package.createTextNode(human.id)
         # requisite.appendChild(text)
         # section.appendChild(requisite)
+
+        #  "Наименование"
+        requisite = xml_package.createElement("Requisite")
+        requisite.setAttribute("Name", u"Наименование")
+        requisite.setAttribute("Type", "String")
+        name = human.surname + ' ' + human.first_name + \
+               (' ' + human.patronymic if human.patronymic else '')
+        text = xml_package.createTextNode(name if len(name) < 50 else name[:49])
+        requisite.appendChild(text)
+        section.appendChild(requisite)
 
         # "Фамилия"
         requisite = xml_package.createElement("Requisite")
@@ -142,7 +153,7 @@ class IntegrationServices:
             requisite = xml_package.createElement("Requisite")
             requisite.setAttribute("Name", u"Примечание")
             requisite.setAttribute("Type", "String")
-            text = xml_package.createTextNode(human.fact_address)
+            text = xml_package.createTextNode(str(human.fact_address))
             requisite.appendChild(text)
             section.appendChild(requisite)
 
@@ -150,7 +161,7 @@ class IntegrationServices:
         requisite = xml_package.createElement("Requisite")
         requisite.setAttribute("Name", u"Расписание")
         requisite.setAttribute("Type", "String")
-        text = xml_package.createTextNode(self.__address_2_str(human.address))
+        text = xml_package.createTextNode(str(human.address))
         requisite.appendChild(text)
         section.appendChild(requisite)
 
@@ -158,7 +169,7 @@ class IntegrationServices:
         requisite = xml_package.createElement("Requisite")
         requisite.setAttribute("Name", u"Строка")
         requisite.setAttribute("Type", "String")
-        text = xml_package.createTextNode(human.phone)
+        text = xml_package.createTextNode(', '.join(human.phone))
         requisite.appendChild(text)
         section.appendChild(requisite)
 
@@ -166,17 +177,19 @@ class IntegrationServices:
         requisite = xml_package.createElement("Requisite")
         requisite.setAttribute("Name", u"Строка2")
         requisite.setAttribute("Type", "String")
-        text = xml_package.createTextNode(human.email)
+        text = xml_package.createTextNode(', '.join(human.email))
         requisite.appendChild(text)
         section.appendChild(requisite)
 
         # "Дата рождения"
-        requisite = xml_package.createElement("Requisite")
-        requisite.setAttribute("Name", u"Дата")
-        requisite.setAttribute("Type", "String")
-        text = xml_package.createTextNode(human.birthdate)
-        requisite.appendChild(text)
-        section.appendChild(requisite)
+        if human.birthdate:
+            requisite = xml_package.createElement("Requisite")
+            requisite.setAttribute("Name", u"Дата")
+            requisite.setAttribute("Type", "String")
+            text = xml_package.createTextNode(
+                human.birthdate.strftime('%d.%m.%Y'))
+            requisite.appendChild(text)
+            section.appendChild(requisite)
 
         # Запись
         rec = xml_package.createElement("Record")
@@ -200,11 +213,10 @@ class IntegrationServices:
 
         res = self.proxy.service.ReferencesUpdate(XMLPackage=package, ISCode='',
                                                   FullSync=True)
-        params = [('Param', human.id),
-                  ('ReferName', u'ПРС')]
-        res = self.run_script('CheckDuplicateByCode', params)
-        if res:
-            raise Exception(res)
+        # params = [('Param', human_id), ('ReferName', u'ПРС')]
+        # res = self.run_script('CheckDuplicateByCode', params)
+        if res[0]:
+            raise Exception(str(res))
         return res
 
     def add_legal_entity(self, entity):
@@ -267,7 +279,7 @@ class IntegrationServices:
         requisite = xml_package.createElement("Requisite")
         requisite.setAttribute("Name", u"Содержание2")
         requisite.setAttribute("Type", "String")
-        addr = self.__address_2_str(entity.address)
+        addr = str(entity.address)
         text = xml_package.createTextNode(
             addr if len(addr) < 255 else addr[:254])
         requisite.appendChild(text)
@@ -295,6 +307,8 @@ class IntegrationServices:
 
         res = self.proxy.service.ReferencesUpdate(XMLPackage=package, ISCode='',
                                                   FullSync=True)
+        if res[0]:
+            raise Exception(str(res))
         return res
 
     def add_declar(self, declar, doc_getter=None, subdivision="106759",
@@ -319,6 +333,7 @@ class IntegrationServices:
             # Добавляем отсутствующие документы
             declar_id = res[0]['ИДЗапГлавРазд']
             doc_ids = []
+            i = 0
             for doc in declar.AppliedDocument:
                 if doc.number:
                     s_str = "ISBEDocName like '%%%s%%' and NumberEDoc='%s' " \
@@ -332,8 +347,22 @@ class IntegrationServices:
                             (doc.title, doc.date.strftime('%d.%m.%Y'))
                 res = self.search('ТКД_ПРОЧИЕ', s_str, tp=self.DOC)
                 if not len(res):
-                    doc_data = doc_getter(doc.url, doc.file_name) \
-                        if doc_getter else ('txt', '')
+                    if doc_getter:
+                        doc_data = doc_getter(doc.url, doc.file_name)
+                    elif declar.files:
+                        found = False
+                        for file_path, file_name in declar.files:
+                            if file_name.lower() == doc.file_name.lower():
+                                found = file_path
+                        if not found:
+                            found, file_name = declar.files[i]
+                        from os import path
+                        fn, ext = path.splitext(doc.file_name)
+                        with open(found, 'rb') as f:
+                            doc_data = (f.read(), ext[1:] if ext else 'txt')
+                    else:
+                        doc_data = (b'test', 'txt')
+                    i += 1
                     res = self.add_doc(doc, doc_data[1], doc_data[0])
                     # bind document with declar
                     params = [('ID', declar_id), ('DocID', res)]
@@ -344,7 +373,7 @@ class IntegrationServices:
                 params = [('ID', declar_id),
                           ('Doc_IDs', ';'.join(doc_ids))]
                 self.run_script('notification_add_docs', params)
-            return res
+            return declar_id
 
         # Add new
         xml_package = Document()
@@ -365,14 +394,21 @@ class IntegrationServices:
                                          "and Расписание='%s'"
                                          " and Состояние='Действующая'" %
                                   (person.surname, person.first_name,
-                                   person.patronymic,
-                                   person.address.Locality + ', ' +
-                                   person.address.Housing))
+                                   person.patronymic, str(person.address)))
+                self.log.debug('res = %s' % res)
                 if res:
                     person_id = res[0].get('ИД')
                 else:
-                    res = self.add_individual(person)
-                    person_id = res
+                    self.add_individual(person)
+                    res = self.search('ПРС',
+                                      "Дополнение='%s' and Дополнение2='%s' "
+                                      "and Дополнение3='%s' "
+                                      "and Расписание='%s'"
+                                      " and Состояние='Действующая'" %
+                                      (person.surname, person.first_name,
+                                       person.patronymic, str(person.address)))
+                    person_id = res[0].get('ИД')
+                    self.log.debug('person_id = %s' % person_id)
                 # "Заявитель ФЛ"
                 rec = xml_package.createElement('Record')
                 rec.setAttribute("ID", str(number))
@@ -402,15 +438,18 @@ class IntegrationServices:
                 if res:
                     ent_id = res[0].get('ИД')
                 else:
-                    res = self.add_legal_entity(ent)
-                    ent_id = res
+                    self.add_legal_entity(ent)
+                    res = self.search('ОРГ', "Наименование='%s'"
+                                             " and Состояние='Действующая'" %
+                                      ent.name)
+                    ent_id = res[0].get('ИД')
                 # "Заявитель ЮЛ"
                 rec = xml_package.createElement('Record')
                 rec.setAttribute("ID", str(number))
                 number += 1
                 rec.setAttribute("Action", "Change")
                 sec = xml_package.createElement("Section")
-                sec.SetAttribute("Index", "0")
+                sec.setAttribute("Index", "0")
                 requisite = xml_package.createElement("Requisite")
                 requisite.setAttribute("Name", "OrgT6")
                 requisite.setAttribute("Type", "Reference")
@@ -524,10 +563,9 @@ class IntegrationServices:
             requisite = xml_package.createElement("Requisite")
             requisite.setAttribute("Name", "LongStringT9")
             requisite.setAttribute("Type", "String")
+            addr = str(declar.object_address)
             text = xml_package.createTextNode(
-                declar.object_address
-                if len(declar.object_address) < 1024
-                else declar.object_address[:1023])
+                addr if len(addr) < 1024 else addr[:1023])
             requisite.appendChild(text)
             sec.appendChild(requisite)
             rec.appendChild(sec)
@@ -559,17 +597,40 @@ class IntegrationServices:
         package = xml_package.toxml(encoding='utf-8').decode('utf-8')
         xml_package.unlink()
 
-        res = self.proxy.service.ReferencesUpdate(XMLPackage=package, ISCode='',
-                                                  FullSync=True)
+        self.proxy.service.ReferencesUpdate(XMLPackage=package, ISCode='',
+                                            FullSync=True)
+        res = self.search('ДПУ', "Дополнение3='%s' and Дата='%s'" %
+                          (declar.declar_number,
+                           declar.register_date.strftime('%d.%m.%Y')))
+        declar_id = res[0]['ИДЗапГлавРазд']
 
+        params = [('Param', None), ('Param2', declar_id)]
+        res = self.run_script('NameDPU', params)
+        self.log.debug('Создание имени дела: %s' % res)
+
+        i = 0
         for doc in declar.AppliedDocument:
-            doc_data = doc_getter(doc.url, doc.file_name) \
-                if doc_getter else ('txt', '')
+            if doc_getter:
+                doc_data = doc_getter(doc.url, doc.file_name)
+            elif declar.files:
+                found = False
+                for file_path, file_name in declar.files:
+                    if file_name.lower() == doc.file_name.lower():
+                        found = file_path
+                if not found:
+                    found, file_name = declar.files[i]
+                from os import path
+                fn, ext = path.splitext(doc.file_name)
+                with open(found, 'rb') as f:
+                    doc_data = (f.read(), ext[1:] if ext else 'txt')
+            else:
+                doc_data = (b'test', 'txt')
+            i += 1
             res = self.add_doc(doc, doc_data[1], doc_data[0])
             # bind document with declar
             params = [('ID', declar_id), ('DocID', res)]
             self.run_script('BindEDocDPbyID', params)
-        return res
+        return declar_id
 
     def search(self, code, criteria, tp=REF):
         """
@@ -745,71 +806,24 @@ class IntegrationServices:
                 doc.unlink()
                 return elem
 
-    def __address_2_str(self, addr):
-        """
-        Converts `declar.Address` to str
-
-        :param addr: `declar.Address`
-
-        :return: str
-        """
-        res = ''
-        if addr.Postal_Code:
-            res = addr.Postal_Code
-        if addr.Region:
-            res += ', ' + addr.Region if res else addr.Region
-        if addr.District:
-            res += ', ' + addr.District if res else addr.District
-        if addr.City:
-            res += ', ' + addr.City if res else addr.City
-        if addr.Urban_District:
-            res += ', ' + addr.Urban_District if res else addr.Urban_District
-        if addr.Soviet_Village:
-            res += ', ' + addr.Soviet_Village if res else addr.Soviet_Village
-        res += ', ' + addr.Locality if res else addr.Locality
-        if addr.Street:
-            res += ', ' + addr.Street
-        if addr.House:
-            res += ', ' + addr.House
-        if addr.Housing:
-            res += ', ' + addr.Housing
-        if addr.Building:
-            res += ', ' + addr.Building
-        if addr.Apartment:
-            res += ', ' + addr.Apartment
-        if addr.Reference_point:
-            res += ', ' + addr.Reference_point
-        return res
-
 
 if __name__ == '__main__':
-    from declar import Declar, Individual, Address
+    from declar import Declar
+    from lxml import etree
 
-    # logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format='%(asctime)s %(name)s:%(module)s(%(lineno)d): %(levelname)s: '
+               '%(message)s')
+    logging.getLogger('zeep.xsd').setLevel(logging.INFO)
+    logging.getLogger('zeep.wsdl').setLevel(logging.INFO)
 
-    d = Declar()
-    d.declar_number = '111111'
-    i = Individual()
-    i.surname = 'Бендер'
-    i.first_name = 'Остап'
-    i.patronymic = 'Ибрагимович'
-    a = Address()
-    a.Locality = 'ул. Бонивура'
-    a.Housing = '7а рег'
-    i.address = a
-    d.person.append(i)
-    d.register_date = date(2014, 8, 8)
-    d.end_date = date(2014, 10, 8)
-    d.service = "Предоставление земельных участков, на которых расположены " \
-                "здания, строения, сооружения на праве аренды, постоянного " \
-                "(бессрочного) пользования, безвозмездного срочного " \
-                "пользования, в собственность"
-    wsdl = "http://servdir1:8083/IntegrationService.svc?singleWsdl"
+    res = open('../tests/GetRequestResponseAttachFTP.xml', 'rb').read()
+    xml = etree.fromstring(res)
+    declar = Declar.parsexml(
+        etree.tostring(xml.find('.//{urn://augo/smev/uslugi/1.0.0}declar')))
 
-    logger = logging.getLogger('directum')
-    logger.setLevel(logging.DEBUG)
-    logger.addHandler(logging.StreamHandler())
-
+    wsdl = "http://snadb:8082/IntegrationService.svc?singleWsdl"
     dis = IntegrationServices(wsdl)
-    res = dis.add_declar(d)
+    res = dis.add_declar(declar)
     print(res)
