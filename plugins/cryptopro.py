@@ -4,7 +4,7 @@ import os
 import subprocess
 import tempfile
 from encodings.base64_codec import base64_encode
-from sys import platform
+from sys import platform, stderr
 
 if 'win32' not in platform:
     raise Exception('This is for Windows only')
@@ -172,12 +172,13 @@ class Crypto:
             args = [os.path.abspath(xmlsigner_path), 'xmlsigner.exe']
             if self.serial:
                 args.append(self.serial)
-            out = subprocess.check_output(args, input=xml)
+            out = subprocess.check_output(args, input=xml,
+                                          stderr=subprocess.STDOUT)
             self.log.debug(out.decode(encoding='cp866'))
             return out.decode(encoding='cp866')
         except subprocess.CalledProcessError as e:
             self.log.error(e.output.decode(encoding='cp866'))
-            return e.output.decode(encoding='cp866')
+            raise Exception(e.output.decode(encoding='cp866'))
 
 
 if __name__ == '__main__':

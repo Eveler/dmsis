@@ -105,6 +105,7 @@ class AppliedDocument(xsd.ComplexType):
     file_name = xsd.Element(xsd.String, minOccurs=0)
     url = xsd.Element(xsd.String)
     url_valid_until = xsd.Element(xsd.DateTime, minOccurs=0)
+    file = None
 
     @classmethod
     def create(cls, title, number, date, url):
