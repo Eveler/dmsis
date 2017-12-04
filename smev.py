@@ -7,7 +7,7 @@ from os import close, write
 from urllib.parse import urlparse
 from uuid import uuid1
 
-from declar import Declar
+from declar import Declar, AppliedDocument
 from lxml import etree, objectify
 from plugins.cryptopro import Crypto
 from zeep import Client
@@ -204,85 +204,104 @@ class Adapter:
         return declar, uuid, reply_to
 
     def send_respose(self, reply_to, declar_number, register_date,
-                     result='FINAL', text='', applied_documents=list()):
+                     result='FINAL', text='', applied_documents=list(),
+                     ftp_user='', ftp_pass=''):
         files = []
         for doc in applied_documents:
             if doc.file:
-                uuid = self.__upload_file(doc.file, doc.file_name)
-                files.append({uuid: doc.file_name})
+                uuid = self.__upload_file(doc.file, doc.file_name, ftp_user,
+                                          ftp_pass)
+                from mimetypes import guess_type
+                files.append({uuid: {'name': doc.file_name,
+                                     'type': guess_type(doc.file),
+                                     'full_name': doc.file}})
 
-        operation = 'SendResponse'
-        element = self.proxy.get_element('ns1:MessagePrimaryContent')
-        # rr = RequestResponse(declar_number=declar_number,
-        #                      register_date=register_date, result=result,
-        #                      text=text, AppliedDocument=applied_documents)
-        # npc = element(etree.fromstring(rr.xml('requestResponse')))
-        rr = etree.Element('{urn://augo/smev/uslugi/1.0.0}requestResponse',
-                           nsmap={'rr': 'urn://augo/smev/uslugi/1.0.0'})
-        etree.SubElement(
-            rr,
-            '{urn://augo/smev/uslugi/1.0.0}declar_number').text = declar_number
-        etree.SubElement(
-            rr,
-            '{urn://augo/smev/uslugi/1.0.0}register_date').text = \
-            register_date.strftime('%Y-%m-%d') if isinstance(
-                register_date, date) else register_date
-        etree.SubElement(rr,
-                         '{urn://augo/smev/uslugi/1.0.0}result').text = result
-        if text:
-            etree.SubElement(rr,
-                             '{urn://augo/smev/uslugi/1.0.0}text').text = text
-        for doc in applied_documents:
-            ad = etree.SubElement(
-                rr, '{urn://augo/smev/uslugi/1.0.0}AppliedDocument')
-            etree.SubElement(
-                ad, '{urn://augo/smev/uslugi/1.0.0}title').text = doc.title
-            etree.SubElement(
-                ad, '{urn://augo/smev/uslugi/1.0.0}number').text = doc.number
-            etree.SubElement(
-                ad, '{urn://augo/smev/uslugi/1.0.0}date').text = doc.date
-            etree.SubElement(
-                ad,
-                '{urn://augo/smev/uslugi/1.0.0}valid_until').text = \
-                doc.valid_until
-            etree.SubElement(
-                ad,
-                '{urn://augo/smev/uslugi/1.0.0}file_name').text = \
-                doc.file_name
-            etree.SubElement(
-                ad, '{urn://augo/smev/uslugi/1.0.0}url').text = doc.url
-            etree.SubElement(
-                ad,
-                '{urn://augo/smev/uslugi/1.0.0}url_valid_until').text = \
-                doc.url_valid_until
+                operation = 'SendResponse'
+                element = self.proxy.get_element('ns1:MessagePrimaryContent')
+                # rr = RequestResponse(declar_number=declar_number,
+                #                      register_date=register_date, result=result,
+                #                      text=text, AppliedDocument=applied_documents)
+                # npc = element(etree.fromstring(rr.xml('requestResponse')))
+                rr = etree.Element(
+                    '{urn://augo/smev/uslugi/1.0.0}requestResponse',
+                    nsmap={'rr': 'urn://augo/smev/uslugi/1.0.0'})
+                etree.SubElement(
+                    rr,
+                    '{urn://augo/smev/uslugi/1.0.0}declar_number').text = declar_number
+                etree.SubElement(
+                    rr,
+                    '{urn://augo/smev/uslugi/1.0.0}register_date').text = \
+                    register_date.strftime('%Y-%m-%d') if isinstance(
+                        register_date, date) else register_date
+                etree.SubElement(rr,
+                                 '{urn://augo/smev/uslugi/1.0.0}result').text = result
+                if text:
+                    etree.SubElement(rr,
+                                     '{urn://augo/smev/uslugi/1.0.0}text').text = text
+                if doc.file:
+                    for doc in applied_documents:
+                        ad = etree.SubElement(
+                            rr, '{urn://augo/smev/uslugi/1.0.0}AppliedDocument')
+                        etree.SubElement(
+                            ad,
+                            '{urn://augo/smev/uslugi/1.0.0}title').text = \
+                            doc.title
+                        etree.SubElement(
+                            ad,
+                            '{urn://augo/smev/uslugi/1.0.0}number').text = \
+                            doc.number
+                        etree.SubElement(
+                            ad,
+                            '{urn://augo/smev/uslugi/1.0.0}date').text = \
+                            doc.date
+                        etree.SubElement(
+                            ad,
+                            '{urn://augo/smev/uslugi/1.0.0}valid_until').text = \
+                            doc.valid_until
+                        etree.SubElement(
+                            ad,
+                            '{urn://augo/smev/uslugi/1.0.0}file_name').text = \
+                            doc.file_name
+                        etree.SubElement(
+                            ad,
+                            '{urn://augo/smev/uslugi/1.0.0}url').text = doc.url
+                        etree.SubElement(
+                            ad,
+                            '{urn://augo/smev/uslugi/1.0.0}url_valid_until').text = \
+                            doc.url_valid_until
 
-        npc = element(rr)
-        node = self.proxy.create_message(
-            self.proxy.service, operation,
-            {'MessageID': uuid1(), 'To': reply_to,
-             'MessagePrimaryContent': npc},
-            CallerInformationSystemSignature=etree.Element('Signature'))
-        res = node.find('.//{*}SenderProvidedResponseData')
-        res.set('Id', 'SIGNED_BY_CALLER')
-        res = etree.QName(res)
+                npc = element(rr)
+                node = self.proxy.create_message(
+                    self.proxy.service, operation,
+                    {'MessageID': uuid1(), 'To': reply_to,
+                     'MessagePrimaryContent': npc},
+                    CallerInformationSystemSignature=etree.Element('Signature'))
+                res = node.find('.//{*}SenderProvidedResponseData')
+                res.set('Id', 'SIGNED_BY_CALLER')
+                res = etree.QName(res)
 
-        if files:
-            rahl = etree.SubElement(res, 'RefAttachmentHeaderList')
-            for uuid, file in files:
-                rah = etree.SubElement(rahl, 'RefAttachmentHeader')
-                etree.SubElement(rah, 'uuid').text = uuid
+                if files:
+                    rahl = etree.SubElement(res, 'RefAttachmentHeaderList')
+                    for uuid, file in files:
+                        rah = etree.SubElement(rahl, 'RefAttachmentHeader')
+                        etree.SubElement(rah, 'uuid').text = uuid
+                        etree.SubElement(
+                            rah, 'Hash').text = self.crypto.get_file_hash(
+                            file['full_name'])
+                        etree.SubElement(rah, 'MimeType').text = file['type']
 
-        node_str = etree.tostring(node)
-        node_str = node_str.replace(
-            b'<ns0:SenderProvidedResponseData',
-            b'<ns0:SenderProvidedResponseData xmlns:ns0="' +
-            res.namespace.encode() + b'"')
-        self.log.debug(node_str)
-        res = self.__xml_part(node_str, b'ns0:SenderProvidedResponseData')
-        res = self.__call_sign(res)
-        res = node_str.decode().replace('<Signature/>', res)
-        res = self.__send(operation, res.encode('utf-8'))
-        self.log.debug(res)
+                node_str = etree.tostring(node)
+                node_str = node_str.replace(
+                    b'<ns0:SenderProvidedResponseData',
+                    b'<ns0:SenderProvidedResponseData xmlns:ns0="' +
+                    res.namespace.encode() + b'"')
+                self.log.debug(node_str)
+                res = self.__xml_part(node_str,
+                                      b'ns0:SenderProvidedResponseData')
+                res = self.__call_sign(res)
+                res = node_str.decode().replace('<Signature/>', res)
+                res = self.__send(operation, res.encode('utf-8'))
+                self.log.debug(res)
 
     def __call_sign(self, xml):
         method_name = 'sign_' + self.method
@@ -290,9 +309,9 @@ class Adapter:
         method = getattr(self.crypto, method_name)
         return method(xml)
 
-    def __upload_file(self, file, file_name):
+    def __upload_file(self, file, file_name, ftp_user=None, ftp_pass=None):
         addr = urlparse(self.ftp_addr).netloc
-        with ftplib.FTP(addr) as con:
+        with ftplib.FTP(addr, ftp_user, ftp_pass) as con:
             uuid = str(uuid1())
             con.mkd(uuid)
             con.cwd(uuid)
@@ -364,4 +383,8 @@ if __name__ == '__main__':
     a = Adapter()
     from datetime import date
 
-    print(a.send_respose('fbklfblkfdgndndf', '454/5624365', date(2008, 8, 25)))
+    doc = AppliedDocument
+    doc.file_name = 'fgfdgfd'
+    doc.file = 'dfdscxvcx'
+    print(a.send_respose('fbklfblkfdgndndf', '454/5624365', date(2008, 8, 25),
+                         applied_documents=[doc]))

@@ -6,8 +6,11 @@
 # Then it queries Directum for changed status for stored requests and sends
 # SendResponse if status changed
 import logging
+import os
+from tempfile import mkstemp
 
 from db import Db
+from declar import AppliedDocument
 from plugins.directum import IntegrationServices
 from smev import Adapter
 
@@ -27,7 +30,7 @@ class Integration:
             self.smev_uri = 'urn://augo/smev/uslugi/1.0.0'
             self.local_name = 'directum'
             self.cert_method = 'sharp'
-            self.mail_server = None
+            self.mail_server, self.ftp_user, self.ftp_pass = None, None, None
 
         self.smev = Adapter(self.smev_wsdl, self.smev_ftp,
                             method=self.cert_method)
@@ -44,9 +47,93 @@ class Integration:
                                                            self.local_name)
             if declar:
                 res = self.directum.add_declar(declar)
-                self.db.add_update(uuid, declar.declar_number, reply_to)
+                self.db.add_update(uuid, declar.declar_number, reply_to,
+                                   directum_id=res)
                 logging.info('Добавлено/обновлено дело с ID = %s' % res)
                 self.directum.run_script('СтартЗадачПоМУ')
+        except Exception as e:
+            self.report_error(e)
+
+        # Send final response
+        try:
+            for response in self.db.all_not_done():
+                declar = self.directum.search('ДПУ',
+                                              'ИД=%s' % response.directum_id)
+
+                # For all requests check if declar`s end date is set
+                if declar[0].get('Дата5'):
+                    applied_docs = []
+                    found = False
+
+                    # Search newest procedure with document bound
+                    # for that declar
+                    procs = self.directum.search(
+                        'ПРОУ', 'Kod2=%s' % response.declar_number,
+                        order_by='Дата4', ascending=False)
+                    for proc in procs:
+                        if proc.get(
+                                'Ведущая аналитика') == response.directum_id:
+                            docs = self.directum.get_bind_docs(
+                                'ПРОУ', proc.get('ИДЗапГлавРазд'))
+                            for doc in docs:
+                                doc_id = doc.get('ID')
+                                ad = AppliedDocument()
+                                # Get only last version
+                                versions = self.directum.get_doc_versions(
+                                    doc_id)
+                                data = self.directum.get_doc(
+                                    doc_id, versions[0])
+                                file, file_n = mkstemp()
+                                os.write(file, data)
+                                os.close(file)
+                                ad.file = file_n
+                                ad.date = doc.get('ISBEDocCreateDate')
+                                ad.file_name = doc.get('ID') + '.' + doc.get(
+                                    'Extension').lower()
+                                ad.number = doc.get('Дополнение') if doc.get(
+                                    'Дополнение') else doc.get('NumberEDoc')
+                                ad.title = doc.get('ISBEDocName')
+                                applied_docs.append(ad)
+                            if docs:
+                                found = True
+                                break
+
+                    # Get bound docs from declar if there is no procedures
+                    # with docs bound
+                    if not found:
+                        docs = self.directum.get_bind_docs(
+                            'ДПУ', response.directum_id)
+                        ad = AppliedDocument()
+                        for doc in docs:
+                            if doc.get('TKED') in ('КИК', 'ИК1', 'ИК2', 'ПСИ'):
+                                if ad.date > doc.get('ISBEDocCreateDate'):
+                                    doc_id = doc.get('ID')
+                                    if ad.file:
+                                        os.remove(ad.file)
+                                    file, file_n = mkstemp()
+                                    ad.file = file_n
+                                    ad.date = doc.get('ISBEDocCreateDate')
+                                    ad.file_name = doc.get(
+                                        'ID') + '.' + doc.get(
+                                        'Extension').lower()
+                                    ad.number = doc.get(
+                                        'Дополнение') if doc.get(
+                                        'Дополнение') else doc.get('NumberEDoc')
+                                    ad.title = doc.get('ISBEDocName')
+                        # Get only last version
+                        versions = self.directum.get_doc_versions(
+                            doc_id)
+                        data = self.directum.get_doc(
+                            doc_id, versions[0])
+                        os.write(ad.file, data)
+                        os.close(ad.file)
+                        applied_docs.append(ad)
+
+                    self.smev.send_respose(
+                        response.reply_to, response.declar_num,
+                        response.declar_date, text='Услуга предоставлена',
+                        applied_documents=applied_docs, ftp_user=self.ftp_user,
+                        ftp_pass=self.ftp_pass)
         except Exception as e:
             self.report_error(e)
 
@@ -138,6 +225,14 @@ class Integration:
             if self.cert_method == 'csp' and not hasattr(self, 'container'):
                 raise Exception('Ошибка в настройках: если method = csp, '
                                 'необходимо указать container')
+            if 'ftp_user' in cfg.options('smev'):
+                self.ftp_user = cfg.get('smev', 'ftp_user')
+            else:
+                self.ftp_user = None
+            if 'ftp_pass' in cfg.options('smev'):
+                self.ftp_pass = cfg.get('smev', 'ftp_pass')
+            else:
+                self.ftp_pass = None
 
             if not cfg.has_section("directum"):
                 cfg.set(
@@ -180,10 +275,16 @@ class Integration:
             message['From'] = from_addr
             message['To'] = self.mail_addr
 
-            s = smtplib.SMTP(self.mail_server)
-            s.sendmail(from_addr, [self.mail_addr], message.as_string())
-            s.quit()
-
+            try:
+                s = smtplib.SMTP(self.mail_server)
+                s.sendmail(from_addr, [self.mail_addr], message.as_string())
+                s.quit()
+            except smtplib.SMTPException:
+                etype, value, tb = exc_info()
+                trace = ''.join(format_exception(etype, value, tb))
+                msg = ("%s" + "\n" + "*" * 70 + "\n%s\n" + "*" * 70) % (
+                value, trace)
+                logging.error(msg)
 
 if __name__ == '__main__':
     logging.root.setLevel(logging.DEBUG)

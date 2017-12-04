@@ -632,7 +632,39 @@ class IntegrationServices:
             self.run_script('BindEDocDPbyID', params)
         return declar_id
 
-    def search(self, code, criteria, tp=REF):
+    def get_entity(self, name, eid):
+        res = self.proxy.service.GetEntity(name, eid)
+        # return res
+        xml_doc = fromstring(res)
+        return [{req: elem.text if req == 'value' else elem.get(req) for req in
+                 ('Type', 'Name', 'value')} for elem in
+                xml_doc.iter('Requisite')]
+
+    def get_bind_docs(self, otype, oid):
+        res = self.proxy.service.GetBindEDocumentsList(otype, oid)
+        xml_doc = fromstring(res)
+        docs = []
+        for elem in xml_doc.iter('Object'):
+            res = {req: elem.get(req)
+                   for req in ('Editor', 'Extension', 'Type', 'Name', 'ID',
+                               'VED', 'TKED')}
+            res.update(
+                {req.get('Name'): req.text for req in elem.iter('Requisite')})
+            docs.append(res)
+        return docs
+
+    def get_doc_versions(self, doc_id):
+        res = self.proxy.service.GetEDocumentVersionList(doc_id)
+        xml_doc = fromstring(res)
+        res = [elem.get('ID') for elem in xml_doc.iter('Version')]
+        res = sorted(res, reverse=True)
+        return res
+
+    def get_doc(self, doc_id, version=-1):
+        res = self.proxy.service.GetEDocument(doc_id, version)
+        return res
+
+    def search(self, code, criteria, tp=REF, order_by='', ascending=True):
         """
         Call search
 
@@ -669,6 +701,9 @@ class IntegrationServices:
         search.appendChild(where)
 
         order = search_pak.createElement('OrderBy')
+        if order_by:
+            order.setAttribute('Name', order_by)
+            order.setAttribute('Ascending', ascending)
         search.appendChild(order)
 
         search_pak.appendChild(search)
@@ -680,10 +715,16 @@ class IntegrationServices:
         self.log.debug("Search result: %s" % res)
         xml_doc = fromstring(res)
         if tp:
-            return [{req: elem.get(req)
-                     for req in ('Editor', 'Extension', 'Type', 'Name', 'ID',
-                                 'VED', 'TKED')}
-                    for elem in xml_doc.iter('Object')]
+            docs = []
+            for elem in xml_doc.iter('Object'):
+                res = {req: elem.get(req)
+                       for req in ('Editor', 'Extension', 'Type', 'Name', 'ID',
+                                   'VED', 'TKED')}
+                res.update(
+                    {req.get('Name'): req.text for req in
+                     elem.iter('Requisite')})
+                docs.append(res)
+            return docs
         else:
             return [
                 {req.get('Name'): req.text for req in elem.iter('Requisite')}
@@ -818,12 +859,24 @@ if __name__ == '__main__':
     logging.getLogger('zeep.xsd').setLevel(logging.INFO)
     logging.getLogger('zeep.wsdl').setLevel(logging.INFO)
 
-    res = open('../tests/GetRequestResponseAttachFTP.xml', 'rb').read()
+    with open('../tests/GetRequestResponseAttachFTP.xml', 'rb') as f:
+        res = f.read()
     xml = etree.fromstring(res)
     declar = Declar.parsexml(
         etree.tostring(xml.find('.//{urn://augo/smev/uslugi/1.0.0}declar')))
 
-    wsdl = "http://snadb:8082/IntegrationService.svc?singleWsdl"
+    wsdl = "http://servdir1:8083/IntegrationService.svc?singleWsdl"
     dis = IntegrationServices(wsdl)
-    res = dis.add_declar(declar)
-    print(res)
+    # res = dis.get_entity('ДПУ', 922928)
+    # print(res)
+    procs = dis.search('ПРОУ', 'Kod2=%s' % 178609, order_by='Дата4',
+                       ascending=False)
+    for proc in procs:
+        if proc.get('Ведущая аналитика') == '3863571':
+            res = dis.get_bind_docs('ПРОУ', proc.get('ИДЗапГлавРазд'))
+            if res:
+                # doc_id = res[0].get('ID')
+                # res = dis.get_doc_versions(doc_id)
+                # res = dis.get_doc(doc_id, res[0])
+                print(proc.get('ИДЗапГлавРазд'), res)
+                # print(res)
