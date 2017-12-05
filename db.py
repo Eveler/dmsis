@@ -1,6 +1,5 @@
 # -*- encoding: utf-8 -*-
 import logging
-
 from datetime import date
 
 from sqlalchemy import Column, Integer, String, Boolean, Date

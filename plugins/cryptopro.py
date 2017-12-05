@@ -4,7 +4,7 @@ import os
 import subprocess
 import tempfile
 from encodings.base64_codec import base64_encode
-from sys import platform, stderr
+from sys import platform
 
 if 'win32' not in platform:
     raise Exception('This is for Windows only')

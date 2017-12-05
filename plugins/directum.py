@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 import logging
-from datetime import date, datetime
 from xml.dom.minidom import Document
 from xml.etree.ElementTree import fromstring
 
