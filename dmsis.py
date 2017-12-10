@@ -24,7 +24,7 @@ class Integration:
     def __init__(self, use_config=True, config_path='./dmsis.ini'):
         logging.basicConfig(
             format='%(asctime)s %(name)s:%(module)s(%(lineno)d): '
-                   '%(levelname)s: %(message)s')
+                   '%(levelname)s: %(message)s', level=logging.INFO)
         if use_config:
             self.parse_config(config_path)
         else:
@@ -37,10 +37,47 @@ class Integration:
             self.cert_method = 'sharp'
             self.mail_server, self.ftp_user, self.ftp_pass = None, None, None
 
-        self.smev = Adapter(self.smev_wsdl, self.smev_ftp,
-                            method=self.cert_method)
-        self.directum = IntegrationServices(self.directum_wsdl)
+        try:
+            self.__smev = Adapter(self.smev_wsdl, self.smev_ftp,
+                              method=self.cert_method)
+        except Exception:
+            self.report_error()
+
+        try:
+            self.__directum = IntegrationServices(self.directum_wsdl)
+        except Exception:
+            self.report_error()
+
         self.db = Db()
+
+    @property
+    def directum(self):
+        if not self.__directum:
+            try:
+                self.__directum = IntegrationServices(self.directum_wsdl)
+            except Exception:
+                self.report_error()
+
+        return self.__directum
+
+    @directum.setter
+    def directum(self, value):
+        self.__directum = value
+
+    @property
+    def smev(self):
+        if not self.__smev:
+            try:
+                self.__smev = Adapter(self.smev_wsdl, self.smev_ftp,
+                                  method=self.cert_method)
+            except Exception:
+                self.report_error()
+
+        return self.__smev
+
+    @smev.setter
+    def smev(self, value):
+        self.__smev = value
 
     def run(self):
         lc = task.LoopingCall(self.step)
@@ -159,9 +196,15 @@ class Integration:
             lst = cfg.read(
                 [config_path, "./dmsis.ini", expanduser("~/dmsis.ini"),
                  "c:/dmsis/dmsis.ini"])
+            if lst:
+                logging.info('Configuration loaded from: %s' % lst)
+            else:
+                logging.warning('No config files found. Using default')
+                lst = [os.path.abspath("./dmsis.ini")]
+                logging.info('Configuration stored in: %s' % lst)
+
             do_write = False
             if not cfg.has_section("main"):
-                logging.info("config = %s" % lst)
                 do_write = True
                 cfg.add_section("main")
                 cfg.set("main", "logfile", "dmsis.log")
@@ -184,7 +227,6 @@ class Integration:
                 '%(asctime)s %(name)s:%(module)s(%(lineno)d): %(levelname)s: '
                 '%(message)s'))
             logging.root.addHandler(handler)
-            logging.info("config(s) = %s" % lst)
             if "loglevel" not in cfg.options("main"):
                 do_write = True
                 cfg.set("main", "loglevel", "warning")
@@ -202,6 +244,7 @@ class Integration:
 
             if not cfg.has_section("smev"):
                 do_write = True
+                cfg.add_section('smev')
                 cfg.set(
                     'smev', 'wsdl', "http://172.20.3.12:7500/smev/v1.2/ws?wsdl")
                 cfg.set('smev', 'ftp', "ftp://172.20.3.12/")
@@ -214,26 +257,28 @@ class Integration:
             else:
                 self.local_name = 'directum'
             if 'wsdl' not in cfg.options('smev'):
+                do_write = True
                 cfg.set(
                     'smev', 'wsdl', "http://172.20.3.12:7500/smev/v1.2/ws?wsdl")
             self.smev_wsdl = cfg.get('smev', 'wsdl')
             if 'ftp' not in cfg.options('smev'):
+                do_write = True
                 cfg.set('smev', 'ftp', "ftp://172.20.3.12/")
             self.smev_ftp = cfg.get('smev', 'ftp')
             if 'method' not in cfg.options('smev'):
+                do_write = True
                 cfg.set('smev', 'method', "sharp")
             self.cert_method = cfg.get('smev', 'method').lower()
             if 'crt_serial' in cfg.options('smev'):
                 self.crt_serial = cfg.get('smev', 'crt_serial')
-            if self.cert_method in ('sharp', 'com') and not hasattr(
-                    self, 'crt_serial'):
-                raise Exception('Ошибка в настройках: если method = sharp или '
-                                'com, необходимо указать crt_serial')
+            else:
+                raise Exception('Ошибка в настройках: необходимо указать '
+                                'crt_serial в секции smev')
             if 'container' in cfg.options('smev'):
                 self.container = cfg.get('smev', 'container')
-            if self.cert_method == 'csp' and not hasattr(self, 'container'):
-                raise Exception('Ошибка в настройках: если method = csp, '
-                                'необходимо указать container')
+            else:
+                raise Exception('Ошибка в настройках: необходимо указать '
+                                'container в секции smev')
             if 'ftp_user' in cfg.options('smev'):
                 self.ftp_user = cfg.get('smev', 'ftp_user')
             else:
@@ -244,30 +289,42 @@ class Integration:
                 self.ftp_pass = None
 
             if not cfg.has_section("directum"):
+                do_write = True
+                cfg.add_section('directum')
+            if 'wsdl' not in cfg.options('directum'):
+                do_write = True
                 cfg.set(
                     'directum', 'wsdl',
                     "http://servdir1:8083/IntegrationService.svc?singleWsdl")
             self.directum_wsdl = cfg.get('directum', 'wsdl')
 
-            if not cfg.has_section("service"):
+            if not cfg.has_section("integration"):
                 do_write = True
-                cfg.set('service', 'repeat_every', 300)
-            self.repeat_every = cfg.getint('service', 'repeat_every')
+                cfg.add_section('integration')
+            if 'repeat_every' not in cfg.options('integration'):
+                do_write = True
+                cfg.set('integration', 'repeat_every', '10')
+            self.repeat_every = cfg.getint('integration', 'repeat_every')
 
             if do_write:
                 for fn in lst:
                     with open(fn, "w") as configfile:
                         cfg.write(configfile)
                         configfile.close()
-        except NoSectionError as e:
-            self.report_error(e)
+        except NoSectionError:
+            self.report_error()
             quit()
-        except NoOptionError as e:
-            self.report_error(e)
-        except Exception as e:
-            self.report_error(e)
+        except NoOptionError:
+            self.report_error()
+        except Exception:
+            if do_write:
+                for fn in lst:
+                    with open(fn, "w") as configfile:
+                        cfg.write(configfile)
+                        configfile.close()
+            raise
 
-    def report_error(self, e):
+    def report_error(self):
         from sys import exc_info
         from traceback import format_exception
         etype, value, tb = exc_info()
@@ -319,7 +376,7 @@ def run():
     reactor.run(installSignalHandlers=0)
 
 
-if __name__ == '__main__':
+def main():
     # Ensure basic thread support is enabled for twisted
     from twisted.python import threadable
 
@@ -337,3 +394,7 @@ if __name__ == '__main__':
         run()
     else:
         HandleCommandLine(Service)
+
+
+if __name__ == '__main__':
+    main()
