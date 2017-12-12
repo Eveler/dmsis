@@ -74,6 +74,21 @@ class Crypto:
         else:
             return self.sign_csp(xml)
 
+    def get_file_hash(self, file_path):
+        csptest_path = 'C:\\Program Files (x86)\\Crypto Pro\\CSP\\csptest.exe'
+        hashtmp_f, hashtmp_fn = tempfile.mkstemp()
+        os.close(hashtmp_f)
+        args = [csptest_path, 'csptest.exe', '-silent', '-keyset', '-hash',
+                'GOST', '-container', self.__container, '-keytype', 'exchange',
+                '-in', os.path.abspath(file_path), '-hashout', hashtmp_fn]
+        out = subprocess.check_output(args, stderr=subprocess.STDOUT)
+        self.log.debug(out.decode(encoding='cp866'))
+
+        with open(hashtmp_fn, 'rb') as f:
+            hsh = f.read()
+        hsh_bytes = base64_encode(hsh)[0][:-1].decode().replace('\n', '')
+        return hsh_bytes
+
     # TODO: Enveloped signature
     def sign_csp(self, xml):
         csptest_path = 'C:\\Program Files (x86)\\Crypto Pro\\CSP\\csptest.exe'
@@ -87,10 +102,10 @@ class Crypto:
             os.close(intmp_f)
             os.close(outtmp_f)
             os.close(hashtmp_f)
-            args = [csptest_path, 'csptest.exe', '-keyset', '-sign', 'GOST',
-                    '-hash', 'GOST', '-container', self.__container, '-keytype',
-                    'exchange', '-in', intmp_fn, '-out', outtmp_fn, '-hashout',
-                    hashtmp_fn]
+            args = [csptest_path, 'csptest.exe', '-silent', '-keyset', '-sign',
+                    'GOST', '-hash', 'GOST', '-container', self.__container,
+                    '-keytype', 'exchange', '-in', intmp_fn, '-out', outtmp_fn,
+                    '-hashout', hashtmp_fn]
             out = subprocess.check_output(args, stderr=subprocess.STDOUT)
             self.log.debug(out.decode(encoding='cp866'))
 
@@ -145,12 +160,12 @@ class Crypto:
                '</ds:Transforms>' \
                '<ds:DigestMethod ' \
                'Algorithm="http://www.w3.org/2001/04/xmldsig-more#gostr3411"/>' \
-               '<ds:DigestValue>' + hsh_bytes + '</ds:DigestValue>' \
-                                                '</ds:Reference></ds:SignedInfo>' \
-                                                '<ds:SignatureValue>' + sign + '</ds:SignatureValue>' \
-                                                                               '<ds:KeyInfo><ds:X509Data>' \
-                                                                               '<ds:X509Certificate>' + cert.decode() + '</ds:X509Certificate>' \
-                                                                                                                        '</ds:X509Data></ds:KeyInfo></ds:Signature>'
+               '<ds:DigestValue>' + hsh_bytes + \
+               '</ds:DigestValue></ds:Reference></ds:SignedInfo>' \
+               '<ds:SignatureValue>' + sign + \
+               '</ds:SignatureValue><ds:KeyInfo><ds:X509Data>' \
+               '<ds:X509Certificate>' + cert.decode() + \
+               '</ds:X509Certificate></ds:X509Data></ds:KeyInfo></ds:Signature>'
 
     def sign_com(self, xml, sign_type=CADESCOM_XML_SIGNATURE_TYPE_ENVELOPED):
         self.log.debug(xml)
@@ -172,12 +187,13 @@ class Crypto:
             args = [os.path.abspath(xmlsigner_path), 'xmlsigner.exe']
             if self.serial:
                 args.append(self.serial)
-            out = subprocess.check_output(args, input=xml)
+            out = subprocess.check_output(args, input=xml,
+                                          stderr=subprocess.STDOUT)
             self.log.debug(out.decode(encoding='cp866'))
             return out.decode(encoding='cp866')
         except subprocess.CalledProcessError as e:
             self.log.error(e.output.decode(encoding='cp866'))
-            return e.output.decode(encoding='cp866')
+            raise Exception(e.output.decode(encoding='cp866'))
 
 
 if __name__ == '__main__':

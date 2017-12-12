@@ -1,51 +1,16 @@
 # -*- encoding: utf-8 -*-
 
 
-# from ladon.compat import PORTABLE_STRING
-# from ladon.ladonizer import ladonize
-# from ladon.types.ladontype import LadonType
-
-# import pyximport
-# pyximport.install()
-# import hello
-# pyximport.uninstall(__import__, pyximport)
-# import hellop
-
-
-# class Declar(LadonType):
-#     number = PORTABLE_STRING
-#
-#
-# class SoapService:
-#     @ladonize(Declar, rtype=PORTABLE_STRING)
-#     def SendDeclar(self, declar):
-#         pass
-
-
-# class Calculator(object):
-#     """
-#     This service does the math, and serves as example for new potential Ladon
-#     users.
-#     """
-#
-#     @ladonize(int, int, rtype=int)
-#     def add(self, a, b):
-#         """
-#         Add two integers together and return the result
-#
-#         @param a: 1st integer
-#         @param b: 2nd integer
-#         @rtype: The result of the addition
-#         """
-#         return a + b
 import logging
-from os import environ, putenv
 
-import requests
+# import requests
 from smev import Adapter
 
+# from os import environ, putenv
+
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(levelname)s:%(module)s:%(name)s:%(lineno)d: %(message)s')
+    logging.basicConfig(level=logging.DEBUG,
+                        format='%(asctime)s %(levelname)s:%(module)s:%(name)s:%(lineno)d: %(message)s')
     logging.getLogger('zeep.xsd').setLevel(logging.INFO)
     logging.getLogger('zeep.wsdl').setLevel(logging.INFO)
     logging.getLogger('urllib3').setLevel(logging.INFO)
@@ -62,8 +27,8 @@ if __name__ == '__main__':
     #         "http://smev3-d.test.gosuslugi.ru:7500/smev/v1.2/ws?wsdl").content,
     #                                       'SMEVMessageExchangeService'))
 
-    environ['OPENSSL_CONF'] = 'cryptography/hazmat/bindings/openssl.cfg'
-    putenv('OPENSSL_CONF', 'cryptography/hazmat/bindings/openssl.cfg')
+    # environ['OPENSSL_CONF'] = 'cryptography/hazmat/bindings/openssl.cfg'
+    # putenv('OPENSSL_CONF', 'cryptography/hazmat/bindings/openssl.cfg')
 
     a = Adapter()
     # logging.debug(a.dump())

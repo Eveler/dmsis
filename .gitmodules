@@ -46,6 +46,18 @@
 [submodule "3dparty/lxml-repo"]
 	path = 3dparty/lxml-repo
 	url = https://git.launchpad.net/lxml
-[submodule "3dparty/pywin32"]
-	path = 3dparty/pywin32
-	url = https://github.com/mhammond/pywin32.git
+[submodule "3dparty/sqlalchemy"]
+	path = 3dparty/sqlalchemy
+	url = https://bitbucket.org/zzzeek/sqlalchemy.git
+[submodule "3dparty/twisted"]
+	path = 3dparty/twisted
+	url = https://github.com/twisted/twisted.git
+[submodule "3dparty/incremental"]
+	path = 3dparty/incremental
+	url = https://github.com/twisted/incremental.git
+[submodule "3dparty/zope.interface"]
+	path = 3dparty/zope.interface
+	url = https://github.com/zopefoundation/zope.interface.git
+[submodule "3dparty/constantly"]
+	path = 3dparty/constantly
+	url = https://github.com/twisted/constantly.git

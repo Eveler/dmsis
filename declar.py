@@ -65,6 +65,35 @@ class Address(xsd.ComplexType):
         instance.Locality = Locality
         return instance
 
+    def __str__(self):
+        res = ''
+        if self.Postal_Code:
+            res += self.Postal_Code
+        if self.Region:
+            res += (', ' if res else '') + self.Region
+        if self.District:
+            res += (', ' if res else '') + self.District
+        if self.City:
+            res += (', ' if res else '') + self.City
+        if self.Urban_District:
+            res += (', ' if res else '') + self.Urban_District
+        if self.Soviet_Village:
+            res += (', ' if res else '') + self.Soviet_Village
+        res += (', ' if res else '') + self.Locality
+        if self.Street:
+            res += ', ' + self.Street
+        if self.House:
+            res += ', д. ' + self.House
+        if self.Housing:
+            res += self.Housing
+        if self.Building:
+            res += ', ст. ' + self.Building
+        if self.Apartment:
+            res += ', к. ' + self.Apartment
+        if self.Reference_point:
+            res += ', ' + self.Reference_point
+        return res
+
 
 class AppliedDocument(xsd.ComplexType):
     INHERITANCE = None
@@ -76,6 +105,7 @@ class AppliedDocument(xsd.ComplexType):
     file_name = xsd.Element(xsd.String, minOccurs=0)
     url = xsd.Element(xsd.String)
     url_valid_until = xsd.Element(xsd.DateTime, minOccurs=0)
+    file = None
 
     @classmethod
     def create(cls, title, number, date, url):
@@ -174,7 +204,7 @@ class Declar(xsd.ComplexType):
     object_address = xsd.Element(Address, minOccurs=0)
     AppliedDocument = xsd.ListElement(AppliedDocument, tagname='AppliedDocument', maxOccurs=xsd.UNBOUNDED)
     legal_entity = xsd.ListElement(LegalEntity, minOccurs=0, tagname='legal_entity', maxOccurs=xsd.UNBOUNDED)
-    person = xsd.ListElement(Individual, minOccurs=0, tagname='legal_entity', maxOccurs=xsd.UNBOUNDED)
+    person = xsd.ListElement(Individual, minOccurs=0, tagname='person', maxOccurs=xsd.UNBOUNDED)
     confidant = xsd.Element(Individual, minOccurs=0)
     files = []
 
@@ -205,6 +235,9 @@ class Declar(xsd.ComplexType):
         for file in self.files:
             if isinstance(file, (str, bytes)):
                 remove(file)
+            elif isinstance(file, dict):
+                if file:
+                    remove(file.popitem()[0])
             else:
                 remove(file.name)
 
