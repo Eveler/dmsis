@@ -61,37 +61,37 @@
 					<xs:complexType>
 						<xs:simpleContent>
 							<xs:extension base="xs:string">
-								<xs:attribute name="type" use="required">
+								<xs:attribute name="type" use="required" type="xs:string">
 									<xs:annotation>
 										<xs:documentation>тип значения параметра: Boolean или Integer или Double или Date или DateTime или String</xs:documentation>
 									</xs:annotation>
 								</xs:attribute>
-								<xs:attribute name="id" use="required">
+								<xs:attribute name="id" use="required" type="xs:string">
 									<xs:annotation>
 										<xs:documentation>внутренний идентификатор параметра (только цифры и латинсуие символы, начинается с символа)</xs:documentation>
 									</xs:annotation>
 								</xs:attribute>
-								<xs:attribute name="label">
+								<xs:attribute name="label" type="xs:string">
 									<xs:annotation>
 										<xs:documentation>читаемое человеком наименование параметра</xs:documentation>
 									</xs:annotation>
 								</xs:attribute>
-								<xs:attribute name="rowNumber">
+								<xs:attribute name="rowNumber" type="xs:string">
 									<xs:annotation>
 										<xs:documentation>если значение параметра - массив, количество строк массива</xs:documentation>
 									</xs:annotation>
 								</xs:attribute>
-								<xs:attribute name="colNumber">
+								<xs:attribute name="colNumber" type="xs:string">
 									<xs:annotation>
 										<xs:documentation>если значение параметра - массив, количество столбцов массива</xs:documentation>
 									</xs:annotation>
 								</xs:attribute>
-								<xs:attribute name="rowDelimiter">
+								<xs:attribute name="rowDelimiter" type="xs:string">
 									<xs:annotation>
 										<xs:documentation>символ - разделитель строк массива</xs:documentation>
 									</xs:annotation>
 								</xs:attribute>
-								<xs:attribute name="colDelimiter">
+								<xs:attribute name="colDelimiter" type="xs:string">
 									<xs:annotation>
 										<xs:documentation>символ - разделитель колонок массива</xs:documentation>
 									</xs:annotation>
@@ -533,4 +533,9 @@
 			</xs:element>
 		</xs:sequence>
 	</xs:complexType>
+	<xs:element name="requestResponse" type="ns1:requestResponse">
+		<xs:annotation>
+			<xs:documentation>Ответ на запрос</xs:documentation>
+		</xs:annotation>
+	</xs:element>
 </xs:schema>
