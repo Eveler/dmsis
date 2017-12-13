@@ -380,11 +380,14 @@ if __name__ == '__main__':
     logging.getLogger('zeep.wsdl').setLevel(logging.INFO)
     logging.getLogger('urllib3').setLevel(logging.INFO)
 
-    a = Adapter()
+    a = Adapter(serial='008E BDC8 291F 0003 81E7 11E1 AF7A 5ED3 27',
+                container='049fc71a-1ff0-4e06-8714-03303ae34afd')
     from datetime import date
 
-    doc = AppliedDocument
-    doc.file_name = 'fgfdgfd'
-    doc.file = 'dfdscxvcx'
-    print(a.send_respose('fbklfblkfdgndndf', '454/5624365', date(2008, 8, 25),
-                         applied_documents=[doc]))
+    # doc = AppliedDocument
+    # doc.file_name = 'fgfdgfd'
+    # doc.file = 'dfdscxvcx'
+    # print(a.send_respose('fbklfblkfdgndndf', '454/5624365', date(2008, 8, 25),
+    #                      applied_documents=[doc]))
+
+    res = a.get_request('urn://augo/smev/uslugi/1.0.0', 'directum')

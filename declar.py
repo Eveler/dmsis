@@ -206,6 +206,7 @@ class Declar(xsd.ComplexType):
     legal_entity = xsd.ListElement(LegalEntity, minOccurs=0, tagname='legal_entity', maxOccurs=xsd.UNBOUNDED)
     person = xsd.ListElement(Individual, minOccurs=0, tagname='person', maxOccurs=xsd.UNBOUNDED)
     confidant = xsd.Element(Individual, minOccurs=0)
+    Param = xsd.ListElement(xsd.String, tagname='Param', minOccurs=0, maxOccurs=xsd.UNBOUNDED)
     files = []
 
     @classmethod
