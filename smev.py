@@ -96,7 +96,8 @@ class Adapter:
 
     # def get_request(self, uri='urn://augo/smev/uslugi/1.0.0',
     #                 local_name='directum'):
-    def get_request(self, uri=None, local_name=None, node_id=None):
+    def get_request(self, uri=None, local_name=None, node_id=None,
+                    gen_xml_only=False):
         if (uri and not local_name) or (not uri and local_name):
             raise Exception(
                 'uri и local_name необходимо указывать одновременно')
@@ -131,6 +132,8 @@ class Adapter:
         #     self.__xml_part(node_str, b'ns1:MessageTypeSelector'))
 
         res = node_str.decode().replace('<Signature/>', res)
+        if gen_xml_only:
+            return res
 
         res = self.__send(operation, res)
         # # res = self.proxy.service.GetRequest(
@@ -374,15 +377,40 @@ class Adapter:
 
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.DEBUG,
+    logging.basicConfig(level=logging.INFO,
                         format='%(asctime)s %(levelname)s:%(module)s:%(name)s:%(lineno)d: %(message)s')
     logging.getLogger('zeep.xsd').setLevel(logging.INFO)
     logging.getLogger('zeep.wsdl').setLevel(logging.INFO)
     logging.getLogger('urllib3').setLevel(logging.INFO)
 
+    import sys
+
+    if len(sys.argv) < 1:
+        from logging.handlers import TimedRotatingFileHandler
+
+        handler = TimedRotatingFileHandler(
+            "tests/dmsis.log", when='D', backupCount=0, encoding='cp1251')
+        handler.setFormatter(logging.Formatter(
+            '%(asctime)s %(name)s:%(module)s(%(lineno)d): %(levelname)s: '
+            '%(message)s'))
+        handler.setLevel(logging.INFO)
+        logging.root.addHandler(handler)
+
     a = Adapter(serial='008E BDC8 291F 0003 81E7 11E1 AF7A 5ED3 27',
-                container='049fc71a-1ff0-4e06-8714-03303ae34afd')
-    from datetime import date
+                container='smev_ep-ov')
+
+    if len(sys.argv) > 1 and sys.argv[1].lower() == 'test2':
+        with open('tests/test2.xml', 'w') as f:
+            f.write(a.get_request('urn://augo/smev/uslugi/1.0.0', 'directum',
+                                  gen_xml_only=True))
+    else:
+        try:
+            res = a.get_request('urn://augo/smev/uslugi/1.0.0', 'directum')
+        except Exception as e:
+            with open('tests/dmsis.log', 'a') as f:
+                logging.error(str(e))
+                f.write(str(e))
+    # from datetime import date
 
     # doc = AppliedDocument
     # doc.file_name = 'fgfdgfd'
@@ -390,4 +418,3 @@ if __name__ == '__main__':
     # print(a.send_respose('fbklfblkfdgndndf', '454/5624365', date(2008, 8, 25),
     #                      applied_documents=[doc]))
 
-    res = a.get_request('urn://augo/smev/uslugi/1.0.0', 'directum')

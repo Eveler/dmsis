@@ -94,7 +94,9 @@ class IntegrationServices:
         document.base64Binary = data
         res = self.proxy.service.EDocumentsCreate(XMLPackage=package,
                                                   Documents=document)
-        self.log.debug('res = %s' % res)
+        self.log.info('Добавлен документ: %s № %s от %s = %s' % (
+            requisites.title, requisites.number,
+            requisites.date.strftime('%d.%m.%Y'), res))
         if res[0][:1] == "1":
             raise Exception(res[0][2:])
         return res[0][2:]
@@ -216,6 +218,8 @@ class IntegrationServices:
         # res = self.run_script('CheckDuplicateByCode', params)
         if res[0]:
             raise Exception(str(res))
+        self.log.info('Добавлен заявител ФЛ: %s, регистрация: %s' %
+                      (name, str(human.fact_address)))
         return res
 
     def add_legal_entity(self, entity):
@@ -308,6 +312,7 @@ class IntegrationServices:
                                                   FullSync=True)
         if res[0]:
             raise Exception(str(res))
+        self.log.info('Добавлен заявитель ЮЛ: %s' % entity.name)
         return res
 
     def add_declar(self, declar, doc_getter=None, subdivision="106759",
@@ -371,7 +376,8 @@ class IntegrationServices:
             if doc_ids:
                 params = [('ID', declar_id),
                           ('Doc_IDs', ';'.join(doc_ids))]
-                self.run_script('notification_add_docs', params)
+                res = self.run_script('notification_add_docs', params)
+                self.log.info('Отправлено уведомление ID = %s' % res)
             return declar_id
 
         # Add new
@@ -602,6 +608,10 @@ class IntegrationServices:
                           (declar.declar_number,
                            declar.register_date.strftime('%d.%m.%Y')))
         declar_id = res[0]['ИДЗапГлавРазд']
+        self.log.info('Добавлено дело № %s от %s ID = %s' %
+                      (declar.declar_number,
+                       declar.register_date.strftime('%d.%m.%Y'),
+                       declar_id))
 
         params = [('Param', None), ('Param2', declar_id)]
         res = self.run_script('NameDPU', params)
@@ -852,30 +862,31 @@ if __name__ == '__main__':
     from lxml import etree
 
     logging.basicConfig(
-        level=logging.DEBUG,
+        level=logging.INFO,
         format='%(asctime)s %(name)s:%(module)s(%(lineno)d): %(levelname)s: '
                '%(message)s')
     logging.getLogger('zeep.xsd').setLevel(logging.INFO)
     logging.getLogger('zeep.wsdl').setLevel(logging.INFO)
 
-    with open('../tests/GetRequestResponseAttachFTP.xml', 'rb') as f:
+    with open('tests/GetRequestResponseAttachFTP.xml', 'rb') as f:
         res = f.read()
     xml = etree.fromstring(res)
     declar = Declar.parsexml(
         etree.tostring(xml.find('.//{urn://augo/smev/uslugi/1.0.0}declar')))
 
-    wsdl = "http://servdir1:8083/IntegrationService.svc?singleWsdl"
+    wsdl = "http://snadb:8082/IntegrationService.svc?singleWsdl"
     dis = IntegrationServices(wsdl)
+    dis.add_declar(declar)
     # res = dis.get_entity('ДПУ', 922928)
     # print(res)
-    procs = dis.search('ПРОУ', 'Kod2=%s' % 178609, order_by='Дата4',
-                       ascending=False)
-    for proc in procs:
-        if proc.get('Ведущая аналитика') == '3863571':
-            res = dis.get_bind_docs('ПРОУ', proc.get('ИДЗапГлавРазд'))
-            if res:
-                # doc_id = res[0].get('ID')
-                # res = dis.get_doc_versions(doc_id)
-                # res = dis.get_doc(doc_id, res[0])
-                print(proc.get('ИДЗапГлавРазд'), res)
-                # print(res)
+    # procs = dis.search('ПРОУ', 'Kod2=%s' % 178609, order_by='Дата4',
+    #                    ascending=False)
+    # for proc in procs:
+    #     if proc.get('Ведущая аналитика') == '3863571':
+    #         res = dis.get_bind_docs('ПРОУ', proc.get('ИДЗапГлавРазд'))
+    #         if res:
+    #             # doc_id = res[0].get('ID')
+    #             # res = dis.get_doc_versions(doc_id)
+    #             # res = dis.get_doc(doc_id, res[0])
+    #             print(proc.get('ИДЗапГлавРазд'), res)
+    #             # print(res)

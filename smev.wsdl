@@ -1,0 +1,1037 @@
+<?xml version='1.0' encoding='UTF-8'?><wsdl:definitions xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/" xmlns:tns="urn://x-artefacts-smev-gov-ru/services/message-exchange/1.2" xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/" xmlns:ns3="http://schemas.xmlsoap.org/soap/http" xmlns:ns2="urn://x-artefacts-smev-gov-ru/services/message-exchange/types/faults/1.2" xmlns:ns1="urn://x-artefacts-smev-gov-ru/services/message-exchange/types/1.2" name="SMEVMessageExchangeService" targetNamespace="urn://x-artefacts-smev-gov-ru/services/message-exchange/1.2">
+  <wsdl:types>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:tns="urn://x-artefacts-smev-gov-ru/services/message-exchange/types/faults/1.2" xmlns:ns1="urn://x-artefacts-smev-gov-ru/services/message-exchange/types/basic/1.2" elementFormDefault="qualified" targetNamespace="urn://x-artefacts-smev-gov-ru/services/message-exchange/types/faults/1.2" version="1.0">
+
+  <xs:import namespace="urn://x-artefacts-smev-gov-ru/services/message-exchange/types/basic/1.2"/>
+
+  <xs:element name="AccessDenied" type="ns1:Void"/>
+
+  <xs:element name="AttachmentContentMiscoordination" type="ns1:Void"/>
+
+  <xs:element name="AttachmentSizeLimitExceeded" type="tns:AttachmentSizeLimitExceeded"/>
+
+  <xs:element name="BusinessDataTypeIsNotSupported" type="tns:BusinessDataTypeIsNotSupported"/>
+
+  <xs:element name="DestinationOverflow" type="tns:DestinationOverflow"/>
+
+  <xs:element name="EndOfLifeReached" type="ns1:Void"/>
+
+  <xs:element name="IncorrectResponseContentType" type="ns1:Void"/>
+
+  <xs:element name="InvalidContent" type="tns:InvalidContent"/>
+
+  <xs:element name="InvalidMessageIdFormat" type="ns1:Void"/>
+
+  <xs:element name="MessageIsAlreadySent" type="ns1:Void"/>
+
+  <xs:element name="QuoteLimitExceeded" type="tns:QuoteLimitExceeded"/>
+
+  <xs:element name="RecipientIsNotFound" type="ns1:Void"/>
+
+  <xs:element name="RequestIsNotFound" type="ns1:Void"/>
+
+  <xs:element name="SMEVFailure" type="ns1:Void"/>
+
+  <xs:element name="SenderIsNotRegistered" type="ns1:Void"/>
+
+  <xs:element name="SignatureVerificationFault" type="tns:SignatureVerificationFault"/>
+
+  <xs:element name="StaleMessageId" type="ns1:Void"/>
+
+  <xs:element name="TargetMessageIsNotFound" type="ns1:Void"/>
+
+  <xs:element name="TransactionCodeInvalid" type="ns1:SmevFault"/>
+
+  <xs:element name="UnknownMessageType" type="ns1:Void"/>
+
+  <xs:complexType name="SignatureVerificationFault">
+    <xs:complexContent>
+      <xs:extension base="ns1:SmevFault">
+        <xs:sequence>
+          <xs:element name="SignatureVerificationFault" type="xs:string"/>
+        </xs:sequence>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <xs:complexType name="InvalidContent">
+    <xs:complexContent>
+      <xs:extension base="ns1:SmevFault">
+        <xs:sequence>
+          <xs:element maxOccurs="unbounded" name="ValidationError">
+            <xs:complexType>
+              <xs:simpleContent>
+                <xs:extension base="xs:string">
+                  <xs:attribute name="errorPosition" type="xs:int" use="required"/>
+                </xs:extension>
+              </xs:simpleContent>
+            </xs:complexType>
+          </xs:element>
+        </xs:sequence>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <xs:complexType name="AttachmentSizeLimitExceeded">
+    <xs:complexContent>
+      <xs:extension base="ns1:SmevFault">
+        <xs:sequence>
+          <xs:element name="PermittedTotalAttachmentSize" type="xs:long"/>
+          <xs:element name="RealTotalAttachmentSize" type="xs:long"/>
+        </xs:sequence>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <xs:complexType name="BusinessDataTypeIsNotSupported">
+    <xs:complexContent>
+      <xs:extension base="ns1:SmevFault">
+        <xs:sequence>
+          <xs:element name="RootElementLocalName" type="xs:string"/>
+          <xs:element name="RootElementNamespaceURI" type="xs:string"/>
+        </xs:sequence>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <xs:complexType name="DestinationOverflow">
+    <xs:complexContent>
+      <xs:extension base="ns1:SmevFault">
+        <xs:sequence>
+          <xs:element name="MessageBrokerAddress" type="xs:string"/>
+          <xs:element name="DestinationName" type="xs:string"/>
+        </xs:sequence>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <xs:complexType name="QuoteLimitExceeded">
+    <xs:complexContent>
+      <xs:extension base="ns1:SmevFault">
+        <xs:sequence>
+          <xs:element name="RemainedTotalQuoteSize" type="xs:long"/>
+          <xs:element name="RealTotalAttachmentSize" type="xs:long"/>
+        </xs:sequence>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+</xs:schema>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xmime="http://www.w3.org/2005/05/xmlmime" xmlns:tns="urn://x-artefacts-smev-gov-ru/services/message-exchange/types/basic/1.2" elementFormDefault="qualified" targetNamespace="urn://x-artefacts-smev-gov-ru/services/message-exchange/types/basic/1.2" version="1.0">
+
+  <xs:import namespace="http://www.w3.org/2005/05/xmlmime"/>
+  <xs:element name="AckTargetMessage">
+    <xs:complexType>
+      <xs:simpleContent>
+        <xs:extension base="xs:string">
+          <xs:attribute name="Id" type="xs:ID" use="required"/>
+          <xs:attribute name="accepted" type="xs:boolean"/>
+        </xs:extension>
+      </xs:simpleContent>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="AttachmentContentList">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element maxOccurs="unbounded" name="AttachmentContent" type="tns:AttachmentContentType"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="AttachmentHeaderList">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element maxOccurs="unbounded" name="AttachmentHeader" type="tns:AttachmentHeaderType"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="FSAttachmentsList">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element maxOccurs="unbounded" name="FSAttachment" type="tns:FSAuthInfo"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="MessagePrimaryContent">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:any namespace="##other" processContents="skip"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="MessageReference">
+    <xs:complexType>
+      <xs:simpleContent>
+        <xs:extension base="xs:string">
+          <xs:attribute name="Id" type="xs:ID"/>
+        </xs:extension>
+      </xs:simpleContent>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="MessageTypeSelector">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element minOccurs="0" name="NamespaceURI" type="xs:anyURI"/>
+        <xs:element minOccurs="0" name="RootElementLocalName" type="xs:NCName"/>
+        <xs:element name="Timestamp" type="xs:dateTime"/>
+        <xs:element minOccurs="0" name="NodeID" type="xs:string"/>
+      </xs:sequence>
+      <xs:attribute name="Id" type="xs:ID"/>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="RefAttachmentHeaderList">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element maxOccurs="unbounded" name="RefAttachmentHeader" type="tns:RefAttachmentHeaderType"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="Timestamp">
+    <xs:complexType>
+      <xs:simpleContent>
+        <xs:extension base="xs:anySimpleType">
+          <xs:attribute name="Id" type="xs:ID"/>
+        </xs:extension>
+      </xs:simpleContent>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:complexType name="XMLDSigSignatureType">
+    <xs:sequence>
+      <xs:any namespace="##other" processContents="skip"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="SmevFault">
+    <xs:complexContent>
+      <xs:extension base="tns:Void">
+        <xs:sequence>
+          <xs:element minOccurs="0" name="Code" type="xs:string"/>
+          <xs:element minOccurs="0" name="Description" type="xs:string"/>
+        </xs:sequence>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <xs:complexType name="Void">
+    <xs:sequence/>
+  </xs:complexType>
+
+  <xs:complexType name="AttachmentHeaderType">
+    <xs:sequence>
+      <xs:element name="contentId" type="xs:string"/>
+      <xs:element name="MimeType" type="xs:string"/>
+      <xs:element minOccurs="0" name="SignaturePKCS7" type="xs:base64Binary"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="RefAttachmentHeaderType">
+    <xs:sequence>
+      <xs:element name="uuid" type="xs:string"/>
+      <xs:element name="Hash" type="xs:string"/>
+      <xs:element name="MimeType" type="xs:string"/>
+      <xs:element minOccurs="0" name="SignaturePKCS7" type="xs:base64Binary"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="FSAuthInfo">
+    <xs:sequence>
+      <xs:element name="uuid" type="xs:string"/>
+      <xs:element name="UserName" type="xs:string"/>
+      <xs:element name="Password" type="xs:string"/>
+      <xs:element name="FileName" type="xs:string"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="AttachmentContentType">
+    <xs:sequence>
+      <xs:element name="Id" type="xs:ID"/>
+      <xs:element name="Content" type="xs:base64Binary" xmime:expectedContentTypes="application/octet-stream"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:simpleType name="InteractionStatusType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="doesNotExist"/>
+      <xs:enumeration value="requestIsQueued"/>
+      <xs:enumeration value="requestIsAcceptedBySmev"/>
+      <xs:enumeration value="requestIsRejectedBySmev"/>
+      <xs:enumeration value="underProcessing"/>
+      <xs:enumeration value="responseIsAcceptedBySmev"/>
+      <xs:enumeration value="responseIsRejectedBySmev"/>
+      <xs:enumeration value="cancelled"/>
+      <xs:enumeration value="messageIsArchived"/>
+      <xs:enumeration value="messageIsDelivered"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+</xs:schema>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:tns="urn://x-artefacts-smev-gov-ru/services/message-exchange/types/1.2" xmlns:ns1="urn://x-artefacts-smev-gov-ru/services/message-exchange/types/basic/1.2" elementFormDefault="qualified" targetNamespace="urn://x-artefacts-smev-gov-ru/services/message-exchange/types/1.2" version="1.0">
+
+  <xs:import namespace="urn://x-artefacts-smev-gov-ru/services/message-exchange/types/basic/1.2"/>
+
+  <xs:element name="AckRequest">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="ns1:AckTargetMessage"/>
+        <xs:element minOccurs="0" name="CallerInformationSystemSignature" type="ns1:XMLDSigSignatureType"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="AckResponse" type="ns1:Void"/>
+
+  <xs:element name="AsyncProcessingStatus">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="OriginalMessageId" type="xs:string"/>
+        <xs:element name="StatusCategory" type="ns1:InteractionStatusType"/>
+        <xs:element minOccurs="0" name="StatusDetails" type="xs:string"/>
+        <xs:element minOccurs="0" name="SmevFault" type="ns1:SmevFault"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="AsyncProcessingStatusData">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="tns:AsyncProcessingStatus"/>
+      </xs:sequence>
+      <xs:attribute name="Id" type="xs:ID"/>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="GetRequestRequest">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="ns1:MessageTypeSelector"/>
+        <xs:element minOccurs="0" name="CallerInformationSystemSignature" type="ns1:XMLDSigSignatureType"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="GetRequestResponse">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element minOccurs="0" name="RequestMessage">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element minOccurs="0" ref="tns:Request"/>
+              <xs:element minOccurs="0" ref="ns1:AttachmentContentList"/>
+              <xs:element minOccurs="0" name="SMEVSignature" type="ns1:XMLDSigSignatureType"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="GetResponseRequest">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="ns1:MessageTypeSelector"/>
+        <xs:element minOccurs="0" name="CallerInformationSystemSignature" type="ns1:XMLDSigSignatureType"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="GetResponseResponse">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element minOccurs="0" name="ResponseMessage">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element ref="tns:Response"/>
+              <xs:element minOccurs="0" ref="ns1:AttachmentContentList"/>
+              <xs:element minOccurs="0" name="SMEVSignature" type="ns1:XMLDSigSignatureType"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="GetStatusRequest">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="ns1:Timestamp"/>
+        <xs:element name="CallerInformationSystemSignature" type="ns1:XMLDSigSignatureType"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="GetStatusResponse">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element minOccurs="0" ref="tns:SmevAsyncProcessingMessage"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="MessageMetadata">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element minOccurs="0" name="MessageId" type="xs:string"/>
+        <xs:element name="MessageType" type="tns:MessageTypeType"/>
+        <xs:element minOccurs="0" name="Sender">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element minOccurs="0" name="Mnemonic" type="xs:string"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="SendingTimestamp" type="xs:dateTime"/>
+        <xs:element minOccurs="0" name="Recipient">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element minOccurs="0" name="Mnemonic" type="xs:string"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element minOccurs="0" name="DeliveryTimestamp" type="xs:dateTime"/>
+        <xs:element minOccurs="0" name="Status" type="ns1:InteractionStatusType"/>
+      </xs:sequence>
+      <xs:attribute name="Id" type="xs:ID"/>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="Request">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="tns:SenderProvidedRequestData"/>
+        <xs:element ref="tns:MessageMetadata"/>
+        <xs:element minOccurs="0" ref="ns1:FSAttachmentsList"/>
+        <xs:element minOccurs="0" name="ReplyTo" type="xs:string"/>
+        <xs:element minOccurs="0" name="SenderInformationSystemSignature" type="ns1:XMLDSigSignatureType"/>
+      </xs:sequence>
+      <xs:attribute name="Id" type="xs:ID"/>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="Response">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element minOccurs="0" name="OriginalMessageId" type="xs:string"/>
+        <xs:element minOccurs="0" name="OriginalTransactionCode" type="xs:string"/>
+        <xs:element minOccurs="0" name="ReferenceMessageID" type="xs:string"/>
+        <xs:element ref="tns:SenderProvidedResponseData"/>
+        <xs:element ref="tns:MessageMetadata"/>
+        <xs:element minOccurs="0" ref="ns1:FSAttachmentsList"/>
+        <xs:element minOccurs="0" name="SenderInformationSystemSignature" type="ns1:XMLDSigSignatureType"/>
+      </xs:sequence>
+      <xs:attribute name="Id" type="xs:ID"/>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="SendRequestRequest">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="tns:SenderProvidedRequestData"/>
+        <xs:element minOccurs="0" ref="ns1:AttachmentContentList"/>
+        <xs:element minOccurs="0" name="CallerInformationSystemSignature" type="ns1:XMLDSigSignatureType"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="SendRequestResponse">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="tns:MessageMetadata"/>
+        <xs:element minOccurs="0" name="SMEVSignature" type="ns1:XMLDSigSignatureType"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="SendResponseRequest">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="tns:SenderProvidedResponseData"/>
+        <xs:element minOccurs="0" ref="ns1:AttachmentContentList"/>
+        <xs:element minOccurs="0" name="CallerInformationSystemSignature" type="ns1:XMLDSigSignatureType"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="SendResponseResponse">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="tns:MessageMetadata"/>
+        <xs:element minOccurs="0" name="SMEVSignature" type="ns1:XMLDSigSignatureType"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="SenderProvidedRequestData">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="MessageID" type="xs:string"/>
+        <xs:element minOccurs="0" name="ReferenceMessageID" type="xs:string"/>
+        <xs:element minOccurs="0" name="TransactionCode" type="xs:string"/>
+        <xs:element minOccurs="0" name="NodeID" type="xs:string"/>
+        <xs:element minOccurs="0" name="EOL" type="xs:dateTime"/>
+        <xs:element ref="ns1:MessagePrimaryContent"/>
+        <xs:element minOccurs="0" name="PersonalSignature" type="ns1:XMLDSigSignatureType"/>
+        <xs:element minOccurs="0" ref="ns1:AttachmentHeaderList"/>
+        <xs:element minOccurs="0" ref="ns1:RefAttachmentHeaderList"/>
+        <xs:element minOccurs="0" name="BusinessProcessMetadata">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:any maxOccurs="unbounded" minOccurs="0" namespace="##other" processContents="skip"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element minOccurs="0" name="TestMessage" type="ns1:Void"/>
+      </xs:sequence>
+      <xs:attribute name="Id" type="xs:ID"/>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="SenderProvidedResponseData">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="MessageID" type="xs:string"/>
+        <xs:element name="To" type="xs:string"/>
+        <xs:element minOccurs="0" ref="ns1:MessagePrimaryContent"/>
+        <xs:element minOccurs="0" name="PersonalSignature" type="ns1:XMLDSigSignatureType"/>
+        <xs:element minOccurs="0" ref="ns1:AttachmentHeaderList"/>
+        <xs:element minOccurs="0" ref="ns1:RefAttachmentHeaderList"/>
+        <xs:element maxOccurs="unbounded" minOccurs="0" name="RequestRejected">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="RejectionReasonCode" type="tns:RejectCode"/>
+              <xs:element name="RejectionReasonDescription" type="xs:string"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element minOccurs="0" name="RequestStatus">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="StatusCode" type="xs:int"/>
+              <xs:element maxOccurs="unbounded" minOccurs="0" name="StatusParameter">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="Key" type="xs:string"/>
+                    <xs:element name="Value" type="xs:string"/>
+                  </xs:sequence>
+                </xs:complexType>
+              </xs:element>
+              <xs:element name="StatusDescription" type="xs:string"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element minOccurs="0" ref="tns:AsyncProcessingStatus"/>
+      </xs:sequence>
+      <xs:attribute name="Id" type="xs:ID"/>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="SmevAsyncProcessingMessage">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element minOccurs="0" ref="tns:AsyncProcessingStatusData"/>
+        <xs:element minOccurs="0" name="SMEVSignature" type="ns1:XMLDSigSignatureType"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:simpleType name="RejectCode">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="ACCESS_DENIED"/>
+      <xs:enumeration value="NO_DATA"/>
+      <xs:enumeration value="UNKNOWN_REQUEST_DESCRIPTION"/>
+      <xs:enumeration value="FAILURE"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="MessageTypeType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="REQUEST"/>
+      <xs:enumeration value="BROADCAST"/>
+      <xs:enumeration value="RESPONSE"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+</xs:schema>
+  </wsdl:types>
+  <wsdl:message name="SignatureVerificationFaultException">
+    <wsdl:part element="ns2:SignatureVerificationFault" name="SignatureVerificationFaultException">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="GetResponse">
+    <wsdl:part element="ns1:GetResponseRequest" name="parameters">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="SenderIsNotRegisteredException">
+    <wsdl:part element="ns2:SenderIsNotRegistered" name="SenderIsNotRegisteredException">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="AttachmentSizeLimitExceededException">
+    <wsdl:part element="ns2:AttachmentSizeLimitExceeded" name="AttachmentSizeLimitExceededException">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="UnknownMessageTypeException">
+    <wsdl:part element="ns2:UnknownMessageType" name="UnknownMessageTypeException">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="Ack">
+    <wsdl:part element="ns1:AckRequest" name="parameters">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="BusinessDataTypeIsNotSupportedException">
+    <wsdl:part element="ns2:BusinessDataTypeIsNotSupported" name="BusinessDataTypeIsNotSupportedException">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="AckResponse">
+    <wsdl:part element="ns1:AckResponse" name="parameters">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="SendResponse">
+    <wsdl:part element="ns1:SendResponseRequest" name="parameters">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="InvalidMessageIdFormatException">
+    <wsdl:part element="ns2:InvalidMessageIdFormat" name="InvalidMessageIdFormatException">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="TransactionCodeInvalidException">
+    <wsdl:part element="ns2:TransactionCodeInvalid" name="TransactionCodeInvalidException">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="SendResponseResponse">
+    <wsdl:part element="ns1:SendResponseResponse" name="parameters">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="MessageIsAlreadySentException">
+    <wsdl:part element="ns2:MessageIsAlreadySent" name="MessageIsAlreadySentException">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="GetRequestResponse">
+    <wsdl:part element="ns1:GetRequestResponse" name="parameters">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="SendRequestResponse">
+    <wsdl:part element="ns1:SendRequestResponse" name="parameters">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="QuoteLimitExceededException">
+    <wsdl:part element="ns2:QuoteLimitExceeded" name="QuoteLimitExceededException">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="SMEVFailureException">
+    <wsdl:part element="ns2:SMEVFailure" name="SMEVFailureException">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="IncorrectResponseContentTypeException">
+    <wsdl:part element="ns2:IncorrectResponseContentType" name="IncorrectResponseContentTypeException">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="DestinationOverflowException">
+    <wsdl:part element="ns2:DestinationOverflow" name="DestinationOverflowException">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="GetStatusResponse">
+    <wsdl:part element="ns1:GetStatusResponse" name="parameters">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="TargetMessageIsNotFoundException">
+    <wsdl:part element="ns2:TargetMessageIsNotFound" name="TargetMessageIsNotFoundException">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="AccessDeniedException">
+    <wsdl:part element="ns2:AccessDenied" name="AccessDeniedException">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="SendRequest">
+    <wsdl:part element="ns1:SendRequestRequest" name="parameters">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="GetStatus">
+    <wsdl:part element="ns1:GetStatusRequest" name="parameters">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="GetResponseResponse">
+    <wsdl:part element="ns1:GetResponseResponse" name="parameters">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="StaleMessageIdException">
+    <wsdl:part element="ns2:StaleMessageId" name="StaleMessageIdException">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="AttachmentContentMiscoordinationException">
+    <wsdl:part element="ns2:AttachmentContentMiscoordination" name="AttachmentContentMiscoordinationException">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="EndOfLifeException">
+    <wsdl:part element="ns2:EndOfLifeReached" name="EndOfLifeException">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="GetRequest">
+    <wsdl:part element="ns1:GetRequestRequest" name="parameters">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="RecipientIsNotFoundException">
+    <wsdl:part element="ns2:RecipientIsNotFound" name="RecipientIsNotFoundException">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="InvalidContentException">
+    <wsdl:part element="ns2:InvalidContent" name="InvalidContentException">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:portType name="SMEVMessageExchangePortType">
+    <wsdl:operation name="GetResponse">
+      <wsdl:input message="tns:GetResponse" name="GetResponse">
+    </wsdl:input>
+      <wsdl:output message="tns:GetResponseResponse" name="GetResponseResponse">
+    </wsdl:output>
+      <wsdl:fault message="tns:InvalidContentException" name="InvalidContentException">
+    </wsdl:fault>
+      <wsdl:fault message="tns:SMEVFailureException" name="SMEVFailureException">
+    </wsdl:fault>
+      <wsdl:fault message="tns:SignatureVerificationFaultException" name="SignatureVerificationFaultException">
+    </wsdl:fault>
+      <wsdl:fault message="tns:SenderIsNotRegisteredException" name="SenderIsNotRegisteredException">
+    </wsdl:fault>
+      <wsdl:fault message="tns:UnknownMessageTypeException" name="UnknownMessageTypeException">
+    </wsdl:fault>
+    </wsdl:operation>
+    <wsdl:operation name="GetStatus">
+      <wsdl:input message="tns:GetStatus" name="GetStatus">
+    </wsdl:input>
+      <wsdl:output message="tns:GetStatusResponse" name="GetStatusResponse">
+    </wsdl:output>
+      <wsdl:fault message="tns:InvalidContentException" name="InvalidContentException">
+    </wsdl:fault>
+      <wsdl:fault message="tns:SMEVFailureException" name="SMEVFailureException">
+    </wsdl:fault>
+      <wsdl:fault message="tns:SignatureVerificationFaultException" name="SignatureVerificationFaultException">
+    </wsdl:fault>
+      <wsdl:fault message="tns:SenderIsNotRegisteredException" name="SenderIsNotRegisteredException">
+    </wsdl:fault>
+      <wsdl:fault message="tns:UnknownMessageTypeException" name="UnknownMessageTypeException">
+    </wsdl:fault>
+    </wsdl:operation>
+    <wsdl:operation name="Ack">
+      <wsdl:input message="tns:Ack" name="Ack">
+    </wsdl:input>
+      <wsdl:output message="tns:AckResponse" name="AckResponse">
+    </wsdl:output>
+      <wsdl:fault message="tns:InvalidContentException" name="InvalidContentException">
+    </wsdl:fault>
+      <wsdl:fault message="tns:SMEVFailureException" name="SMEVFailureException">
+    </wsdl:fault>
+      <wsdl:fault message="tns:TargetMessageIsNotFoundException" name="TargetMessageIsNotFoundException">
+    </wsdl:fault>
+      <wsdl:fault message="tns:SignatureVerificationFaultException" name="SignatureVerificationFaultException">
+    </wsdl:fault>
+      <wsdl:fault message="tns:SenderIsNotRegisteredException" name="SenderIsNotRegisteredException">
+    </wsdl:fault>
+    </wsdl:operation>
+    <wsdl:operation name="GetRequest">
+      <wsdl:input message="tns:GetRequest" name="GetRequest">
+    </wsdl:input>
+      <wsdl:output message="tns:GetRequestResponse" name="GetRequestResponse">
+    </wsdl:output>
+      <wsdl:fault message="tns:InvalidContentException" name="InvalidContentException">
+    </wsdl:fault>
+      <wsdl:fault message="tns:SMEVFailureException" name="SMEVFailureException">
+    </wsdl:fault>
+      <wsdl:fault message="tns:SignatureVerificationFaultException" name="SignatureVerificationFaultException">
+    </wsdl:fault>
+      <wsdl:fault message="tns:SenderIsNotRegisteredException" name="SenderIsNotRegisteredException">
+    </wsdl:fault>
+      <wsdl:fault message="tns:UnknownMessageTypeException" name="UnknownMessageTypeException">
+    </wsdl:fault>
+    </wsdl:operation>
+    <wsdl:operation name="SendResponse">
+      <wsdl:input message="tns:SendResponse" name="SendResponse">
+    </wsdl:input>
+      <wsdl:output message="tns:SendResponseResponse" name="SendResponseResponse">
+    </wsdl:output>
+      <wsdl:fault message="tns:BusinessDataTypeIsNotSupportedException" name="BusinessDataTypeIsNotSupportedException">
+    </wsdl:fault>
+      <wsdl:fault message="tns:DestinationOverflowException" name="DestinationOverflowException">
+    </wsdl:fault>
+      <wsdl:fault message="tns:SignatureVerificationFaultException" name="SignatureVerificationFaultException">
+    </wsdl:fault>
+      <wsdl:fault message="tns:AttachmentSizeLimitExceededException" name="AttachmentSizeLimitExceededException">
+    </wsdl:fault>
+      <wsdl:fault message="tns:SenderIsNotRegisteredException" name="SenderIsNotRegisteredException">
+    </wsdl:fault>
+      <wsdl:fault message="tns:IncorrectResponseContentTypeException" name="IncorrectResponseContentTypeException">
+    </wsdl:fault>
+      <wsdl:fault message="tns:QuoteLimitExceededException" name="QuoteLimitExceededException">
+    </wsdl:fault>
+      <wsdl:fault message="tns:InvalidContentException" name="InvalidContentException">
+    </wsdl:fault>
+      <wsdl:fault message="tns:SMEVFailureException" name="SMEVFailureException">
+    </wsdl:fault>
+      <wsdl:fault message="tns:MessageIsAlreadySentException" name="MessageIsAlreadySentException">
+    </wsdl:fault>
+      <wsdl:fault message="tns:RecipientIsNotFoundException" name="RecipientIsNotFoundException">
+    </wsdl:fault>
+      <wsdl:fault message="tns:StaleMessageIdException" name="StaleMessageIdException">
+    </wsdl:fault>
+      <wsdl:fault message="tns:AttachmentContentMiscoordinationException" name="AttachmentContentMiscoordinationException">
+    </wsdl:fault>
+      <wsdl:fault message="tns:InvalidMessageIdFormatException" name="InvalidMessageIdFormatException">
+    </wsdl:fault>
+    </wsdl:operation>
+    <wsdl:operation name="SendRequest">
+      <wsdl:input message="tns:SendRequest" name="SendRequest">
+    </wsdl:input>
+      <wsdl:output message="tns:SendRequestResponse" name="SendRequestResponse">
+    </wsdl:output>
+      <wsdl:fault message="tns:AccessDeniedException" name="AccessDeniedException">
+    </wsdl:fault>
+      <wsdl:fault message="tns:BusinessDataTypeIsNotSupportedException" name="BusinessDataTypeIsNotSupportedException">
+    </wsdl:fault>
+      <wsdl:fault message="tns:DestinationOverflowException" name="DestinationOverflowException">
+    </wsdl:fault>
+      <wsdl:fault message="tns:SignatureVerificationFaultException" name="SignatureVerificationFaultException">
+    </wsdl:fault>
+      <wsdl:fault message="tns:AttachmentSizeLimitExceededException" name="AttachmentSizeLimitExceededException">
+    </wsdl:fault>
+      <wsdl:fault message="tns:SenderIsNotRegisteredException" name="SenderIsNotRegisteredException">
+    </wsdl:fault>
+      <wsdl:fault message="tns:QuoteLimitExceededException" name="QuoteLimitExceededException">
+    </wsdl:fault>
+      <wsdl:fault message="tns:InvalidContentException" name="InvalidContentException">
+    </wsdl:fault>
+      <wsdl:fault message="tns:SMEVFailureException" name="SMEVFailureException">
+    </wsdl:fault>
+      <wsdl:fault message="tns:MessageIsAlreadySentException" name="MessageIsAlreadySentException">
+    </wsdl:fault>
+      <wsdl:fault message="tns:RecipientIsNotFoundException" name="RecipientIsNotFoundException">
+    </wsdl:fault>
+      <wsdl:fault message="tns:StaleMessageIdException" name="StaleMessageIdException">
+    </wsdl:fault>
+      <wsdl:fault message="tns:AttachmentContentMiscoordinationException" name="AttachmentContentMiscoordinationException">
+    </wsdl:fault>
+      <wsdl:fault message="tns:EndOfLifeException" name="EndOfLifeException">
+    </wsdl:fault>
+      <wsdl:fault message="tns:InvalidMessageIdFormatException" name="InvalidMessageIdFormatException">
+    </wsdl:fault>
+      <wsdl:fault message="tns:TransactionCodeInvalidException" name="TransactionCodeInvalidException">
+    </wsdl:fault>
+    </wsdl:operation>
+  </wsdl:portType>
+  <wsdl:binding name="SMEVMessageExchangeServiceSoapBinding" type="tns:SMEVMessageExchangePortType">
+    <soap:binding style="document" transport="http://schemas.xmlsoap.org/soap/http"/>
+    <wsdl:operation name="GetResponse">
+      <soap:operation soapAction="urn:GetResponse" style="document"/>
+      <wsdl:input name="GetResponse">
+        <soap:body use="literal"/>
+      </wsdl:input>
+      <wsdl:output name="GetResponseResponse">
+        <soap:body use="literal"/>
+      </wsdl:output>
+      <wsdl:fault name="InvalidContentException">
+        <soap:fault name="InvalidContentException" use="literal"/>
+      </wsdl:fault>
+      <wsdl:fault name="SMEVFailureException">
+        <soap:fault name="SMEVFailureException" use="literal"/>
+      </wsdl:fault>
+      <wsdl:fault name="SignatureVerificationFaultException">
+        <soap:fault name="SignatureVerificationFaultException" use="literal"/>
+      </wsdl:fault>
+      <wsdl:fault name="SenderIsNotRegisteredException">
+        <soap:fault name="SenderIsNotRegisteredException" use="literal"/>
+      </wsdl:fault>
+      <wsdl:fault name="UnknownMessageTypeException">
+        <soap:fault name="UnknownMessageTypeException" use="literal"/>
+      </wsdl:fault>
+    </wsdl:operation>
+    <wsdl:operation name="GetStatus">
+      <soap:operation soapAction="urn:GetStatus" style="document"/>
+      <wsdl:input name="GetStatus">
+        <soap:body use="literal"/>
+      </wsdl:input>
+      <wsdl:output name="GetStatusResponse">
+        <soap:body use="literal"/>
+      </wsdl:output>
+      <wsdl:fault name="InvalidContentException">
+        <soap:fault name="InvalidContentException" use="literal"/>
+      </wsdl:fault>
+      <wsdl:fault name="SMEVFailureException">
+        <soap:fault name="SMEVFailureException" use="literal"/>
+      </wsdl:fault>
+      <wsdl:fault name="SignatureVerificationFaultException">
+        <soap:fault name="SignatureVerificationFaultException" use="literal"/>
+      </wsdl:fault>
+      <wsdl:fault name="SenderIsNotRegisteredException">
+        <soap:fault name="SenderIsNotRegisteredException" use="literal"/>
+      </wsdl:fault>
+      <wsdl:fault name="UnknownMessageTypeException">
+        <soap:fault name="UnknownMessageTypeException" use="literal"/>
+      </wsdl:fault>
+    </wsdl:operation>
+    <wsdl:operation name="Ack">
+      <soap:operation soapAction="urn:Ack" style="document"/>
+      <wsdl:input name="Ack">
+        <soap:body use="literal"/>
+      </wsdl:input>
+      <wsdl:output name="AckResponse">
+        <soap:body use="literal"/>
+      </wsdl:output>
+      <wsdl:fault name="InvalidContentException">
+        <soap:fault name="InvalidContentException" use="literal"/>
+      </wsdl:fault>
+      <wsdl:fault name="SMEVFailureException">
+        <soap:fault name="SMEVFailureException" use="literal"/>
+      </wsdl:fault>
+      <wsdl:fault name="TargetMessageIsNotFoundException">
+        <soap:fault name="TargetMessageIsNotFoundException" use="literal"/>
+      </wsdl:fault>
+      <wsdl:fault name="SignatureVerificationFaultException">
+        <soap:fault name="SignatureVerificationFaultException" use="literal"/>
+      </wsdl:fault>
+      <wsdl:fault name="SenderIsNotRegisteredException">
+        <soap:fault name="SenderIsNotRegisteredException" use="literal"/>
+      </wsdl:fault>
+    </wsdl:operation>
+    <wsdl:operation name="GetRequest">
+      <soap:operation soapAction="urn:GetRequest" style="document"/>
+      <wsdl:input name="GetRequest">
+        <soap:body use="literal"/>
+      </wsdl:input>
+      <wsdl:output name="GetRequestResponse">
+        <soap:body use="literal"/>
+      </wsdl:output>
+      <wsdl:fault name="InvalidContentException">
+        <soap:fault name="InvalidContentException" use="literal"/>
+      </wsdl:fault>
+      <wsdl:fault name="SMEVFailureException">
+        <soap:fault name="SMEVFailureException" use="literal"/>
+      </wsdl:fault>
+      <wsdl:fault name="SignatureVerificationFaultException">
+        <soap:fault name="SignatureVerificationFaultException" use="literal"/>
+      </wsdl:fault>
+      <wsdl:fault name="SenderIsNotRegisteredException">
+        <soap:fault name="SenderIsNotRegisteredException" use="literal"/>
+      </wsdl:fault>
+      <wsdl:fault name="UnknownMessageTypeException">
+        <soap:fault name="UnknownMessageTypeException" use="literal"/>
+      </wsdl:fault>
+    </wsdl:operation>
+    <wsdl:operation name="SendResponse">
+      <soap:operation soapAction="urn:SendResponse" style="document"/>
+      <wsdl:input name="SendResponse">
+        <soap:body use="literal"/>
+      </wsdl:input>
+      <wsdl:output name="SendResponseResponse">
+        <soap:body use="literal"/>
+      </wsdl:output>
+      <wsdl:fault name="BusinessDataTypeIsNotSupportedException">
+        <soap:fault name="BusinessDataTypeIsNotSupportedException" use="literal"/>
+      </wsdl:fault>
+      <wsdl:fault name="DestinationOverflowException">
+        <soap:fault name="DestinationOverflowException" use="literal"/>
+      </wsdl:fault>
+      <wsdl:fault name="SignatureVerificationFaultException">
+        <soap:fault name="SignatureVerificationFaultException" use="literal"/>
+      </wsdl:fault>
+      <wsdl:fault name="AttachmentSizeLimitExceededException">
+        <soap:fault name="AttachmentSizeLimitExceededException" use="literal"/>
+      </wsdl:fault>
+      <wsdl:fault name="SenderIsNotRegisteredException">
+        <soap:fault name="SenderIsNotRegisteredException" use="literal"/>
+      </wsdl:fault>
+      <wsdl:fault name="IncorrectResponseContentTypeException">
+        <soap:fault name="IncorrectResponseContentTypeException" use="literal"/>
+      </wsdl:fault>
+      <wsdl:fault name="QuoteLimitExceededException">
+        <soap:fault name="QuoteLimitExceededException" use="literal"/>
+      </wsdl:fault>
+      <wsdl:fault name="InvalidContentException">
+        <soap:fault name="InvalidContentException" use="literal"/>
+      </wsdl:fault>
+      <wsdl:fault name="SMEVFailureException">
+        <soap:fault name="SMEVFailureException" use="literal"/>
+      </wsdl:fault>
+      <wsdl:fault name="MessageIsAlreadySentException">
+        <soap:fault name="MessageIsAlreadySentException" use="literal"/>
+      </wsdl:fault>
+      <wsdl:fault name="RecipientIsNotFoundException">
+        <soap:fault name="RecipientIsNotFoundException" use="literal"/>
+      </wsdl:fault>
+      <wsdl:fault name="StaleMessageIdException">
+        <soap:fault name="StaleMessageIdException" use="literal"/>
+      </wsdl:fault>
+      <wsdl:fault name="AttachmentContentMiscoordinationException">
+        <soap:fault name="AttachmentContentMiscoordinationException" use="literal"/>
+      </wsdl:fault>
+      <wsdl:fault name="InvalidMessageIdFormatException">
+        <soap:fault name="InvalidMessageIdFormatException" use="literal"/>
+      </wsdl:fault>
+    </wsdl:operation>
+    <wsdl:operation name="SendRequest">
+      <soap:operation soapAction="urn:SendRequest" style="document"/>
+      <wsdl:input name="SendRequest">
+        <soap:body use="literal"/>
+      </wsdl:input>
+      <wsdl:output name="SendRequestResponse">
+        <soap:body use="literal"/>
+      </wsdl:output>
+      <wsdl:fault name="AccessDeniedException">
+        <soap:fault name="AccessDeniedException" use="literal"/>
+      </wsdl:fault>
+      <wsdl:fault name="BusinessDataTypeIsNotSupportedException">
+        <soap:fault name="BusinessDataTypeIsNotSupportedException" use="literal"/>
+      </wsdl:fault>
+      <wsdl:fault name="DestinationOverflowException">
+        <soap:fault name="DestinationOverflowException" use="literal"/>
+      </wsdl:fault>
+      <wsdl:fault name="SignatureVerificationFaultException">
+        <soap:fault name="SignatureVerificationFaultException" use="literal"/>
+      </wsdl:fault>
+      <wsdl:fault name="AttachmentSizeLimitExceededException">
+        <soap:fault name="AttachmentSizeLimitExceededException" use="literal"/>
+      </wsdl:fault>
+      <wsdl:fault name="SenderIsNotRegisteredException">
+        <soap:fault name="SenderIsNotRegisteredException" use="literal"/>
+      </wsdl:fault>
+      <wsdl:fault name="QuoteLimitExceededException">
+        <soap:fault name="QuoteLimitExceededException" use="literal"/>
+      </wsdl:fault>
+      <wsdl:fault name="InvalidContentException">
+        <soap:fault name="InvalidContentException" use="literal"/>
+      </wsdl:fault>
+      <wsdl:fault name="SMEVFailureException">
+        <soap:fault name="SMEVFailureException" use="literal"/>
+      </wsdl:fault>
+      <wsdl:fault name="MessageIsAlreadySentException">
+        <soap:fault name="MessageIsAlreadySentException" use="literal"/>
+      </wsdl:fault>
+      <wsdl:fault name="RecipientIsNotFoundException">
+        <soap:fault name="RecipientIsNotFoundException" use="literal"/>
+      </wsdl:fault>
+      <wsdl:fault name="StaleMessageIdException">
+        <soap:fault name="StaleMessageIdException" use="literal"/>
+      </wsdl:fault>
+      <wsdl:fault name="AttachmentContentMiscoordinationException">
+        <soap:fault name="AttachmentContentMiscoordinationException" use="literal"/>
+      </wsdl:fault>
+      <wsdl:fault name="EndOfLifeException">
+        <soap:fault name="EndOfLifeException" use="literal"/>
+      </wsdl:fault>
+      <wsdl:fault name="InvalidMessageIdFormatException">
+        <soap:fault name="InvalidMessageIdFormatException" use="literal"/>
+      </wsdl:fault>
+      <wsdl:fault name="TransactionCodeInvalidException">
+        <soap:fault name="TransactionCodeInvalidException" use="literal"/>
+      </wsdl:fault>
+    </wsdl:operation>
+  </wsdl:binding>
+  <wsdl:service name="SMEVMessageExchangeService">
+    <wsdl:port binding="tns:SMEVMessageExchangeServiceSoapBinding" name="SMEVMessageExchangeEndpoint">
+      <soap:address location="http://smev3-d.test.gosuslugi.ru:7500/smev/v1.2/ws"/>
+    </wsdl:port>
+  </wsdl:service>
+</wsdl:definitions>

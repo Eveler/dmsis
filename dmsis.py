@@ -221,7 +221,7 @@ class Integration:
                 do_write = True
                 cfg.set("main", "log_count", "7")
             handler = TimedRotatingFileHandler(
-                cfg.get("main", "logfile"), when='D',
+                os.path.abspath(cfg.get("main", "logfile")), when='D',
                 backupCount=backupcount, encoding='cp1251')
             handler.setFormatter(logging.Formatter(
                 '%(asctime)s %(name)s:%(module)s(%(lineno)d): %(levelname)s: '
@@ -366,7 +366,7 @@ class Service(ServiceFramework):
         #
         # ... Initialize application here
         #
-        log.msg('max_integration running...')
+        log.msg('dmsis running...')
         run()
 
 

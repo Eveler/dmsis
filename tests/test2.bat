@@ -1,3 +1,5 @@
 set PYTHONPATH=%CD%\..;%PYTHONPATH%
 
-c:\Python35\python.exe ..\smev.py
+cd ..\
+c:\Python35\python.exe smev.py test2
+cd tests
