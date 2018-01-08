@@ -27,6 +27,7 @@ namespace xmlsigner
 			}
 			string xmlStr;
 			xmlStr = Console.In.ReadToEnd();
+			
 //			Console.Write(xmlStr);
 			
 //			xmlStr = "<soap-env:Envelope xmlns:soap-env=\"http://schemas.xmlsoap.org/soap/envelope/\"><soap-env:Body>" +
@@ -44,6 +45,10 @@ namespace xmlsigner
 			
 //			xmlStr = "<ns1:MessageTypeSelector xmlns:ns1=\"urn://x-artefacts-smev-gov-ru/services/message-exchange/types/basic/1.2\" Id=\"SIGNED_BY_CALLER\">" +
 //				"<ns1:Timestamp>2017-11-22T00:54:55.936780</ns1:Timestamp></ns1:MessageTypeSelector>";
+			
+//			xmlStr = "<ns1:AckTargetMessage xmlns=\"urn://x-artefacts-smev-gov-ru/services/message-exchange/types/1.2\" " +
+//				"xmlns:ns1=\"urn://x-artefacts-smev-gov-ru/services/message-exchange/types/basic/1.2\" " +
+//				"Id=\"SIGNED_BY_CALLER\" accepted=\"true\">099f69d3-eba6-11e7-a22e-a45d36c7706f</ns1:AckTargetMessage>";
 			
 			var cert = GetCertificate(serial);
 			string res = SignXmlFile(xmlStr, cert);
@@ -86,10 +91,10 @@ namespace xmlsigner
 			signedXml.SafeCanonicalizationMethods.Add("urn://smev-gov-ru/xmldsig/transform");
 			
 			var reference = new Reference("#SIGNED_BY_CALLER");
-//			reference.DigestMethod = "http://www.w3.org/2001/04/xmldsig-more#gostr3411";
 			reference.DigestMethod = CPSignedXml.XmlDsigGost3411UrlObsolete; 
 			reference.AddTransform(new XmlDsigExcC14NTransform());
 			reference.AddTransform(new XmlDsigSmevTransform());
+			reference.AddTransform(new XmlDsigEnvelopedSignatureTransform());
 			
 			var keyInfo = new KeyInfo();
 			keyInfo.AddClause(new KeyInfoX509Data(cert));
