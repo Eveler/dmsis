@@ -378,7 +378,7 @@ class Adapter:
         method = getattr(self.crypto, method_name)
         return method(xml)
 
-    def __upload_file(self, file, file_name, ftp_user=None, ftp_pass=None):
+    def __upload_file(self, file, file_name, ftp_user='anonymous', ftp_pass='anonymous'):
         addr = urlparse(self.ftp_addr).netloc
         with ftplib.FTP(addr, ftp_user, ftp_pass) as con:
             uuid = str(uuid1())
