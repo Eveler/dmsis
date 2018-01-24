@@ -98,13 +98,13 @@ class Integration:
                 logging.info('Добавлено/обновлено дело с ID = %s' % res)
                 self.directum.run_script('СтартЗадачПоМУ')
         except Exception as e:
-            self.report_error(e)
+            self.report_error()
 
         # Send final response
         try:
-            for response in self.db.all_not_done():
+            for request in self.db.all_not_done():
                 declar = self.directum.search('ДПУ',
-                                              'ИД=%s' % response.directum_id)
+                                              'ИД=%s' % request.directum_id)
 
                 # For all requests check if declar`s end date is set
                 if declar[0].get('Дата5'):
@@ -114,11 +114,11 @@ class Integration:
                     # Search newest procedure with document bound
                     # for that declar
                     procs = self.directum.search(
-                        'ПРОУ', 'Kod2=%s' % response.declar_number,
+                        'ПРОУ', 'Kod2=%s' % request.declar_number,
                         order_by='Дата4', ascending=False)
                     for proc in procs:
                         if proc.get(
-                                'Ведущая аналитика') == response.directum_id:
+                                'Ведущая аналитика') == request.directum_id:
                             docs = self.directum.get_bind_docs(
                                 'ПРОУ', proc.get('ИДЗапГлавРазд'))
                             for doc in docs:
@@ -148,7 +148,7 @@ class Integration:
                     # with docs bound
                     if not found:
                         docs = self.directum.get_bind_docs(
-                            'ДПУ', response.directum_id)
+                            'ДПУ', request.directum_id)
                         ad = AppliedDocument()
                         for doc in docs:
                             if doc.get('TKED') in ('КИК', 'ИК1', 'ИК2', 'ПСИ'):
@@ -175,13 +175,24 @@ class Integration:
                         os.close(ad.file)
                         applied_docs.append(ad)
 
+                    text = 'Услуга предоставлена'
+                    if declar[0].get('СтатусУслуги'):
+                        state = self.directum.search(
+                            'СОУ', 'Kod=%s' % declar[0].get('СтатусУслуги'))
+                        if state[0].get('Наименование'):
+                            text += '. Статус: %s' % \
+                                    state[0].get('Наименование')
+
                     self.smev.send_respose(
-                        response.reply_to, response.declar_num,
-                        response.declar_date, text='Услуга предоставлена',
+                        request.reply_to, request.declar_num,
+                        request.declar_date, text=text,
                         applied_documents=applied_docs, ftp_user=self.ftp_user,
                         ftp_pass=self.ftp_pass)
+                    # self.db.delete(request.uuid)
+                    request.done = True
+                    self.db.commit()
         except Exception as e:
-            self.report_error(e)
+            self.report_error()
 
     def parse_config(self, config_path):
         """

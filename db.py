@@ -79,6 +79,9 @@ class Db:
         self.session.delete(r)
         self.session.commit()
 
+    def commit(self):
+        self.session.commit()
+
     def _clear(self):
         for req in self.all():
             self.session.delete(req)
