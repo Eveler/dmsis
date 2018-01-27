@@ -2,7 +2,8 @@
 import logging
 from datetime import date
 
-from sqlalchemy import Column, Integer, String, Boolean, Date
+from sqlalchemy import Column, Integer, String, Boolean, Date, ForeignKey
+from sqlalchemy.orm import relationship
 from sqlalchemy.engine import create_engine
 from sqlalchemy.ext.declarative.api import declarative_base
 from sqlalchemy.orm.session import sessionmaker
@@ -21,6 +22,128 @@ class Requests(Base):
     reply_to = Column(String)
     last_status = Column(String)
     done = Column(Boolean, index=True)
+
+
+class Declars(Base):
+    __tablename__ = 'declars'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
+    declar_number = Column(String, nullable=False)
+    service = Column(String, nullable=False)
+    register_date = Column(Date, nullable=False)
+    end_date = Column(Date, nullable=False)
+    object_address = Column(String)
+    param = Column(String)
+    documents = relationship('Documents', back_populates='declar')
+    
+    
+class Documents(Base):
+    __tablename__ = 'documents'
+
+    id = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
+    title = Column(String(length=1024), nullable=False)
+    number = Column(String(length=50), nullable=False)
+    date = Column(Date, nullable=False)
+    valid_until = Column(Date)
+    file_name = Column(String, nullable=False)
+    mime_type = Column(String)
+    body = Column(String)
+    declar_id = Column(Integer, ForeignKey('declars.id'), index=True)
+    declar = relationship('Declars', back_populates='documents')
+    
+    
+class LegalEntity(Base):
+    __tablename__ = 'entities'
+
+    id = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
+    name = Column(String, nullable=False)
+    full_name = Column(String)
+    inn = Column(String)
+    kpp = Column(String)
+    address = Column(String, nullable=False)
+    ogrn = Column(String)
+    taxRegDoc = Column(String)
+    govRegDoc = Column(String)
+    govRegDate = Column(Date)
+    # phone = xsd.ListElement(String, tagname='phone', minOccurs=0,
+    #                         maxOccurs=xsd.UNBOUNDED)
+    # email = xsd.ListElement(String, tagname='email', minOccurs=0,
+    #                         maxOccurs=xsd.UNBOUNDED)
+    bossFio = Column(String)
+    buhFio = Column(String)
+    bank = Column(String)
+    bankAccount = Column(String)
+    lastCtrlDate = Column(Date)
+    opf = Column(String)
+    govRegOgv = Column(String)
+    person = Column(Integer)
+    declar = Column(Integer, ForeignKey('declars.id'), index=True)
+    
+
+class Individuals(Base):
+    __tablename__ = 'persons'
+
+    id = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
+    surname = Column(String, nullable=False)
+    first_name = Column(String, nullable=False)
+    patronymic = Column(String)
+    address = Column(String, nullable=False)
+    fact_address = Column(String)
+    # email = xsd.ListElement(String, tagname='email', minOccurs=0,
+    #                         maxOccurs=xsd.UNBOUNDED)
+    birthdate = Column(Date)
+    passport_serial = Column(String)
+    passport_number = Column(String)
+    passport_agency = Column(String)
+    passport_date = Column(Date)
+    # phone = xsd.ListElement(String, tagname='phone', minOccurs=0,
+    #                         maxOccurs=xsd.UNBOUNDED)
+    inn = Column(String)
+    sex = Column(String)
+    snils = Column(String)
+    declar = Column(Integer, ForeignKey('declars.id'), index=True)
+    entity = Column(Integer, ForeignKey('entities.id'))
+    
+    
+class Phones(Base):
+    __tablename__ = 'phones'
+
+    id = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
+    phone = Column(String)
+
+
+class EntityPhones(Base):
+    __tablename__ = 'entityphones'
+
+    entity = Column(Integer, ForeignKey('entities.id'), index=True)
+    phone = Column(Integer, ForeignKey('phones.id'))
+
+class IndividualPhones(Base):
+    __tablename__ = 'individualphones'
+
+    person = Column(Integer, ForeignKey('persons.id'), index=True)
+    phone = Column(Integer, ForeignKey('phones.id'))
+
+
+class Emails(Base):
+    __tablename__ = 'emails'
+
+    id = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
+    email = Column(String)
+
+
+class EntityEmails(Base):
+    __tablename__ = 'entityemails'
+
+    entity = Column(Integer, ForeignKey('entities.id'), index=True)
+    email = Column(Integer, ForeignKey('emails.id'))
+
+
+class IndividualEmails(Base):
+    __tablename__ = 'individualemails'
+
+    person = Column(Integer, ForeignKey('persons.id'), index=True)
+    email = Column(Integer, ForeignKey('emails.id'))
 
 
 class Db:
