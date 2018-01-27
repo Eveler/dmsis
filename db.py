@@ -26,17 +26,19 @@ class Requests(Base):
 
 class Declars(Base):
     __tablename__ = 'declars'
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
     declar_number = Column(String, nullable=False)
     service = Column(String, nullable=False)
     register_date = Column(Date, nullable=False)
     end_date = Column(Date, nullable=False)
     object_address = Column(String)
-    param = Column(String)
+    param = relationship('Params', back_populates='declar')
+    uuid = Column(String, nullable=False)
+    reply_to = Column(String)
     documents = relationship('Documents', back_populates='declar')
-    
-    
+
+
 class Documents(Base):
     __tablename__ = 'documents'
 
@@ -50,8 +52,24 @@ class Documents(Base):
     body = Column(String)
     declar_id = Column(Integer, ForeignKey('declars.id'), index=True)
     declar = relationship('Declars', back_populates='documents')
-    
-    
+
+
+class Params(Base):
+    __tablename__ = 'params'
+
+    id = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
+    type = Column(String, nullable=False)
+    param_id = Column(String, nullable=False)
+    label = Column(String)
+    row_number = Column(String)
+    col_number = Column(String)
+    row_delimiter = Column(String)
+    col_delimiter = Column(String)
+    value = Column(String, nullable=False)
+    declar_id = Column(Integer, ForeignKey('declars.id'), index=True)
+    declar = relationship('Declars', back_populates='param')
+
+
 class LegalEntity(Base):
     __tablename__ = 'entities'
 
@@ -78,7 +96,7 @@ class LegalEntity(Base):
     govRegOgv = Column(String)
     person = Column(Integer)
     declar = Column(Integer, ForeignKey('declars.id'), index=True)
-    
+
 
 class Individuals(Base):
     __tablename__ = 'persons'
@@ -103,8 +121,8 @@ class Individuals(Base):
     snils = Column(String)
     declar = Column(Integer, ForeignKey('declars.id'), index=True)
     entity = Column(Integer, ForeignKey('entities.id'))
-    
-    
+
+
 class Phones(Base):
     __tablename__ = 'phones'
 
@@ -117,6 +135,7 @@ class EntityPhones(Base):
 
     entity = Column(Integer, ForeignKey('entities.id'), index=True)
     phone = Column(Integer, ForeignKey('phones.id'))
+
 
 class IndividualPhones(Base):
     __tablename__ = 'individualphones'
@@ -205,24 +224,67 @@ class Db:
     def commit(self):
         self.session.commit()
 
-    def _clear(self):
-        for req in self.all():
-            self.session.delete(req)
-        self.session.commit()
-        self.session.execute('VACUUM FULL')
+    def save_declar(self, declar, uuid, reply_to):
+        d = Declars(declar_number=declar.declar_number, service=declar.service,
+                    register_date=declar.register_date,
+                    end_date=declar.end_date,
+                    object_address=str(declar.object_address), uuid=uuid,
+                    reply_to=reply_to)
+        self.session.add(d)
+        i = 0
+        for adoc in declar.AppliedDocument:
+            from mimetypes import guess_type
+            if hasattr(adoc, 'file') and adoc.file:
+                with open(adoc.file, 'rb') as f:
+                    mime_type = guess_type(f.name)[0]
+                    doc_data = f.read()
+            elif hasattr(declar, 'files') and declar.files:
+                found = False
+                for file_path, file_name in declar.files:
+                    if file_name.lower() == adoc.file_name.lower():
+                        found = file_path
+                if not found:
+                    found, file_name = declar.files[i]
+                mime_type = guess_type(found)[0]
+                with open(found, 'rb') as f:
+                    doc_data = f.read()
+            else:
+                doc_data = b'test'
+                mime_type = 'app/text'
+            i += 1
+            doc = Documents(title=doc.title, number=doc.number, date=doc.date,
+                            valid_until=doc.valid_until,
+                            file_name=doc.file_name, mime_type=mime_type,
+                            body=doc_data, declar_id=d.id, declar=d)
+            self.session.add(doc)
+        for param in declar.Param:
+            p = Params(type=param.attr('type'), param_id=param.attr('id'),
+                       label=param.attr('label'),
+                       row_number=param.attr('rowNumber'),
+                       col_number=param.attr('colNumber'),
+                       row_delimiter=param.attr('rowDelimiter'),
+                       col_delimiter=param.attr('colDelimiter'),
+                       value=param, declar_id=d.id, declar=d)
+            self.session.add(p)
+        self.commit()
 
-    def __del__(self):
-        self.session.execute('VACUUM FULL')
+        def _clear(self):
+            for req in self.all():
+                self.session.delete(req)
+            self.session.commit()
+            self.session.execute('VACUUM FULL')
 
+        def __del__(self):
+            self.session.execute('VACUUM FULL')
 
-if __name__ == '__main__':
-    logging.basicConfig(level=logging.DEBUG)
-    db = Db()
-    db.add_update('gdfgdsgdfg-fdgfsdf-dfgdfsg', '85473h59394',
-                  'gdfgdsgdfg-fdgfsdf-dfgdfsg')
-    res = db.all()
-    print('*' * 80)
-    for r in res:
-        print(r.id, '|', r.uuid, '|', r.declar_num)
-    print('*' * 80)
-    db._clear()
+    if __name__ == '__main__':
+        logging.basicConfig(level=logging.DEBUG)
+        db = Db()
+        db.add_update('gdfgdsgdfg-fdgfsdf-dfgdfsg', '85473h59394',
+                      'gdfgdsgdfg-fdgfsdf-dfgdfsg')
+        res = db.all()
+        print('*' * 80)
+        for r in res:
+            print(r.id, '|', r.uuid, '|', r.declar_num)
+        print('*' * 80)
+        db._clear()
