@@ -105,7 +105,6 @@ class AppliedDocument(xsd.ComplexType):
     file_name = xsd.Element(xsd.String, minOccurs=0)
     url = xsd.Element(xsd.String)
     url_valid_until = xsd.Element(xsd.DateTime, minOccurs=0)
-    file = None
 
     @classmethod
     def create(cls, title, number, date, url):
@@ -207,7 +206,6 @@ class Declar(xsd.ComplexType):
     person = xsd.ListElement(Individual, minOccurs=0, tagname='person', maxOccurs=xsd.UNBOUNDED)
     confidant = xsd.Element(Individual, minOccurs=0)
     Param = xsd.ListElement(xsd.String, tagname='Param', minOccurs=0, maxOccurs=xsd.UNBOUNDED)
-    files = []
 
     @classmethod
     def create(cls, declar_number, service, register_date, end_date, AppliedDocument):
@@ -231,16 +229,6 @@ class Declar(xsd.ComplexType):
                 ', '.join(['%s № %s от %s' %
                            (d.title, d.number, d.date.strftime('%d.%m.%Y'))
                            for d in self.AppliedDocument]))
-
-    def __del__(self):
-        for file in self.files:
-            if isinstance(file, (str, bytes)):
-                remove(file)
-            elif isinstance(file, dict):
-                if file:
-                    remove(file.popitem()[0])
-            else:
-                remove(file.name)
 
 
 Schema_ef09a = xsd.Schema(

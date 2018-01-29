@@ -1,6 +1,6 @@
 # -*- encoding: utf-8 -*-
 import logging
-from datetime import date
+from datetime import date, datetime
 
 from sqlalchemy import Column, Integer, String, Boolean, Date, ForeignKey
 from sqlalchemy.orm import relationship
@@ -34,7 +34,7 @@ class Declars(Base):
     end_date = Column(Date, nullable=False)
     object_address = Column(String)
     param = relationship('Params', back_populates='declar')
-    uuid = Column(String, nullable=False)
+    uuid = Column(String, nullable=False, index=True)
     reply_to = Column(String)
     documents = relationship('Documents', back_populates='declar')
 
@@ -133,6 +133,7 @@ class Phones(Base):
 class EntityPhones(Base):
     __tablename__ = 'entityphones'
 
+    id = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
     entity = Column(Integer, ForeignKey('entities.id'), index=True)
     phone = Column(Integer, ForeignKey('phones.id'))
 
@@ -140,6 +141,7 @@ class EntityPhones(Base):
 class IndividualPhones(Base):
     __tablename__ = 'individualphones'
 
+    id = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
     person = Column(Integer, ForeignKey('persons.id'), index=True)
     phone = Column(Integer, ForeignKey('phones.id'))
 
@@ -154,6 +156,7 @@ class Emails(Base):
 class EntityEmails(Base):
     __tablename__ = 'entityemails'
 
+    id = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
     entity = Column(Integer, ForeignKey('entities.id'), index=True)
     email = Column(Integer, ForeignKey('emails.id'))
 
@@ -161,6 +164,7 @@ class EntityEmails(Base):
 class IndividualEmails(Base):
     __tablename__ = 'individualemails'
 
+    id = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
     person = Column(Integer, ForeignKey('persons.id'), index=True)
     email = Column(Integer, ForeignKey('emails.id'))
 
@@ -224,37 +228,35 @@ class Db:
     def commit(self):
         self.session.commit()
 
-    def save_declar(self, declar, uuid, reply_to):
+    def save_declar(self, declar, uuid, reply_to, files):
         d = Declars(declar_number=declar.declar_number, service=declar.service,
-                    register_date=declar.register_date,
-                    end_date=declar.end_date,
+                    register_date=datetime.strptime(
+                        declar.register_date.strftime('%Y-%m-%d'), '%Y-%m-%d'),
+                    end_date=datetime.strptime(
+                        declar.end_date.strftime('%Y-%m-%d'), '%Y-%m-%d'),
                     object_address=str(declar.object_address), uuid=uuid,
                     reply_to=reply_to)
         self.session.add(d)
-        i = 0
         for adoc in declar.AppliedDocument:
             from mimetypes import guess_type
-            if hasattr(adoc, 'file') and adoc.file:
-                with open(adoc.file, 'rb') as f:
-                    mime_type = guess_type(f.name)[0]
-                    doc_data = f.read()
-            elif hasattr(declar, 'files') and declar.files:
-                found = False
-                for file_path, file_name in declar.files:
-                    if file_name.lower() == adoc.file_name.lower():
-                        found = file_path
-                if not found:
-                    found, file_name = declar.files[i]
-                mime_type = guess_type(found)[0]
-                with open(found, 'rb') as f:
-                    doc_data = f.read()
-            else:
-                doc_data = b'test'
-                mime_type = 'app/text'
-            i += 1
-            doc = Documents(title=doc.title, number=doc.number, date=doc.date,
-                            valid_until=doc.valid_until,
-                            file_name=doc.file_name, mime_type=mime_type,
+            found = files[adoc.file_name]
+            mime_type = guess_type(found)[0]
+            with open(found, 'rb') as f:
+                doc_data = f.read()
+            # from encodings.base64_codec import base64_encode
+            # doc = Documents(title=doc.title, number=doc.number, date=doc.date,
+            #                 valid_until=doc.valid_until,
+            #                 file_name=doc.file_name, mime_type=mime_type,
+            #                 body=base64_encode(doc_data), declar_id=d.id,
+            #                 declar=d)
+            doc = Documents(title=adoc.title, number=adoc.number,
+                            date=datetime.strptime(
+                                adoc.date.strftime('%Y-%m-%d'), '%Y-%m-%d'),
+                            valid_until=datetime.strptime(
+                                adoc.valid_until.strftime('%Y-%m-%d'),
+                                '%Y-%m-%d')
+                            if adoc.valid_until else None,
+                            file_name=adoc.file_name, mime_type=mime_type,
                             body=doc_data, declar_id=d.id, declar=d)
             self.session.add(doc)
         for param in declar.Param:
@@ -268,23 +270,38 @@ class Db:
             self.session.add(p)
         self.commit()
 
-        def _clear(self):
-            for req in self.all():
-                self.session.delete(req)
-            self.session.commit()
-            self.session.execute('VACUUM FULL')
+    def load_declar(self, uuid):
+        r = self.session.query(Declars).filter_by(uuid=uuid).first()
+        return r
 
-        def __del__(self):
-            self.session.execute('VACUUM FULL')
+    def _clear(self):
+        for req in self.all():
+            self.session.delete(req)
+        self.session.commit()
+        self.session.execute('VACUUM FULL')
 
-    if __name__ == '__main__':
-        logging.basicConfig(level=logging.DEBUG)
-        db = Db()
-        db.add_update('gdfgdsgdfg-fdgfsdf-dfgdfsg', '85473h59394',
-                      'gdfgdsgdfg-fdgfsdf-dfgdfsg')
-        res = db.all()
-        print('*' * 80)
-        for r in res:
-            print(r.id, '|', r.uuid, '|', r.declar_num)
-        print('*' * 80)
-        db._clear()
+    def __del__(self):
+        self.session.execute('VACUUM FULL')
+
+
+if __name__ == '__main__':
+    logging.basicConfig(level=logging.DEBUG)
+    db = Db()
+    with open('logo-ussuriisk.png', 'rb') as f:
+        data = f.read()
+    from declar import Declar, AppliedDocument
+
+    doc = AppliedDocument(title='dsgsfdgs', number='cvgfdg',
+                          date=date(2008, 1, 12), url='dfgdsfgs',
+                          file_name='logo-ussuriisk.png')
+    # doc.file = 'logo-ussuriisk.png'
+    declar = Declar(declar_number='dfgds', service='dfd',
+                    register_date=date(2008, 1, 12), end_date=date(2009, 1, 1),
+                    AppliedDocument=[doc])
+    files = {'logo-ussuriisk.png': 'logo-ussuriisk.png'}
+    db.save_declar(declar, 'sfsdf', 'sdfdsfdsf', files)
+
+    r = db.load_declar('sfsdf')
+    for doc in r.documents:
+        with open('logo-ussuriisk1.png', 'wb') as f:
+            f.write(doc.body)
