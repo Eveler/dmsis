@@ -173,6 +173,7 @@ class IndividualEmails(Base):
 
 class Db:
     def __init__(self, dbstr='sqlite:///dmsis.db'):
+        self.log = logging.getLogger('db')
         self.engine = create_engine(dbstr,
                                     echo=(logging.root.level == logging.DEBUG))
         Base.metadata.create_all(self.engine, checkfirst=True)
@@ -271,7 +272,7 @@ class Db:
         try:
             self.session.commit()
         except SQLAlchemyError as e:
-            logging.warning(
+            self.log.warning(
                 'Cannot write file to DB. Fallback to file storage.',
                 exc_info=True)
             for doc in docs:
