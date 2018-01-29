@@ -2,7 +2,8 @@
 import logging
 from datetime import date, datetime
 
-from sqlalchemy import Column, Integer, String, Boolean, Date, ForeignKey
+from sqlalchemy import Column, Integer, String, Boolean, Date, ForeignKey, func
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import relationship
 from sqlalchemy.engine import create_engine
 from sqlalchemy.ext.declarative.api import declarative_base
@@ -50,6 +51,7 @@ class Documents(Base):
     file_name = Column(String, nullable=False)
     mime_type = Column(String)
     body = Column(String)
+    file_path = Column(String)
     declar_id = Column(Integer, ForeignKey('declars.id'), index=True)
     declar = relationship('Declars', back_populates='documents')
 
@@ -237,6 +239,7 @@ class Db:
                     object_address=str(declar.object_address), uuid=uuid,
                     reply_to=reply_to)
         self.session.add(d)
+        docs = []
         for adoc in declar.AppliedDocument:
             from mimetypes import guess_type
             found = files[adoc.file_name]
@@ -244,11 +247,7 @@ class Db:
             with open(found, 'rb') as f:
                 doc_data = f.read()
             # from encodings.base64_codec import base64_encode
-            # doc = Documents(title=doc.title, number=doc.number, date=doc.date,
-            #                 valid_until=doc.valid_until,
-            #                 file_name=doc.file_name, mime_type=mime_type,
-            #                 body=base64_encode(doc_data), declar_id=d.id,
-            #                 declar=d)
+            # doc_data = base64_encode(doc_data)
             doc = Documents(title=adoc.title, number=adoc.number,
                             date=datetime.strptime(
                                 adoc.date.strftime('%Y-%m-%d'), '%Y-%m-%d'),
@@ -259,6 +258,7 @@ class Db:
                             file_name=adoc.file_name, mime_type=mime_type,
                             body=doc_data, declar_id=d.id, declar=d)
             self.session.add(doc)
+            docs.append(doc)
         for param in declar.Param:
             p = Params(type=param.attr('type'), param_id=param.attr('id'),
                        label=param.attr('label'),
@@ -268,7 +268,43 @@ class Db:
                        col_delimiter=param.attr('colDelimiter'),
                        value=param, declar_id=d.id, declar=d)
             self.session.add(p)
-        self.commit()
+        try:
+            self.session.commit()
+        except SQLAlchemyError as e:
+            logging.warning(
+                'Cannot write file to DB. Fallback to file storage.',
+                exc_info=True)
+            for doc in docs:
+                self.session.delete(doc)
+            for adoc in declar.AppliedDocument:
+                from mimetypes import guess_type
+                found = files[adoc.file_name]
+                mime_type = guess_type(found)[0]
+                maxid = self.session.query(func.max(Documents.id)).first() + 1
+                from os import makedirs, path
+                if not path.exists('storage'):
+                    makedirs('storage')
+                from shutil import copy2
+                if maxid > 10000:
+                    if not path.exists(path.join('storage', str(maxid)[:-4])):
+                        makedirs(path.join('storage', str(maxid)[:-4]))
+                    file_path = path.join('storage', str(maxid)[:-4],
+                                          adoc.file_name)
+                    copy2(found, file_path)
+                else:
+                    file_path = path.join('storage', adoc.file_name)
+                    copy2(found, file_path)
+                doc = Documents(title=adoc.title, number=adoc.number,
+                                date=datetime.strptime(
+                                    adoc.date.strftime('%Y-%m-%d'), '%Y-%m-%d'),
+                                valid_until=datetime.strptime(
+                                    adoc.valid_until.strftime('%Y-%m-%d'),
+                                    '%Y-%m-%d')
+                                if adoc.valid_until else None,
+                                file_name=adoc.file_name, mime_type=mime_type,
+                                file_path=file_path, declar_id=d.id, declar=d)
+                self.session.add(doc)
+            self.session.commit()
 
     def load_declar(self, uuid):
         r = self.session.query(Declars).filter_by(uuid=uuid).first()
