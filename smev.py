@@ -143,7 +143,7 @@ class Adapter:
         # #      'Timestamp': timestamp, 'NodeID': node_id},
         # #     CallerInformationSystemSignature=etree.fromstring(res))
 
-        declar, uuid, reply_to = None, None, None
+        declar, uuid, reply_to, files = None, None, None, {}
 
         if 'MessagePrimaryContent' in res:
             xml = etree.fromstring(res)
@@ -201,7 +201,6 @@ class Adapter:
                     res.Request.SenderProvidedRequestData.MessagePrimaryContent._value_1))
             if hasattr(res.Request, 'FSAttachmentsList') \
                     and res.Request.FSAttachmentsList:
-                files = {}
                 attach_head_list = res.Request.SenderProvidedRequestData.RefAttachmentHeaderList
                 for head in attach_head_list:
                     files[head.uuid] = {'MimeType': head.MimeType}
@@ -226,7 +225,8 @@ class Adapter:
                     else:
                         res, e = res
                         file_name = fn + '.txt'
-                    declar.files.append({res: file_name})
+                    # declar.files.append({res: file_name})
+                    files[file_name] = res
 
             uuid = res.Request.SenderProvidedRequestData.MessageID
             reply_to = res.Request.ReplyTo
@@ -263,7 +263,7 @@ class Adapter:
             res = self.__send(operation, res)
             self.log.debug(res)
 
-        return declar, uuid, reply_to
+        return declar, uuid, reply_to, files
 
     def send_respose(self, reply_to, declar_number, register_date,
                      result='FINAL', text='', applied_documents=list(),

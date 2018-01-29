@@ -7,13 +7,13 @@
 # SendResponse if status changed
 import logging
 import os
-from tempfile import mkstemp
+import tempfile
 
 from win32._service import SERVICE_STOP_PENDING
 from win32serviceutil import ServiceFramework, HandleCommandLine
 
 from db import Db
-from declar import AppliedDocument
+from declar import AppliedDocument, Declar, Address, LegalEntity
 from plugins.directum import IntegrationServices
 from smev import Adapter
 from twisted.internet import task, reactor
@@ -39,7 +39,7 @@ class Integration:
 
         try:
             self.__smev = Adapter(self.smev_wsdl, self.smev_ftp,
-                              method=self.cert_method)
+                                  method=self.cert_method)
         except Exception:
             self.report_error()
 
@@ -69,7 +69,7 @@ class Integration:
         if not self.__smev:
             try:
                 self.__smev = Adapter(self.smev_wsdl, self.smev_ftp,
-                                  method=self.cert_method)
+                                      method=self.cert_method)
             except Exception:
                 self.report_error()
 
@@ -88,15 +88,93 @@ class Integration:
         Sends GetRequest. Then queries Directum for changed status for stored
         requests and sends SendResponse if status changed
         """
+        # Send to DIRECTUM previously saved declars
         try:
-            declar, uuid, reply_to = self.smev.get_request(self.smev_uri,
-                                                           self.local_name)
-            if declar:
-                res = self.directum.add_declar(declar)
-                self.db.add_update(uuid, declar.declar_number, reply_to,
-                                   directum_id=res)
+            for declar in self.db.all_declars():
+                files = {}
+                for doc in declar.documents:
+                    if doc.body:
+                        from tempfile import mkstemp
+                        fp, file_path = tempfile.mkstemp()
+                        os.close(fp)
+                        with open(file_path, 'wb') as f:
+                            f.write(doc.body)
+                        files[doc.file_name] = file_path
+                    else:
+                        files[doc.file_name] = doc.file_path
+                a = Address(
+                    Postal_Code=declar.object_address.Postal_Code,
+                    Region=declar.object_address.Region,
+                    District=declar.object_address.District,
+                    City=declar.object_address.City,
+                    Urban_District=declar.object_address.Urban_District,
+                    Soviet_Village=declar.object_address.Soviet_Village,
+                    Locality=declar.object_address.Locality,
+                    Street=declar.object_address.Street,
+                    House=declar.object_address.House,
+                    Housing=declar.object_address.Housing,
+                    Building=declar.object_address.Building,
+                    Apartment=declar.object_address.Apartment,
+                    Reference_point=declar.object_address.Reference_point)
+                docs = [AppliedDocument(
+                    title=doc.title, number=doc.number, date=doc.date,
+                    valid_until=doc.valid_until, file_name=doc.file_name,
+                    url=doc.url, url_valid_until=doc.url_valid_until) for
+                    doc in declar.documents]
+                legal_person = None
+                legal_phones = []
+                legal_entities = [LegalEntity(
+                    name = declar.legal_entity.,
+                    full_name = declar.legal_entity.,
+                    inn = declar.legal_entity.,
+                    kpp = declar.legal_entity.,
+                    address = declar.legal_entity.,
+                    ogrn = declar.legal_entity.,
+                    taxRegDoc = declar.legal_entity.,
+                    govRegDoc = declar.legal_entity.,
+                    govRegDate = declar.legal_entity.,
+                    phone = legal_phones,
+                    email = xsd.ListElement(xsd.String, tagname='email', minOccurs=0, maxOccurs=xsd.UNBOUNDED)
+    bossFio = xsd.Element(xsd.String, minOccurs=0)
+    buhFio = xsd.Element(xsd.String, minOccurs=0)
+    bank = xsd.Element(xsd.String, minOccurs=0)
+    bankAccount = xsd.Element(xsd.String, minOccurs=0)
+    lastCtrlDate = xsd.Element(xsd.Date, minOccurs=0)
+    opf = xsd.Element(xsd.String, minOccurs=0)
+    govRegOgv = xsd.Element(xsd.String, minOccurs=0)
+    person =legal_person)]
+                d = Declar(
+                    declar_number=declar.declar_number, service=declar.service,
+                    register_date=declar.register_date,
+                    end_date=declar.end_date, object_address=a,
+                    AppliedDocument=docs, legal_entity=declar.legal_entity,
+                    person=declar.person, confidant=declar.confidant,
+                    Param=declar.param)
+                res = self.directum.add_declar(d, files=files)
+                self.db.add_update(declar.uuid, declar.declar_number,
+                                   declar.reply_to, directum_id=res)
                 logging.info('Добавлено/обновлено дело с ID = %s' % res)
                 self.directum.run_script('СтартЗадачПоМУ')
+                self.db.delete_declar(declar.uuid)
+        except Exception:
+            self.report_error()
+
+        try:
+            declar, uuid, reply_to, files = self.smev.get_request(
+                self.smev_uri,
+                self.local_name)
+            if declar:
+                try:
+                    res = self.directum.add_declar(declar, files=files)
+                    self.db.add_update(uuid, declar.declar_number, reply_to,
+                                       directum_id=res)
+                    logging.info('Добавлено/обновлено дело с ID = %s' % res)
+                    self.directum.run_script('СтартЗадачПоМУ')
+                except Exception:
+                    logging.warning(
+                        'Failed to send data to DIRECTUM. Saving locally.',
+                        exc_info=True)
+                    self.db.save_declar(declar, uuid, reply_to, files)
         except Exception as e:
             self.report_error()
 
@@ -134,9 +212,11 @@ class Integration:
                                 os.close(file)
                                 ad.file = file_n
                                 ad.date = doc.get('ISBEDocCreateDate')
-                                ad.file_name = doc.get('ID') + '.' + doc.get(
+                                ad.file_name = doc.get(
+                                    'ID') + '.' + doc.get(
                                     'Extension').lower()
-                                ad.number = doc.get('Дополнение') if doc.get(
+                                ad.number = doc.get(
+                                    'Дополнение') if doc.get(
                                     'Дополнение') else doc.get('NumberEDoc')
                                 ad.title = doc.get('ISBEDocName')
                                 applied_docs.append(ad)
@@ -151,7 +231,8 @@ class Integration:
                             'ДПУ', request.directum_id)
                         ad = AppliedDocument()
                         for doc in docs:
-                            if doc.get('TKED') in ('КИК', 'ИК1', 'ИК2', 'ПСИ'):
+                            if doc.get('TKED') in (
+                                    'КИК', 'ИК1', 'ИК2', 'ПСИ'):
                                 if ad.date > doc.get('ISBEDocCreateDate'):
                                     doc_id = doc.get('ID')
                                     if ad.file:
@@ -164,7 +245,8 @@ class Integration:
                                         'Extension').lower()
                                     ad.number = doc.get(
                                         'Дополнение') if doc.get(
-                                        'Дополнение') else doc.get('NumberEDoc')
+                                        'Дополнение') else doc.get(
+                                        'NumberEDoc')
                                     ad.title = doc.get('ISBEDocName')
                         # Get only last version
                         versions = self.directum.get_doc_versions(
@@ -186,7 +268,8 @@ class Integration:
                     self.smev.send_respose(
                         request.reply_to, request.declar_num,
                         request.declar_date, text=text,
-                        applied_documents=applied_docs, ftp_user=self.ftp_user,
+                        applied_documents=applied_docs,
+                        ftp_user=self.ftp_user,
                         ftp_pass=self.ftp_pass)
                     # self.db.delete(request.uuid)
                     request.done = True
@@ -257,7 +340,8 @@ class Integration:
                 do_write = True
                 cfg.add_section('smev')
                 cfg.set(
-                    'smev', 'wsdl', "http://172.20.3.12:7500/smev/v1.2/ws?wsdl")
+                    'smev', 'wsdl',
+                    "http://172.20.3.12:7500/smev/v1.2/ws?wsdl")
                 cfg.set('smev', 'ftp', "ftp://172.20.3.12/")
             if 'uri' in cfg.options('smev'):
                 self.smev_uri = cfg.get('smev', 'uri')
@@ -270,7 +354,8 @@ class Integration:
             if 'wsdl' not in cfg.options('smev'):
                 do_write = True
                 cfg.set(
-                    'smev', 'wsdl', "http://172.20.3.12:7500/smev/v1.2/ws?wsdl")
+                    'smev', 'wsdl',
+                    "http://172.20.3.12:7500/smev/v1.2/ws?wsdl")
             self.smev_wsdl = cfg.get('smev', 'wsdl')
             if 'ftp' not in cfg.options('smev'):
                 do_write = True
@@ -340,7 +425,8 @@ class Integration:
         from traceback import format_exception
         etype, value, tb = exc_info()
         trace = ''.join(format_exception(etype, value, tb))
-        msg = ("%s" + "\n" + "*" * 70 + "\n%s\n" + "*" * 70) % (value, trace)
+        msg = ("%s" + "\n" + "*" * 70 + "\n%s\n" + "*" * 70) % (
+            value, trace)
         logging.error(msg)
 
         if self.mail_server:
@@ -395,7 +481,8 @@ def main():
 
     from optparse import OptionParser
 
-    parser = OptionParser(version="%prog ver. 1.0", conflict_handler="resolve")
+    parser = OptionParser(version="%prog ver. 1.0",
+                          conflict_handler="resolve")
     parser.print_version()
     parser.add_option("-r", "--run", action="store_true", dest="run",
                       help="Just run program. Don`t work as win32service")

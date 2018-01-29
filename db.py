@@ -33,11 +33,32 @@ class Declars(Base):
     service = Column(String, nullable=False)
     register_date = Column(Date, nullable=False)
     end_date = Column(Date, nullable=False)
-    object_address = Column(String)
+    object_address = relationship('Addresses', back_populate='adresses')
+    documents = relationship('Documents', back_populates='declar')
+    legal_entity = relationship('LegalEntity', back_populates='declar')
+    person = relationship('Individuals', back_populates='declar')
     param = relationship('Params', back_populates='declar')
     uuid = Column(String, nullable=False, index=True)
     reply_to = Column(String)
-    documents = relationship('Documents', back_populates='declar')
+
+
+class Addresses(Base):
+    __tablename__ = 'adresses'
+
+    id = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
+    Postal_Code = Column(String)
+    Region = Column(String)
+    District = Column(String)
+    City = Column(String)
+    Urban_District = Column(String)
+    Soviet_Village = Column(String)
+    Locality = Column(String)
+    Street = Column(String)
+    House = Column(String)
+    Housing = Column(String)
+    Building = Column(String)
+    Apartment = Column(String)
+    Reference_point = Column(String)
 
 
 class Documents(Base):
@@ -49,6 +70,8 @@ class Documents(Base):
     date = Column(Date, nullable=False)
     valid_until = Column(Date)
     file_name = Column(String, nullable=False)
+    url = Column(String)
+    url_valid_until = Column(Date)
     mime_type = Column(String)
     body = Column(String)
     file_path = Column(String)
@@ -80,7 +103,7 @@ class LegalEntity(Base):
     full_name = Column(String)
     inn = Column(String)
     kpp = Column(String)
-    address = Column(String, nullable=False)
+    address = relationship('Addresses', back_populate='adresses')
     ogrn = Column(String)
     taxRegDoc = Column(String)
     govRegDoc = Column(String)
@@ -97,7 +120,8 @@ class LegalEntity(Base):
     opf = Column(String)
     govRegOgv = Column(String)
     person = Column(Integer)
-    declar = Column(Integer, ForeignKey('declars.id'), index=True)
+    declar_id = Column(Integer, ForeignKey('declars.id'), index=True)
+    declar = relationship('Declars', back_populates='legal_entity')
 
 
 class Individuals(Base):
@@ -121,7 +145,8 @@ class Individuals(Base):
     inn = Column(String)
     sex = Column(String)
     snils = Column(String)
-    declar = Column(Integer, ForeignKey('declars.id'), index=True)
+    declar_id = Column(Integer, ForeignKey('declars.id'), index=True)
+    declar = relationship('Declars', back_populates='person')
     entity = Column(Integer, ForeignKey('entities.id'))
 
 
@@ -232,13 +257,26 @@ class Db:
         self.session.commit()
 
     def save_declar(self, declar, uuid, reply_to, files):
+        a = Addresses(
+            Postal_Code=declar.object_address.Postal_Code,
+            Region=declar.object_address.Region,
+            District=declar.object_address.District,
+            City=declar.object_address.City,
+            Urban_District=declar.object_address.Urban_District,
+            Soviet_Village=declar.object_address.Soviet_Village,
+            Locality=declar.object_address.Locality,
+            Street=declar.object_address.Street,
+            House=declar.object_address.House,
+            Housing=declar.object_address.Housing,
+            Building=declar.object_address.Building,
+            Apartment=declar.object_address.Apartment,
+            Reference_point=declar.object_address.Reference_point)
         d = Declars(declar_number=declar.declar_number, service=declar.service,
                     register_date=datetime.strptime(
                         declar.register_date.strftime('%Y-%m-%d'), '%Y-%m-%d'),
                     end_date=datetime.strptime(
                         declar.end_date.strftime('%Y-%m-%d'), '%Y-%m-%d'),
-                    object_address=str(declar.object_address), uuid=uuid,
-                    reply_to=reply_to)
+                    object_address=a, uuid=uuid, reply_to=reply_to)
         self.session.add(d)
         docs = []
         for adoc in declar.AppliedDocument:
@@ -310,6 +348,25 @@ class Db:
     def load_declar(self, uuid):
         r = self.session.query(Declars).filter_by(uuid=uuid).first()
         return r
+
+    def all_declars(self):
+        return self.session.query(Declars).all()
+
+    def delete_declar(self, uuid):
+        for d in self.session.query(Declars).filter_by(uuid=uuid).all():
+            self.session.delete(d.object_address)
+            for doc in d.documents:
+                if doc.file_path:
+                    from os import remove
+                    remove(doc.file_path)
+                self.session.delete(doc)
+            for entity in d.legal_entity:
+                self.session.delete(entity)
+            for person in d.person:
+                self.session.delete(person)
+            for param in d.param:
+                self.session.delete(param)
+        self.session.commit()
 
     def _clear(self):
         for req in self.all():
