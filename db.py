@@ -3,10 +3,9 @@ import logging
 from datetime import date, datetime
 
 from sqlalchemy import Column, Integer, String, Boolean, Date, ForeignKey, func
-from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import relationship
 from sqlalchemy.engine import create_engine
 from sqlalchemy.ext.declarative.api import declarative_base
+from sqlalchemy.orm import relationship
 from sqlalchemy.orm.session import sessionmaker
 
 Base = declarative_base()
@@ -108,10 +107,8 @@ class LegalEntity(Base):
     taxRegDoc = Column(String)
     govRegDoc = Column(String)
     govRegDate = Column(Date)
-    # phone = xsd.ListElement(String, tagname='phone', minOccurs=0,
-    #                         maxOccurs=xsd.UNBOUNDED)
-    # email = xsd.ListElement(String, tagname='email', minOccurs=0,
-    #                         maxOccurs=xsd.UNBOUNDED)
+    phone = relationship('Phones', back_populate='entity')
+    email = relationship('Emails', back_populate='entity')
     bossFio = Column(String)
     buhFio = Column(String)
     bank = Column(String)
@@ -119,7 +116,7 @@ class LegalEntity(Base):
     lastCtrlDate = Column(Date)
     opf = Column(String)
     govRegOgv = Column(String)
-    person = Column(Integer)
+    person = relationship('Individuals', back_populates='persons')
     declar_id = Column(Integer, ForeignKey('declars.id'), index=True)
     declar = relationship('Declars', back_populates='legal_entity')
 
@@ -133,15 +130,13 @@ class Individuals(Base):
     patronymic = Column(String)
     address = Column(String, nullable=False)
     fact_address = Column(String)
-    # email = xsd.ListElement(String, tagname='email', minOccurs=0,
-    #                         maxOccurs=xsd.UNBOUNDED)
+    email = relationship('Emails', back_populate='person')
     birthdate = Column(Date)
     passport_serial = Column(String)
     passport_number = Column(String)
     passport_agency = Column(String)
     passport_date = Column(Date)
-    # phone = xsd.ListElement(String, tagname='phone', minOccurs=0,
-    #                         maxOccurs=xsd.UNBOUNDED)
+    phone = relationship('Phones', back_populate='person')
     inn = Column(String)
     sex = Column(String)
     snils = Column(String)
@@ -155,22 +150,8 @@ class Phones(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
     phone = Column(String)
-
-
-class EntityPhones(Base):
-    __tablename__ = 'entityphones'
-
-    id = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
-    entity = Column(Integer, ForeignKey('entities.id'), index=True)
-    phone = Column(Integer, ForeignKey('phones.id'))
-
-
-class IndividualPhones(Base):
-    __tablename__ = 'individualphones'
-
-    id = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
-    person = Column(Integer, ForeignKey('persons.id'), index=True)
-    phone = Column(Integer, ForeignKey('phones.id'))
+    entity = relationship('LegalEntity', back_populates='entities')
+    person = relationship('LegalEntity', back_populates='persons')
 
 
 class Emails(Base):
@@ -178,22 +159,8 @@ class Emails(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
     email = Column(String)
-
-
-class EntityEmails(Base):
-    __tablename__ = 'entityemails'
-
-    id = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
-    entity = Column(Integer, ForeignKey('entities.id'), index=True)
-    email = Column(Integer, ForeignKey('emails.id'))
-
-
-class IndividualEmails(Base):
-    __tablename__ = 'individualemails'
-
-    id = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
-    person = Column(Integer, ForeignKey('persons.id'), index=True)
-    email = Column(Integer, ForeignKey('emails.id'))
+    entity = relationship('LegalEntity', back_populates='entities')
+    person = relationship('Individuals', back_populates='persons')
 
 
 class Db:
@@ -217,10 +184,11 @@ class Db:
             if directum_id:
                 r.directum_id = directum_id
         else:
-            r = Requests(uuid=uuid, declar_num=declar_num, reply_to=reply_to,
-                         last_status=status,
-                         declar_date=declar_date if declar_date else date.today(),
-                         directum_id=directum_id)
+            r = Requests(
+                uuid=uuid, declar_num=declar_num, reply_to=reply_to,
+                last_status=status,
+                declar_date=declar_date if declar_date else date.today(),
+                directum_id=directum_id)
             self.session.add(r)
         self.session.commit()
 
@@ -271,6 +239,7 @@ class Db:
             Building=declar.object_address.Building,
             Apartment=declar.object_address.Apartment,
             Reference_point=declar.object_address.Reference_point)
+        self.session.add(a)
         d = Declars(declar_number=declar.declar_number, service=declar.service,
                     register_date=datetime.strptime(
                         declar.register_date.strftime('%Y-%m-%d'), '%Y-%m-%d'),
@@ -278,15 +247,119 @@ class Db:
                         declar.end_date.strftime('%Y-%m-%d'), '%Y-%m-%d'),
                     object_address=a, uuid=uuid, reply_to=reply_to)
         self.session.add(d)
+        for legal_entity in declar.legal_entity:
+            a = Addresses(
+                Postal_Code=legal_entity.Postal_Code,
+                Region=legal_entity.Region,
+                District=legal_entity.District, City=legal_entity.City,
+                Urban_District=legal_entity.Urban_District,
+                Soviet_Village=legal_entity.Soviet_Village,
+                Locality=legal_entity.Locality, Street=legal_entity.Street,
+                House=legal_entity.House, Housing=legal_entity.Housing,
+                Building=legal_entity.Building,
+                Apartment=legal_entity.Apartment,
+                Reference_point=legal_entity.Reference_point)
+            self.session.add(a)
+            p = None
+            if legal_entity.person:
+                person = legal_entity.person
+                pa = Addresses(
+                    Postal_Code=person.address.Postal_Code,
+                    Region=person.address.Region,
+                    District=person.address.District, City=person.address.City,
+                    Urban_District=person.address.Urban_District,
+                    Soviet_Village=person.address.Soviet_Village,
+                    Locality=person.address.Locality,
+                    Street=person.address.Street,
+                    House=person.address.House, Housing=person.address.Housing,
+                    Building=person.address.Building,
+                    Apartment=person.address.Apartment,
+                    Reference_point=person.address.Reference_point)
+                self.session.add(pa)
+                pfa = None
+                if person.fact_address:
+                    pfa = Addresses(
+                        Postal_Code=person.fact_address.Postal_Code,
+                        Region=person.fact_address.Region,
+                        District=person.fact_address.District,
+                        City=person.fact_address.City,
+                        Urban_District=person.fact_address.Urban_District,
+                        Soviet_Village=person.fact_address.Soviet_Village,
+                        Locality=person.fact_address.Locality,
+                        Street=person.fact_address.Street,
+                        House=person.fact_address.House,
+                        Housing=person.fact_address.Housing,
+                        Building=person.fact_address.Building,
+                        Apartment=person.fact_address.Apartment,
+                        Reference_point=person.fact_address.Reference_point)
+                    self.session.add(pfa)
+                p = Individuals(
+                    surname=person.surname, first_name=person.first_name,
+                    patronymic=person.patronymic, address=pa, fact_address=pfa,
+                    birthdate=datetime.strptime(
+                        person.birthdate.strftime('%Y-%m-%d'), '%Y-%m-%d'),
+                    passport_serial=person.passport_serial,
+                    passport_number=person.passport_number,
+                    passport_agency=person.passport_agency,
+                    passport_date=datetime.strptime(
+                        person.passport_date.strftime('%Y-%m-%d'),
+                        '%Y-%m-%d'), inn=person.inn, sex=person.sex,
+                    snils=person.snils)
+                for phone in person.phone:
+                    pp = Phones(phone=phone, person=p)
+                    self.session.add(pp)
+                for email in person.email:
+                    pe = Emails(email=email, person=p)
+                    self.session.add(pe)
+            l = LegalEntity(
+                name=legal_entity.name, full_name=legal_entity.full_name,
+                inn=legal_entity.inn, kpp=legal_entity.kpp,
+                address=a, ogrn=legal_entity.ogrn,
+                taxRegDoc=legal_entity.taxRegDoc,
+                govRegDoc=legal_entity.govRegDoc,
+                govRegDate=datetime.strptime(
+                    legal_entity.govRegDate.strftime('%Y-%m-%d'),
+                    '%Y-%m-%d'), bossFio=legal_entity.bossFio,
+                buhFio=legal_entity.buhFio, bank=legal_entity.bank,
+                bankAccount=legal_entity.bankAccount,
+                lastCtrlDate=datetime.strptime(
+                    legal_entity.lastCtrlDate.strftime('%Y-%m-%d'),
+                    '%Y-%m-%d'), opf=legal_entity.opf,
+                govRegOgv=legal_entity.govRegOgv, person=p, declar=d)
+            self.session.add(l)
+            for phone in legal_entity.phone:
+                ep = Phones(phone=phone, entity=l)
+                self.session.add(ep)
+            for email in legal_entity.email:
+                ee = Emails(email=email, entity=l)
+                self.session.add(ee)
         docs = []
         for adoc in declar.AppliedDocument:
             from mimetypes import guess_type
             found = files[adoc.file_name]
             mime_type = guess_type(found)[0]
-            with open(found, 'rb') as f:
-                doc_data = f.read()
-            # from encodings.base64_codec import base64_encode
-            # doc_data = base64_encode(doc_data)
+            doc_data = None
+            file_path = None
+            from os import path
+            if path.getsize(found) > 1000000 - 2048:
+                maxid = self.session.query(func.max(Documents.id)).first() + 1
+                from os import makedirs
+                if not path.exists('storage'):
+                    makedirs('storage')
+                from shutil import copy2
+                if maxid > 10000:
+                    file_path = path.join('storage', str(maxid)[:-4])
+                    if not path.exists(file_path):
+                        makedirs(file_path)
+                    file_path = path.join(file_path, adoc.file_name)
+                else:
+                    file_path = path.join('storage', adoc.file_name)
+                copy2(found, file_path)
+            else:
+                with open(found, 'rb') as f:
+                    doc_data = f.read()
+                # from encodings.base64_codec import base64_encode
+                # doc_data = base64_encode(doc_data)
             doc = Documents(title=adoc.title, number=adoc.number,
                             date=datetime.strptime(
                                 adoc.date.strftime('%Y-%m-%d'), '%Y-%m-%d'),
@@ -295,7 +368,8 @@ class Db:
                                 '%Y-%m-%d')
                             if adoc.valid_until else None,
                             file_name=adoc.file_name, mime_type=mime_type,
-                            body=doc_data, declar_id=d.id, declar=d)
+                            body=doc_data, file_path=file_path, declar_id=d.id,
+                            declar=d)
             self.session.add(doc)
             docs.append(doc)
         for param in declar.Param:
@@ -307,43 +381,7 @@ class Db:
                        col_delimiter=param.attr('colDelimiter'),
                        value=param, declar_id=d.id, declar=d)
             self.session.add(p)
-        try:
-            self.session.commit()
-        except SQLAlchemyError as e:
-            self.log.warning(
-                'Cannot write file to DB. Fallback to file storage.',
-                exc_info=True)
-            for doc in docs:
-                self.session.delete(doc)
-            for adoc in declar.AppliedDocument:
-                from mimetypes import guess_type
-                found = files[adoc.file_name]
-                mime_type = guess_type(found)[0]
-                maxid = self.session.query(func.max(Documents.id)).first() + 1
-                from os import makedirs, path
-                if not path.exists('storage'):
-                    makedirs('storage')
-                from shutil import copy2
-                if maxid > 10000:
-                    if not path.exists(path.join('storage', str(maxid)[:-4])):
-                        makedirs(path.join('storage', str(maxid)[:-4]))
-                    file_path = path.join('storage', str(maxid)[:-4],
-                                          adoc.file_name)
-                    copy2(found, file_path)
-                else:
-                    file_path = path.join('storage', adoc.file_name)
-                    copy2(found, file_path)
-                doc = Documents(title=adoc.title, number=adoc.number,
-                                date=datetime.strptime(
-                                    adoc.date.strftime('%Y-%m-%d'), '%Y-%m-%d'),
-                                valid_until=datetime.strptime(
-                                    adoc.valid_until.strftime('%Y-%m-%d'),
-                                    '%Y-%m-%d')
-                                if adoc.valid_until else None,
-                                file_name=adoc.file_name, mime_type=mime_type,
-                                file_path=file_path, declar_id=d.id, declar=d)
-                self.session.add(doc)
-            self.session.commit()
+        self.session.commit()
 
     def load_declar(self, uuid):
         r = self.session.query(Declars).filter_by(uuid=uuid).first()
@@ -351,6 +389,67 @@ class Db:
 
     def all_declars(self):
         return self.session.query(Declars).all()
+
+    def all_declars_as_xsd(self):
+        from declar import AppliedDocument, Declar, Address, LegalEntity, \
+            Individual
+        declars_info = []
+        for declar in self.session.query(Declars).all():
+            files = {}
+            for doc in declar.documents:
+                if doc.body:
+                    from tempfile import mkstemp
+                    import os
+                    fp, file_path = mkstemp()
+                    os.close(fp)
+                    with open(file_path, 'wb') as f:
+                        f.write(doc.body)
+                    files[doc.file_name] = file_path
+                else:
+                    files[doc.file_name] = doc.file_path
+            object_address = declar.object_address
+            a = Address(
+                Postal_Code=object_address.Postal_Code,Region=object_address.Region,District=object_address.District,City=object_address.City,Urban_District=object_address.Urban_District,Soviet_Village=object_address.Soviet_Village,Locality=object_address.Locality,Street=object_address.Street,House=object_address.House,Housing=object_address.Housing,Building=object_address.Building,Apartment=object_address.Apartment,Reference_point=object_address.Reference_point)
+            docs = [AppliedDocument(
+                title=doc.title, number=doc.number, date=doc.date,
+                valid_until=doc.valid_until, file_name=doc.file_name,
+                url=doc.url, url_valid_until=doc.url_valid_until) for
+                doc in declar.documents]
+            legal_person = None
+            legal_phones = []
+            govRegDate = Column(Date)
+            phone = relationship('Phones', back_populate='entity')
+            email = relationship('Emails', back_populate='entity')
+            bossFio = Column(String)
+            buhFio = Column(String)
+            bank = Column(String)
+            bankAccount = Column(String)
+            lastCtrlDate = Column(Date)
+            opf = Column(String)
+            govRegOgv = Column(String)
+
+            legal_entities = [LegalEntity(
+                name=legal_entity.name,full_name=legal_entity.full_name,inn=legal_entity.inn,kpp=legal_entity.kpp,address=Address(legal_entity.address),ogrn=legal_entity.ogrn,taxRegDoc=legal_entity.taxRegDoc,govRegDoc=legal_entity.,
+                govRegDate=legal_entity.,
+                phone=legal_phones,
+                email=xsd.ListElement(xsd.String, tagname='email', minOccurs=0,
+                                      maxOccurs=xsd.UNBOUNDED)
+                bossFio = xsd.Element(xsd.String, minOccurs=0)
+            buhFio = xsd.Element(xsd.String, minOccurs=0)
+            bank = xsd.Element(xsd.String, minOccurs=0)
+            bankAccount = xsd.Element(xsd.String, minOccurs=0)
+            lastCtrlDate = xsd.Element(xsd.Date, minOccurs=0)
+            opf = xsd.Element(xsd.String, minOccurs=0)
+            govRegOgv = xsd.Element(xsd.String, minOccurs=0)
+            person = Individual(legal_entity.person)) for legal_entity in declar.legal_entity]
+            d = Declar(
+                declar_number=declar.declar_number, service=declar.service,
+                register_date=declar.register_date,
+                end_date=declar.end_date, object_address=a,
+                AppliedDocument=docs, legal_entity=declar.legal_entity,
+                person=declar.person, confidant=declar.confidant,
+                Param=declar.param)
+        return declars_info
 
     def delete_declar(self, uuid):
         for d in self.session.query(Declars).filter_by(uuid=uuid).all():
@@ -367,6 +466,7 @@ class Db:
             for param in d.param:
                 self.session.delete(param)
         self.session.commit()
+        self.session.execute('VACUUM FULL')
 
     def _clear(self):
         for req in self.all():

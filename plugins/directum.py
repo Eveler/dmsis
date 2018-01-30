@@ -318,7 +318,9 @@ class IntegrationServices:
     def add_declar(self, declar, files={}, doc_getter=None,
                    subdivision="106759", reg_place="108279"):
         """
-        Saves `declar` to Directum reference 'ДПУ' and binds `docs` to it. Creates appropriate records for 'ПРС' and 'ОРГ' if needed. If record already exists simply add not existing documents
+        Saves `declar` to Directum reference 'ДПУ' and binds `docs` to it.
+        Creates appropriate records for 'ПРС' and 'ОРГ' if needed. If record
+        already exists simply add not existing documents
 
         :param reg_place:
         :param subdivision:
@@ -633,6 +635,11 @@ class IntegrationServices:
         for doc in declar.AppliedDocument:
             if doc_getter:
                 doc_data = doc_getter(doc.url, doc.file_name)
+            elif hasattr(doc, 'file') and doc.file:
+                fn, ext = path.splitext(doc.file_name)
+                with open(doc.file, 'rb') as f:
+                    doc_data = (
+                        f.read(), ext[1:].lower() if ext else 'txt')
             elif declar.files:
                 found = False
                 for file_path, file_name in declar.files:
@@ -644,6 +651,12 @@ class IntegrationServices:
                 fn, ext = path.splitext(doc.file_name)
                 with open(found, 'rb') as f:
                     doc_data = (f.read(), ext[1:] if ext else 'txt')
+            elif files:
+                found = files.get(doc.file_name)
+                fn, ext = path.splitext(doc.file_name)
+                with open(found, 'rb') as f:
+                    doc_data = (
+                        f.read(), ext[1:].lower() if ext else 'txt')
             else:
                 doc_data = (b'test', 'txt')
             i += 1

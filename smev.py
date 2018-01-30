@@ -138,10 +138,6 @@ class Adapter:
         res = self.__send(operation, res)
         self.log.debug(type(res))
         self.log.debug(res)
-        # # res = self.proxy.service.GetRequest(
-        # #     {'NamespaceURI': uri, 'RootElementLocalName': local_name,
-        # #      'Timestamp': timestamp, 'NodeID': node_id},
-        # #     CallerInformationSystemSignature=etree.fromstring(res))
 
         declar, uuid, reply_to, files = None, None, None, {}
 
@@ -239,23 +235,11 @@ class Adapter:
             node = self.proxy.create_message(
                 self.proxy.service, operation, tm,
                 CallerInformationSystemSignature=etree.Element('Signature'))
-            # node[0][0][0].set('Id', 'SIGNED_BY_CALLER')
-            # node[0][0][0].set('accepted', 'true')
-            # node[0][0][0].text = uuid
-            # node_str = etree.tostring(node)
-            # self.log.debug(node_str)
-            # res = self.__call_sign(
-            #     self.__xml_part(node_str, b'ns1:AckTargetMessage'))
             res = node.find('.//{*}AckTargetMessage')
             res.set('Id', 'SIGNED_BY_CALLER')
             res.set('accepted', 'true')
             res.text = uuid
-            # res = etree.QName(res)
             node_str = etree.tostring(node)
-            # node_str = node_str.replace(
-            #     b'<ns1:AckTargetMessage',
-            #     b'<ns1:AckTargetMessage xmlns="' + etree.QName(
-            #         node.find('.//{*}AckRequest')).namespace.encode() + b'"')
             self.log.debug(node_str)
             res = self.__xml_part(node_str, b'ns1:AckTargetMessage')
             res = self.__call_sign(res)
@@ -286,10 +270,6 @@ class Adapter:
 
         operation = 'SendResponse'
         element = self.proxy.get_element('ns1:MessagePrimaryContent')
-        # rr = RequestResponse(declar_number=declar_number,
-        #                      register_date=register_date, result=result,
-        #                      text=text, AppliedDocument=applied_documents)
-        # npc = element(etree.fromstring(rr.xml('requestResponse')))
         rr = etree.Element(
             '{urn://augo/smev/uslugi/1.0.0}requestResponse',
             nsmap={'rr': 'urn://augo/smev/uslugi/1.0.0'})

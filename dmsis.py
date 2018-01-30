@@ -7,13 +7,12 @@
 # SendResponse if status changed
 import logging
 import os
-import tempfile
+from tempfile import mkstemp
 
 from win32._service import SERVICE_STOP_PENDING
 from win32serviceutil import ServiceFramework, HandleCommandLine
 
 from db import Db
-from declar import AppliedDocument, Declar, Address, LegalEntity
 from plugins.directum import IntegrationServices
 from smev import Adapter
 from twisted.internet import task, reactor
@@ -90,69 +89,10 @@ class Integration:
         """
         # Send to DIRECTUM previously saved declars
         try:
-            for declar in self.db.all_declars():
-                files = {}
-                for doc in declar.documents:
-                    if doc.body:
-                        from tempfile import mkstemp
-                        fp, file_path = tempfile.mkstemp()
-                        os.close(fp)
-                        with open(file_path, 'wb') as f:
-                            f.write(doc.body)
-                        files[doc.file_name] = file_path
-                    else:
-                        files[doc.file_name] = doc.file_path
-                a = Address(
-                    Postal_Code=declar.object_address.Postal_Code,
-                    Region=declar.object_address.Region,
-                    District=declar.object_address.District,
-                    City=declar.object_address.City,
-                    Urban_District=declar.object_address.Urban_District,
-                    Soviet_Village=declar.object_address.Soviet_Village,
-                    Locality=declar.object_address.Locality,
-                    Street=declar.object_address.Street,
-                    House=declar.object_address.House,
-                    Housing=declar.object_address.Housing,
-                    Building=declar.object_address.Building,
-                    Apartment=declar.object_address.Apartment,
-                    Reference_point=declar.object_address.Reference_point)
-                docs = [AppliedDocument(
-                    title=doc.title, number=doc.number, date=doc.date,
-                    valid_until=doc.valid_until, file_name=doc.file_name,
-                    url=doc.url, url_valid_until=doc.url_valid_until) for
-                    doc in declar.documents]
-                legal_person = None
-                legal_phones = []
-                legal_entities = [LegalEntity(
-                    name = declar.legal_entity.,
-                    full_name = declar.legal_entity.,
-                    inn = declar.legal_entity.,
-                    kpp = declar.legal_entity.,
-                    address = declar.legal_entity.,
-                    ogrn = declar.legal_entity.,
-                    taxRegDoc = declar.legal_entity.,
-                    govRegDoc = declar.legal_entity.,
-                    govRegDate = declar.legal_entity.,
-                    phone = legal_phones,
-                    email = xsd.ListElement(xsd.String, tagname='email', minOccurs=0, maxOccurs=xsd.UNBOUNDED)
-    bossFio = xsd.Element(xsd.String, minOccurs=0)
-    buhFio = xsd.Element(xsd.String, minOccurs=0)
-    bank = xsd.Element(xsd.String, minOccurs=0)
-    bankAccount = xsd.Element(xsd.String, minOccurs=0)
-    lastCtrlDate = xsd.Element(xsd.Date, minOccurs=0)
-    opf = xsd.Element(xsd.String, minOccurs=0)
-    govRegOgv = xsd.Element(xsd.String, minOccurs=0)
-    person =legal_person)]
-                d = Declar(
-                    declar_number=declar.declar_number, service=declar.service,
-                    register_date=declar.register_date,
-                    end_date=declar.end_date, object_address=a,
-                    AppliedDocument=docs, legal_entity=declar.legal_entity,
-                    person=declar.person, confidant=declar.confidant,
-                    Param=declar.param)
-                res = self.directum.add_declar(d, files=files)
+            for declar, files, reply_to in self.db.all_declars_as_xsd():
+                res = self.directum.add_declar(declar, files=files)
                 self.db.add_update(declar.uuid, declar.declar_number,
-                                   declar.reply_to, directum_id=res)
+                                   reply_to, directum_id=res)
                 logging.info('Добавлено/обновлено дело с ID = %s' % res)
                 self.directum.run_script('СтартЗадачПоМУ')
                 self.db.delete_declar(declar.uuid)
@@ -186,6 +126,10 @@ class Integration:
 
                 # For all requests check if declar`s end date is set
                 if declar[0].get('Дата5'):
+                    # Stub class for document info
+                    class Ad(object):
+                        pass
+
                     applied_docs = []
                     found = False
 
@@ -201,7 +145,7 @@ class Integration:
                                 'ПРОУ', proc.get('ИДЗапГлавРазд'))
                             for doc in docs:
                                 doc_id = doc.get('ID')
-                                ad = AppliedDocument()
+                                ad = Ad()
                                 # Get only last version
                                 versions = self.directum.get_doc_versions(
                                     doc_id)
@@ -229,7 +173,7 @@ class Integration:
                     if not found:
                         docs = self.directum.get_bind_docs(
                             'ДПУ', request.directum_id)
-                        ad = AppliedDocument()
+                        ad = Ad()
                         for doc in docs:
                             if doc.get('TKED') in (
                                     'КИК', 'ИК1', 'ИК2', 'ПСИ'):
