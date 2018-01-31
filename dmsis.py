@@ -89,13 +89,13 @@ class Integration:
         """
         # Send to DIRECTUM previously saved declars
         try:
-            for declar, files, reply_to in self.db.all_declars_as_xsd():
+            for declar, files, reply_to, uuid in self.db.all_declars_as_xsd():
                 res = self.directum.add_declar(declar, files=files)
-                self.db.add_update(declar.uuid, declar.declar_number,
+                self.db.add_update(uuid, declar.declar_number,
                                    reply_to, directum_id=res)
                 logging.info('Добавлено/обновлено дело с ID = %s' % res)
                 self.directum.run_script('СтартЗадачПоМУ')
-                self.db.delete_declar(declar.uuid)
+                self.db.delete_declar(uuid)
         except Exception:
             self.report_error()
 

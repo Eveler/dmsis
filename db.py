@@ -409,46 +409,177 @@ class Db:
                     files[doc.file_name] = doc.file_path
             object_address = declar.object_address
             a = Address(
-                Postal_Code=object_address.Postal_Code,Region=object_address.Region,District=object_address.District,City=object_address.City,Urban_District=object_address.Urban_District,Soviet_Village=object_address.Soviet_Village,Locality=object_address.Locality,Street=object_address.Street,House=object_address.House,Housing=object_address.Housing,Building=object_address.Building,Apartment=object_address.Apartment,Reference_point=object_address.Reference_point)
+                Postal_Code=object_address.Postal_Code,
+                Region=object_address.Region, District=object_address.District,
+                City=object_address.City,
+                Urban_District=object_address.Urban_District,
+                Soviet_Village=object_address.Soviet_Village,
+                Locality=object_address.Locality, Street=object_address.Street,
+                House=object_address.House, Housing=object_address.Housing,
+                Building=object_address.Building,
+                Apartment=object_address.Apartment,
+                Reference_point=object_address.Reference_point)
             docs = [AppliedDocument(
                 title=doc.title, number=doc.number, date=doc.date,
                 valid_until=doc.valid_until, file_name=doc.file_name,
-                url=doc.url, url_valid_until=doc.url_valid_until) for
-                doc in declar.documents]
-            legal_person = None
-            legal_phones = []
-            govRegDate = Column(Date)
-            phone = relationship('Phones', back_populate='entity')
-            email = relationship('Emails', back_populate='entity')
-            bossFio = Column(String)
-            buhFio = Column(String)
-            bank = Column(String)
-            bankAccount = Column(String)
-            lastCtrlDate = Column(Date)
-            opf = Column(String)
-            govRegOgv = Column(String)
-
+                url=doc.url, url_valid_until=doc.url_valid_until)
+                for doc in declar.documents]
             legal_entities = [LegalEntity(
-                name=legal_entity.name,full_name=legal_entity.full_name,inn=legal_entity.inn,kpp=legal_entity.kpp,address=Address(legal_entity.address),ogrn=legal_entity.ogrn,taxRegDoc=legal_entity.taxRegDoc,govRegDoc=legal_entity.,
-                govRegDate=legal_entity.,
-                phone=legal_phones,
-                email=xsd.ListElement(xsd.String, tagname='email', minOccurs=0,
-                                      maxOccurs=xsd.UNBOUNDED)
-                bossFio = xsd.Element(xsd.String, minOccurs=0)
-            buhFio = xsd.Element(xsd.String, minOccurs=0)
-            bank = xsd.Element(xsd.String, minOccurs=0)
-            bankAccount = xsd.Element(xsd.String, minOccurs=0)
-            lastCtrlDate = xsd.Element(xsd.Date, minOccurs=0)
-            opf = xsd.Element(xsd.String, minOccurs=0)
-            govRegOgv = xsd.Element(xsd.String, minOccurs=0)
-            person = Individual(legal_entity.person)) for legal_entity in declar.legal_entity]
+                name=legal_entity.name, full_name=legal_entity.full_name,
+                inn=legal_entity.inn, kpp=legal_entity.kpp,
+                address=Address(
+                    Postal_Code=legal_entity.address.Postal_Code,
+                    Region=legal_entity.address.Region,
+                    District=legal_entity.address.District,
+                    City=legal_entity.address.City,
+                    Urban_District=legal_entity.address.Urban_District,
+                    Soviet_Village=legal_entity.address.Soviet_Village,
+                    Locality=legal_entity.address.Locality,
+                    Street=legal_entity.address.Street,
+                    House=legal_entity.address.House,
+                    Housing=legal_entity.address.Housing,
+                    Building=legal_entity.address.Building,
+                    Apartment=legal_entity.address.Apartment,
+                    Reference_point=legal_entity.address.Reference_point),
+                ogrn=legal_entity.ogrn, taxRegDoc=legal_entity.taxRegDoc,
+                govRegDoc=legal_entity.govRegDoc,
+                govRegDate=legal_entity.govRegDate,
+                phone=[phone for phone in legal_entity.phone],
+                email=[email for email in legal_entity.email],
+                bossFio=legal_entity.bossFio, buhFio=legal_entity.buhFio,
+                bank=legal_entity.bank, bankAccount=legal_entity.bankAccount,
+                lastCtrlDate=legal_entity.lastCtrlDate, opf=legal_entity.opf,
+                govRegOgv=legal_entity.govRegOgv,
+                person=Individual(
+                    surname=legal_entity.person.surname,
+                    first_name=legal_entity.person.first_name,
+                    patronymic=legal_entity.person.patronymic,
+                    address=Address(
+                        Postal_Code=legal_entity.person.address.Postal_Code,
+                        Region=legal_entity.person.address.Region,
+                        District=legal_entity.person.address.District,
+                        City=legal_entity.person.address.City,
+                        Urban_District=legal_entity.person.address.Urban_District,
+                        Soviet_Village=legal_entity.person.address.Soviet_Village,
+                        Locality=legal_entity.person.address.Locality,
+                        Street=legal_entity.person.address.Street,
+                        House=legal_entity.person.address.House,
+                        Housing=legal_entity.person.address.Housing,
+                        Building=legal_entity.person.address.Building,
+                        Apartment=legal_entity.person.address.Apartment,
+                        Reference_point=legal_entity.person.address.Reference_point),
+                    fact_address=Address(
+                        Postal_Code=legal_entity.person.fact_address.Postal_Code,
+                        Region=legal_entity.person.fact_address.Region,
+                        District=legal_entity.person.fact_address.District,
+                        City=legal_entity.person.fact_address.City,
+                        Urban_District=legal_entity.person.fact_address.Urban_District,
+                        Soviet_Village=legal_entity.person.fact_address.Soviet_Village,
+                        Locality=legal_entity.person.fact_address.Locality,
+                        Street=legal_entity.person.fact_address.Street,
+                        House=legal_entity.person.fact_address.House,
+                        Housing=legal_entity.person.fact_address.Housing,
+                        Building=legal_entity.person.fact_address.address.Building,
+                        Apartment=legal_entity.person.fact_address.Apartment,
+                        Reference_point=legal_entity.person.fact_address.Reference_point) if legal_entity.person.fact_address else None,
+                    email=[email for email in legal_entity.person.email],
+                    birthdate=legal_entity.person.birthdate,
+                    passport_serial=legal_entity.person.passport_serial,
+                    passport_number=legal_entity.person.passport_number,
+                    passport_agency=legal_entity.person.passport_agency,
+                    passport_date=legal_entity.person.passport_date,
+                    phone=[phone for phone in legal_entity.person.phone],
+                    inn=legal_entity.person.inn, sex=legal_entity.person.sex,
+                    snils=legal_entity.person.snils) if legal_entity.person else None)
+                for legal_entity in declar.legal_entity]
+            persons = [
+                Individual(
+                    surname=person.surname, first_name=person.first_name,
+                    patronymic=person.patronymic, address=Address(
+                        Postal_Code=person.address.Postal_Code,
+                        Region=person.address.Region,
+                        District=person.address.District,
+                        City=person.address.City,
+                        Urban_District=person.address.Urban_District,
+                        Soviet_Village=person.address.Soviet_Village,
+                        Locality=person.address.Locality,
+                        Street=person.address.Street,
+                        House=person.address.House,
+                        Housing=person.address.Housing,
+                        Building=person.address.Building,
+                        Apartment=person.address.Apartment,
+                        Reference_point=person.address.Reference_point),
+                    fact_address=Address(
+                        Postal_Code=person.fact_address.Postal_Code,
+                        Region=person.fact_address.Region,
+                        District=person.fact_address.District,
+                        City=person.fact_address.City,
+                        Urban_District=person.fact_address.Urban_District,
+                        Soviet_Village=person.fact_address.Soviet_Village,
+                        Locality=person.fact_address.Locality,
+                        Street=person.fact_address.Street,
+                        House=person.fact_address.House,
+                        Housing=person.fact_address.Housing,
+                        Building=person.fact_address.address.Building,
+                        Apartment=person.fact_address.Apartment,
+                        Reference_point=person.fact_address.Reference_point) if person.fact_address else None,
+                    email=[email for email in person.email],
+                    birthdate=person.birthdate,
+                    passport_serial=person.passport_serial,
+                    passport_number=person.passport_number,
+                    passport_agency=person.passport_agency,
+                    passport_date=person.passport_date,
+                    phone=[phone for phone in person.phone], inn=person.inn,
+                    sex=person.sex, snils=person.snils) for person in
+                declar.person]
+            params = [param for param in declar.param]
             d = Declar(
                 declar_number=declar.declar_number, service=declar.service,
-                register_date=declar.register_date,
-                end_date=declar.end_date, object_address=a,
-                AppliedDocument=docs, legal_entity=declar.legal_entity,
-                person=declar.person, confidant=declar.confidant,
-                Param=declar.param)
+                register_date=declar.register_date, end_date=declar.end_date,
+                object_address=a, AppliedDocument=docs,
+                legal_entity=legal_entities, person=persons,
+                confidant=Individual(
+                    surname=declar.confidant.surname,
+                    first_name=declar.confidant.first_name,
+                    patronymic=declar.confidant.patronymic, address=Address(
+                        Postal_Code=declar.confidant.address.Postal_Code,
+                        Region=declar.confidant.address.Region,
+                        District=declar.confidant.address.District,
+                        City=declar.confidant.address.City,
+                        Urban_District=declar.confidant.address.Urban_District,
+                        Soviet_Village=declar.confidant.address.Soviet_Village,
+                        Locality=declar.confidant.address.Locality,
+                        Street=declar.confidant.address.Street,
+                        House=declar.confidant.address.House,
+                        Housing=declar.confidant.address.Housing,
+                        Building=declar.confidant.address.Building,
+                        Apartment=declar.confidant.address.Apartment,
+                        Reference_point=declar.confidant.address.Reference_point),
+                    fact_address=Address(
+                        Postal_Code=declar.confidant.fact_address.Postal_Code,
+                        Region=declar.confidant.fact_address.Region,
+                        District=declar.confidant.fact_address.District,
+                        City=declar.confidant.fact_address.City,
+                        Urban_District=declar.confidant.fact_address.Urban_District,
+                        Soviet_Village=declar.confidant.fact_address.Soviet_Village,
+                        Locality=declar.confidant.fact_address.Locality,
+                        Street=declar.confidant.fact_address.Street,
+                        House=declar.confidant.fact_address.House,
+                        Housing=declar.confidant.fact_address.Housing,
+                        Building=declar.confidant.fact_address.address.Building,
+                        Apartment=declar.confidant.fact_address.Apartment,
+                        Reference_point=declar.confidant.fact_address.Reference_point) if declar.confidant.fact_address else None,
+                    email=[email for email in declar.confidant.email],
+                    birthdate=declar.confidant.birthdate,
+                    passport_serial=declar.confidant.passport_serial,
+                    passport_number=declar.confidant.passport_number,
+                    passport_agency=declar.confidant.passport_agency,
+                    passport_date=declar.confidant.passport_date,
+                    phone=[phone for phone in declar.confidant.phone],
+                    inn=declar.confidant.inn, sex=declar.confidant.sex,
+                    snils=declar.confidant.snils) if declar.confidant else None,
+                Param=params)
+            declars_info.append((d, files, declar.reply_to, declar.uuid))
         return declars_info
 
     def delete_declar(self, uuid):
