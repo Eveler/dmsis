@@ -29,7 +29,7 @@ class Integration:
         self.mfc_db = None
         self.parse_config()
 
-        self.directum = IntegrationServices(self.config)
+        self.directum = None
         self.doc_ids = {}
 
     def run(self):
@@ -47,12 +47,17 @@ class Integration:
         Executes method of this class named integration_<proc_name> with parameters values from params,
          i.e. integration_<proc_name>(params[0], params[1],...)
         """
-        to_exec = "self.integration_%s(" % proc_name
-        to_exec += ",".join(params) + ")"
         try:
-            return eval(to_exec)
+##            to_exec = "self.integration_%s(" % proc_name
+##            to_exec += ",".join(params) + ")"
+##            return eval(to_exec)
+            method = getattr(self, "integration_" + proc_name)
+            return method(*params)
         except Exception as e:
-            logging.error("Cannot execute %s: %s" % (to_exec, e.message))
+            logging.error("Cannot execute integration_%s:" % proc_name)
+            logging.error("params:")
+            logging.error(params)
+            logging.error(e.message.encode(errors="replace"))
             try:
                 etype, value, tb = exc_info()
                 trace = ''.join(format_exception(etype, value, tb))
@@ -179,15 +184,17 @@ class Integration:
         """
         logging.info("Integration started")
         try:
+            self.directum = IntegrationServices(self.config)
             self.mfc_db = Max(self.dbstr)  # connect to MFC DB
             for operation in self.mfc_db.session.query(self.mfc_db.operations) \
-                    .filter(self.mfc_db.operations.c.is_done == False).order_by(self.mfc_db.operations.c.id).all():
+                .filter(self.mfc_db.operations.c.is_done == False).order_by(self.mfc_db.operations.c.id).all():
                 self.declar = self.mfc_db.session.query(self.mfc_db.declars) \
                     .filter(self.mfc_db.declars.c.id == operation.declars_id).first()
                 params = ["declars_id=" + str(operation.declars_id)]
                 for parameter in self.mfc_db.session.query(
-                        self.mfc_db.parameters).filter(self.mfc_db.parameters.c.operations_id == operation.id).all():
-                    params.append(parameter.tablename + '_id=' + str(parameter.obj_id))
+                    self.mfc_db.parameters).filter(self.mfc_db.parameters.c.operations_id == operation.id).all():
+##                    params.append(str(parameter.tablename) + '_id=' + str(parameter.obj_id))
+                    params.append(str(parameter.obj_id))
                 res = self._exec_proc(operation.operation, params)
 
                 # If declar is archived set is_done = True
@@ -205,8 +212,7 @@ class Integration:
                     self.directum.run_script('notification_add_docs', params)
                 self.doc_ids = {}
 
-            self.mfc_db.session.rollback()
-            self.mfc_db = None
+            # self.mfc_db.session.rollback()
         except Exception as e:
             logging.error("Integration aborted: %s" % e.message)
             etype, value, tb = exc_info()
@@ -217,14 +223,18 @@ class Integration:
             logging.info("Integration done.")
             # For debug
             # reactor.callFromThread(reactor.stop)
+        self.mfc_db = None
+        self.directum = None
 
     def integration_add_doc(self, declars_id, documents_id):
         """
         Gets document requisites identified by documents_id from MFC DB, document body from ftp and
         stores it to reference record with code=declars_id of Directum
         """
-        for doc in self.mfc_db.session.query(self.mfc_db.documents, self.mfc_db.doctypes) \
-                .join(self.mfc_db.doctypes).filter(self.mfc_db.documents.c.id == documents_id).all():
+        docs_qry = self.mfc_db.session.query(self.mfc_db.documents, self.mfc_db.doctypes) \
+                .join(self.mfc_db.doctypes).filter(self.mfc_db.documents.c.id == documents_id)
+        all = docs_qry.all()
+        for doc in all:
             url = doc.url
             # Only documents with body on ftp
             if url:
@@ -249,26 +259,34 @@ class Integration:
                 requisites.name = doc_name
                 requisites.date = doc.docdate
                 if doc.aname.upper() == u"ЗАЯВЛЕНИЕ":
-                    # Для ФЛ и ЮЛ используются разные типы карточек и виды документов
-                    client = self.mfc_db.session.query(self.mfc_db.declar_clients, self.mfc_db.clients) \
-                        .join(self.mfc_db.clients).filter(self.mfc_db.declar_clients.c.declar_id == declars_id) \
-                        .order_by(self.mfc_db.declar_clients.c.id).first()
-                    if client.isorg == 0:  # human (ФЛ)
-                        human = self.mfc_db.session.query(self.mfc_db.humans).filter(
-                            self.mfc_db.humans.c.id == client.clid).first()
-                        requisites.human_name = "%s %s %s" % (human.surname, human.firstname, human.lastname)
-                    else:
-                        org = self.mfc_db.session.query(self.mfc_db.orgs).filter(
-                            self.mfc_db.orgs.c.id == client.clid).first()
-                        params = [('Param', org.shortname if org.shortname else org.fullname),
-                                  ('Param1', org.directum_id if org.directum_id else '')]
-                        logging.info(u' >>  Поиск организации (Param = %s, Param1 = %s)' %
-                                     (org.shortname if org.shortname else org.fullname,
-                                      org.directum_id if org.directum_id else ''))
-                        res = self.directum.run_script('SearchORG', params)
-                        if res and res != '0':
-                            requisites.org_directum_id = res
-                            # FIXME: else: Add org to Directum
+                    try:
+                        # Для ФЛ и ЮЛ используются разные типы карточек и виды документов
+                        if isinstance(declars_id, str) and '=' in declars_id:
+                            declars_id = declars_id.split('=')[1]
+                        client = self.mfc_db.session.query(self.mfc_db.declar_clients, self.mfc_db.clients) \
+                            .join(self.mfc_db.clients).filter(self.mfc_db.declar_clients.c.declar_id == declars_id) \
+                            .order_by(self.mfc_db.declar_clients.c.id).first()
+                        if client.isorg == 0:  # human (ФЛ)
+                            human = self.mfc_db.session.query(self.mfc_db.humans).filter(
+                                self.mfc_db.humans.c.id == client.clid).first()
+                            requisites.human_name = "%s %s %s" % (human.surname, human.firstname, human.lastname)
+                        else:
+                            org = self.mfc_db.session.query(self.mfc_db.orgs).filter(
+                                self.mfc_db.orgs.c.id == client.clid).first()
+                            params = [('Param', org.shortname if org.shortname else org.fullname),
+                                      ('Param1', org.directum_id if org.directum_id else '')]
+                            logging.info(u' >>  Поиск организации (Param = %s, Param1 = %s)' %
+                                         (org.shortname if org.shortname else org.fullname,
+                                          org.directum_id if org.directum_id else ''))
+                            try:
+                                res = self.directum.run_script('SearchORG', params)
+                                if res and res != '0':
+                                    requisites.org_directum_id = res
+                                    # FIXME: else: Add org to Directum
+                            except Exception as e:
+                                logging.error(e.message)
+                    except Exception as e:
+                        logging.error(e.message)
                     if not requisites.number:
                         requisites.number = u'б/н'
 
@@ -276,8 +294,18 @@ class Integration:
 
                 ftp = FTP(host='192.168.91.60', user='mike', passwd='me2db4con')
                 doc_in = self.tmppath + "/doc_in.zip"
-                ftp.retrbinary("RETR %s" % url, open(doc_in, "wb").write)
-                ftp.close()
+                try:
+                    ftp.retrbinary("RETR %s" % url, open(doc_in, "wb").write)
+                except Exception as e:
+                    logging.error("FTP transfer error: %s" % url)
+                    msg = e.message.decode('utf-8', errors="replace")
+                    logging.error(msg)
+                    if u'Нет такого файла или каталога' in msg:
+                        return True
+                    else:
+                        return False
+                finally:
+                    ftp.close()
 
                 doc_files = []
                 if self.convert_to_pdf:
@@ -329,19 +357,41 @@ class Integration:
                     data = fp.read(size)
                     fp.close()
                     logging.info(u' >>  Передача в Directum')
-                    res = self.directum.add_doc(requisites, 'PDF' if '.PDF' in doc_file.upper() else 'ZIP', data)
-                    doc_ids.append(str(res))
-                    # bind document with declar
-                    # params = [('Code', declars_id),
-                    #           ('DocID', res)]
-                    params = [('ID', self.declar.directum_id),
-                              ('DocID', res)]
-                    logging.info(u' >>  Привязка к делу (ID = %s, DocID = %s)' %
-                                 (self.declar.directum_id, res))
-                    self.directum.run_script('BindEDocDPbyID', params)
+                    try:
+                        directum_id = self.declar.directum_id
+                        # Проверим, существует ли дело в директум
+                        params = [('Param', self.declar.id)]
+                        res = self.directum.run_script('GetCaseIdByCode', params)
+                        if not res or res == 0 or res == "0":
+                            logging.info(u'Дело № %s отсутствует в директум' % self.declar.declarnum)
+                            remove(doc_file)
+                            return False
+                        elif res != directum_id:
+                            directum_id = res
+                        
+                        res = self.directum.add_doc(requisites, 'PDF' if '.PDF' in doc_file.upper() else 'ZIP', data)
+                        doc_ids.append(str(res))
+                        # bind document with declar
+                        # params = [('Code', declars_id),
+                        #           ('DocID', res)]
+                        params = [('ID', directum_id),
+                                  ('DocID', res)]
+                        logging.info(u' >>  Привязка к делу (ID = %s, DocID = %s)' %
+                                     (directum_id, res))
+                        try:
+                            self.directum.run_script('BindEDocDPbyID', params)
+                            logging.info(u'Добавлен документ "%s" для дела № = %s (directum ИД = %s)' %
+                                         (doc_name, self.declar.declarnum, res))
+                        except Exception as e:
+                            logging.error(e.message)
+                            if 'Declar not found' in e.message:
+                                pass
+                            else:
+                                remove(doc_file)
+                                return False
 
-                    logging.info(u'Добавлен документ "%s" для дела № = %s (directum ИД = %s)' %
-                                 (doc_name, self.declar.declarnum, res))
+                    except Exception as e:
+                        logging.error(e.message)
                     remove(doc_file)
 
                 if declars_id in self.doc_ids:
@@ -359,8 +409,6 @@ class Integration:
                 #           ('Doc_IDs', ';'.join(doc_ids))]
                 # self.directum.run_script('notification_add_docs', params)
                 return True
-
-            return False
 
     def integration_set_delivery_result(self, declars_id, assessment_types_id):
         # assessment_types:
@@ -384,7 +432,12 @@ class Integration:
             res = self.directum.run_script('set_delivery_result', params)
         except Exception as e:
             res = e.message.encode(errors='replace')
-            if (("Task not found" in str(res)) or ("no such job" in str(res)) or ("don`t attached to any task" in str(res))) and self.declar.archived:
+            if "not found" in str(res):
+                logging.info(
+                    u'Дело № = %s в архиве. Отмена установки результата (result_code = %s)' %
+                    (self.declar.declarnum, result_code))
+                return True
+            if self.declar.archived:
                 logging.info(u'Дело № = %s в архиве. Отмена установки результата (result_code = %s)' %
                              (self.declar.declarnum, result_code))
                 return True
@@ -394,28 +447,38 @@ class Integration:
         if str(res) == "True":
             logging.info(u'Результат выдачи для дела № = %s установлен (result_code = %s)' %
                          (self.declar.declarnum, result_code))
+        elif self.declar.archived:
+            logging.info(u'Дело № = %s в архиве. Отмена установки результата (result_code = %s)' %
+                            (self.declar.declarnum, result_code))
+            return True
         else:
             logging.info(u'Установка результата выдачи отложена для дела № = %s (result_code = %s): причина: %s' %
                          (self.declar.declarnum, result_code, res))
         return res == "True"
 
     def integration_set_cancellation(self, declars_id):
-        logging.info(u'Аннулирование дела № = %s' % self.declar.declarnum)
+        logging.info(u'Аннулирование дела № %s' % self.declar.declarnum)
 
-        docpaths = self.mfc_db.session.query(self.mfc_db.docpaths).filter(self.mfc_db.docpaths.c.declarid == declars_id) \
-            .filter(self.mfc_db.docpaths.c.procname == 2145121329).first()
+        try:
+            docpaths = self.mfc_db.session.query(self.mfc_db.docpaths).filter(self.mfc_db.docpaths.c.declarid == declars_id.split('=')[1]) \
+                .filter(self.mfc_db.docpaths.c.procname == 2145121329).first()
+        except Exception as e:
+            logging.error(e.message.decode('utf-8', errors='replace'))
+            docpaths = None
 
         if not docpaths:
-            logging.info(u'Аннулирование дела № = %s отменено' % self.declar.declarnum)
+            logging.info(u'Аннулирование дела № %s отменено' % self.declar.declarnum)
             return True
 
         # params = [('Code', declars_id),
         #           ('Doc_date', docpaths.startdate.strftime('%d.%m.%Y'))]
         params = [('ID', self.declar.directum_id),
                   ('Doc_date', docpaths.startdate.strftime('%d.%m.%Y'))]
-        self.directum.run_script('set_cancellation', params)
-
-        logging.info(u'Дело № = %s аннулировано' % self.declar.declarnum)
+        try:
+            self.directum.run_script('set_cancellation', params)
+            logging.info(u'Дело № %s аннулировано' % self.declar.declarnum)
+        except Exception as e:
+            logging.error(e.message.decode(errors='replace'))
         return True
 
     def integration_add_declar(self, declars_id):
