@@ -32,7 +32,8 @@ class Declars(Base):
     service = Column(String, nullable=False)
     register_date = Column(Date, nullable=False)
     end_date = Column(Date, nullable=False)
-    object_address = relationship('Addresses', back_populate='adresses')
+    object_address = relationship('Addresses')
+    object_address_id = Column(ForeignKey('adresses.id'))
     documents = relationship('Documents', back_populates='declar')
     legal_entity = relationship('LegalEntity', back_populates='declar')
     person = relationship('Individuals', back_populates='declar')
@@ -74,8 +75,8 @@ class Documents(Base):
     mime_type = Column(String)
     body = Column(String)
     file_path = Column(String)
-    declar_id = Column(Integer, ForeignKey('declars.id'), index=True)
     declar = relationship('Declars', back_populates='documents')
+    declar_id = Column(ForeignKey('declars.id'), index=True)
 
 
 class Params(Base):
@@ -90,8 +91,8 @@ class Params(Base):
     row_delimiter = Column(String)
     col_delimiter = Column(String)
     value = Column(String, nullable=False)
-    declar_id = Column(Integer, ForeignKey('declars.id'), index=True)
     declar = relationship('Declars', back_populates='param')
+    declar_id = Column(ForeignKey('declars.id'), index=True)
 
 
 class LegalEntity(Base):
@@ -102,13 +103,14 @@ class LegalEntity(Base):
     full_name = Column(String)
     inn = Column(String)
     kpp = Column(String)
-    address = relationship('Addresses', back_populate='adresses')
+    address = relationship('Addresses')
+    address_id = Column(ForeignKey('adresses.id'))
     ogrn = Column(String)
     taxRegDoc = Column(String)
     govRegDoc = Column(String)
     govRegDate = Column(Date)
-    phone = relationship('Phones', back_populate='entity')
-    email = relationship('Emails', back_populate='entity')
+    phone = relationship('Phones', back_populates='entity')
+    email = relationship('Emails', back_populates='entity')
     bossFio = Column(String)
     buhFio = Column(String)
     bank = Column(String)
@@ -116,9 +118,10 @@ class LegalEntity(Base):
     lastCtrlDate = Column(Date)
     opf = Column(String)
     govRegOgv = Column(String)
-    person = relationship('Individuals', back_populates='persons')
-    declar_id = Column(Integer, ForeignKey('declars.id'), index=True)
+    person = relationship('Individuals', back_populates='entity')
+    person_id = Column(ForeignKey('persons.id'))
     declar = relationship('Declars', back_populates='legal_entity')
+    declar_id = Column(ForeignKey('declars.id'))
 
 
 class Individuals(Base):
@@ -128,21 +131,23 @@ class Individuals(Base):
     surname = Column(String, nullable=False)
     first_name = Column(String, nullable=False)
     patronymic = Column(String)
-    address = Column(String, nullable=False)
-    fact_address = Column(String)
-    email = relationship('Emails', back_populate='person')
+    address_id = Column(ForeignKey('adresses.id'))
+    address = relationship('Addresses', foreign_keys=address_id)
+    fact_address_id = Column(ForeignKey('adresses.id'))
+    fact_address = relationship('Addresses', foreign_keys=fact_address_id)
+    email = relationship('Emails', back_populates='person')
     birthdate = Column(Date)
     passport_serial = Column(String)
     passport_number = Column(String)
     passport_agency = Column(String)
     passport_date = Column(Date)
-    phone = relationship('Phones', back_populate='person')
+    phone = relationship('Phones', back_populates='person')
     inn = Column(String)
     sex = Column(String)
     snils = Column(String)
-    declar_id = Column(Integer, ForeignKey('declars.id'), index=True)
     declar = relationship('Declars', back_populates='person')
-    entity = Column(Integer, ForeignKey('entities.id'))
+    declar_id = Column(ForeignKey('declars.id'))
+    entity = relationship('LegalEntity', back_populates='person')
 
 
 class Phones(Base):
@@ -150,8 +155,10 @@ class Phones(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
     phone = Column(String)
-    entity = relationship('LegalEntity', back_populates='entities')
-    person = relationship('LegalEntity', back_populates='persons')
+    entity = relationship('LegalEntity', back_populates='phone')
+    entity_id = Column(ForeignKey('entities.id'))
+    person = relationship('Individuals', back_populates='phone')
+    person_id = Column(ForeignKey('persons.id'))
 
 
 class Emails(Base):
@@ -159,8 +166,10 @@ class Emails(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
     email = Column(String)
-    entity = relationship('LegalEntity', back_populates='entities')
-    person = relationship('Individuals', back_populates='persons')
+    entity = relationship('LegalEntity', back_populates='email')
+    entity_id = Column(ForeignKey('entities.id'))
+    person = relationship('Individuals', back_populates='email')
+    person_id = Column(ForeignKey('persons.id'))
 
 
 class Db:

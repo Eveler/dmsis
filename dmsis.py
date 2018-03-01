@@ -228,12 +228,13 @@ class Integration:
         from configparser import ConfigParser, NoSectionError, NoOptionError
 
         cfg = ConfigParser()
+        do_write = False
         # If an exception, report it end exit
         try:
             from os.path import expanduser
             lst = cfg.read(
-                [config_path, "./dmsis.ini", expanduser("~/dmsis.ini"),
-                 "c:/dmsis/dmsis.ini"])
+                ["c:/dmsis/dmsis.ini", expanduser("~/dmsis.ini"), "./dmsis.ini",
+                 config_path])
             if lst:
                 logging.info('Configuration loaded from: %s' % lst)
             else:
@@ -241,7 +242,6 @@ class Integration:
                 lst = [os.path.abspath("./dmsis.ini")]
                 logging.info('Configuration stored in: %s' % lst)
 
-            do_write = False
             if not cfg.has_section("main"):
                 do_write = True
                 cfg.add_section("main")
