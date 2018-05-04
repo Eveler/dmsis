@@ -1,4 +1,5 @@
 # -*- encoding: utf-8 -*-
+
 import logging
 import os
 import subprocess
@@ -24,12 +25,14 @@ class Crypto:
     CADESCOM_XML_SIGNATURE_TYPE_ENVELOPING = 1
     CADESCOM_XML_SIGNATURE_TYPE_TEMPLATE = 2
 
-    def __init__(self, cert_sn="", container=None, use_com=False):
+    def __init__(self, cert_sn="", container=None, crt_name=None,
+                 use_com=False):
         self.log = logging.getLogger('cryptopro')
         self.log.setLevel(logging.root.level)
         self.__use_com = use_com
         self.__container = container
         self.serial = cert_sn.replace(' ', '')
+        self.__crt_name = crt_name
 
         if use_com:
             import pythoncom
@@ -68,6 +71,14 @@ class Crypto:
     def container(self, value):
         self.__container = value
 
+    @property
+    def crt_name(self):
+        return self.__crt_name
+
+    @crt_name.setter
+    def crt_name(self, value):
+        self.__crt_name = value
+
     def sign(self, xml):
         if self.__use_com:
             return self.sign_com(xml)
@@ -76,18 +87,67 @@ class Crypto:
 
     def get_file_hash(self, file_path):
         csptest_path = 'C:\\Program Files (x86)\\Crypto Pro\\CSP\\csptest.exe'
+        if not os.path.exists(csptest_path):
+            csptest_path = 'C:\\Program Files\\Crypto Pro\\CSP\\csptest.exe'
         hashtmp_f, hashtmp_fn = tempfile.mkstemp()
         os.close(hashtmp_f)
-        args = [csptest_path, 'csptest.exe', '-silent', '-keyset', '-hash',
+        args = [csptest_path, 'csptest.exe', '-keyset', '-hash',
                 'GOST', '-container', self.__container, '-keytype', 'exchange',
                 '-in', os.path.abspath(file_path), '-hashout', hashtmp_fn]
-        out = subprocess.check_output(args, stderr=subprocess.STDOUT)
-        self.log.debug(out.decode(encoding='cp866'))
+        try:
+            out = subprocess.check_output(args, stderr=subprocess.STDOUT)
+            self.log.debug(out.decode(encoding='cp866'))
 
-        with open(hashtmp_fn, 'rb') as f:
-            hsh = f.read()
-        hsh_bytes = base64_encode(hsh)[0][:-1].decode().replace('\n', '')
-        return hsh_bytes
+            with open(hashtmp_fn, 'rb') as f:
+                hsh = f.read()
+            hsh_bytes = base64_encode(hsh)[0][:-1].decode().replace('\n', '')
+            # hsh_bytes = base64_encode(hsh)[0].decode().replace('\n', '')
+            return hsh_bytes
+        except:
+            if 'out' in locals():
+                self.log.error(out.decode(encoding='cp866'))
+            raise
+        finally:
+            os.remove(hashtmp_fn)
+
+    def get_file_sign(self, file_path, crt_name=None):
+        """ Generates PKCS #7 signature"""
+        csptest_path = 'C:\\Program Files (x86)\\Crypto Pro\\CSP\\csptest.exe'
+        if not os.path.exists(csptest_path):
+            csptest_path = 'C:\\Program Files\\Crypto Pro\\CSP\\csptest.exe'
+        signtmp_f, signtmp_fn = tempfile.mkstemp()
+        os.close(signtmp_f)
+        args = [csptest_path, 'csptest.exe', '-sfsign', '-sign',
+                '-my', crt_name if crt_name else self.__crt_name, '-detached',
+                '-in', os.path.abspath(file_path), '-out', signtmp_fn, '-add',
+                '-base64', '-addsigtime']
+        try:
+            out = subprocess.check_output(args, stderr=subprocess.STDOUT)
+            self.log.debug(out.decode(encoding='cp866'))
+
+            with open(signtmp_fn, 'rb') as f:
+                hsh = f.read()
+            return hsh.replace(b'\n', b'').replace(b'\r', b'')
+            # hsh_bytes = base64_encode(hsh)[0][:-1].decode().replace('\n', '')
+            # return hsh_bytes
+        except subprocess.CalledProcessError as e:
+            self.log.error(e.output.decode(encoding='cp866'))
+            raise
+        finally:
+            os.remove(signtmp_fn)
+
+    def get_buf_sign(self, buf, crt_name=None):
+        if isinstance(buf, str):
+            buf = buf.encode(errors='replace')
+        tmp_f, tmp_fn = tempfile.mkstemp()
+        os.write(tmp_f, buf)
+        os.close(tmp_f)
+        try:
+            return self.get_file_sign(tmp_fn, crt_name=crt_name)
+        except:
+            raise
+        finally:
+            os.remove(tmp_fn)
 
     # TODO: Enveloped signature
     def sign_csp(self, xml):
@@ -102,7 +162,7 @@ class Crypto:
             os.close(intmp_f)
             os.close(outtmp_f)
             os.close(hashtmp_f)
-            args = [csptest_path, 'csptest.exe', '-silent', '-keyset', '-sign',
+            args = [csptest_path, 'csptest.exe', '-keyset', '-sign',
                     'GOST', '-hash', 'GOST', '-container', self.__container,
                     '-keytype', 'exchange', '-in', intmp_fn, '-out', outtmp_fn,
                     '-hashout', hashtmp_fn]
@@ -118,7 +178,7 @@ class Crypto:
             hsh_bytes = base64_encode(hsh)[0][:-1].decode().replace('\n', '')
         except subprocess.CalledProcessError as e:
             self.log.error(e.output.decode(encoding='cp866'))
-            return e.output.decode(encoding='cp866')
+            raise
         finally:
             os.remove(intmp_fn)
             os.remove(outtmp_fn)

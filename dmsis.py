@@ -38,7 +38,8 @@ class Integration:
 
         try:
             self.__smev = Adapter(self.smev_wsdl, self.smev_ftp,
-                                  method=self.cert_method)
+                                  method=self.cert_method,
+                                  crt_name=self.crt_name)
         except Exception:
             self.report_error()
 
@@ -68,7 +69,8 @@ class Integration:
         if not self.__smev:
             try:
                 self.__smev = Adapter(self.smev_wsdl, self.smev_ftp,
-                                      method=self.cert_method)
+                                      method=self.cert_method,
+                                      crt_name=self.crt_name)
             except Exception:
                 self.report_error()
 
@@ -314,6 +316,11 @@ class Integration:
             else:
                 raise Exception('Ошибка в настройках: необходимо указать '
                                 'crt_serial в секции smev')
+            if 'crt_name' in cfg.options('smev'):
+                self.crt_name = cfg.get('smev', 'crt_name')
+            else:
+                raise Exception('Ошибка в настройках: необходимо указать '
+                                'crt_name в секции smev')
             if 'container' in cfg.options('smev'):
                 self.container = cfg.get('smev', 'container')
             else:

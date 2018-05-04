@@ -1,16 +1,27 @@
 # -*- encoding: utf-8 -*-
+
 import ftplib
+import json
 import logging
+import operator
+import os
+import sys
 import tempfile
 from datetime import datetime, date
-from os import close, write
+from logging.handlers import TimedRotatingFileHandler
+from mimetypes import guess_type, guess_extension
+from os import close, write, path
+from os.path import basename
 from urllib.parse import urlparse
 from uuid import uuid1
 
-from declar import Declar, AppliedDocument
+# from datetime import date
+import six
+from declar import Declar
 from lxml import etree, objectify
 from plugins.cryptopro import Crypto
-from zeep import Client, xsd
+from translit import translate
+from zeep import Client
 from zeep.plugins import HistoryPlugin
 
 
@@ -39,12 +50,14 @@ class Adapter:
     def __init__(self,
                  wsdl="http://smev3-d.test.gosuslugi.ru:7500/smev/v1.2/ws?wsdl",
                  ftp_addr="ftp://smev3-d.test.gosuslugi.ru/",
-                 history=False, method='sharp', serial=None, container=None):
+                 history=False, method='sharp', serial=None, container=None,
+                 crt_name=None):
         self.log = logging.getLogger('smev.adapter')
         self.log.setLevel(logging.root.level)
         self.ftp_addr = ftp_addr
         self.crypto = Crypto()
         self.crypto.serial = serial
+        self.crypto.crt_name = crt_name
         self.crypto.container = container
         self.method = method
 
@@ -72,13 +85,11 @@ class Adapter:
             res += ' ' * 4 + value + '\n'
 
         res += "\nBindings:\n"
-        import six
         for binding_obj in sorted(self.proxy.wsdl.bindings.values(),
                                   key=lambda k: six.text_type(k)):
             res += ' ' * 4 + six.text_type(binding_obj) + '\n'
 
         res += '\n'
-        import operator
         for service in self.proxy.wsdl.services.values():
             res += six.text_type(service) + '\n'
             for port in service.ports.values():
@@ -162,13 +173,11 @@ class Adapter:
                     files[attach.uuid]['FileName'] = str(attach.FileName)
                 for uuid, file in files.items():
                     file_name = file['FileName']
-                    from os import path
                     fn, ext = path.splitext(file_name)
                     res = self.__load_file(uuid, file['UserName'],
                                            file['Password'],
                                            file['FileName'])
                     if isinstance(res, (str, bytes)):
-                        from mimetypes import guess_extension
                         new_ext = guess_extension(file_name).lower()
                         ext = ext.lower()
                         if ext != new_ext:
@@ -207,13 +216,11 @@ class Adapter:
                     files[attach.uuid]['FileName'] = str(attach.FileName)
                 for uuid, file in files.items():
                     file_name = file['FileName']
-                    from os import path
                     fn, ext = path.splitext(file_name)
                     res = self.__load_file(uuid, file['UserName'],
                                            file['Password'],
                                            file['FileName'])
                     if isinstance(res, (str, bytes)):
-                        from mimetypes import guess_extension
                         new_ext = guess_extension(file_name).lower()
                         ext = ext.lower()
                         if ext != new_ext:
@@ -249,23 +256,128 @@ class Adapter:
 
         return declar, uuid, reply_to, files
 
+    def __add_element(self, parent, ns, elem, data):
+        if not data:
+            return
+        if isinstance(data, dict):
+            se = etree.SubElement(parent, '{%s}%s' % (ns, elem))
+            for k, v in data.items():
+                if not v:
+                    continue
+                self.__add_element(se, ns, k, v)
+        elif isinstance(data, (list, tuple)):
+            for v in data:
+                if not isinstance(v, (dict, list, tuple)):
+                    etree.SubElement(parent, '{%s}%s' % (ns, elem)).text = v
+                else:
+                    se = etree.SubElement(parent, '{%s}%s' % (ns, elem))
+                    self.__add_element(se, ns, elem, v)
+        else:
+            etree.SubElement(parent, '{%s}%s' % (ns, elem)).text = data
+
+    def send_request(self, declar):
+        operation = 'SendRequest'
+        file_names = []
+
+        element = self.proxy.get_element('ns1:MessagePrimaryContent')
+        rr = etree.Element(
+            '{urn://augo/smev/uslugi/1.0.0}declar',
+            nsmap={'rr': 'urn://augo/smev/uslugi/1.0.0'})
+        self.log.debug(declar)
+        for k, v in declar.items():
+            if isinstance(v, list):
+                for val in v:
+                    se = etree.SubElement(
+                        rr, '{urn://augo/smev/uslugi/1.0.0}%s' % k)
+                    for n, m in val.items():
+                        if not m:
+                            continue
+                        if n == 'file_name':
+                            file_names.append(m)
+                        else:
+                            # etree.SubElement(
+                            #     se,
+                            #     '{urn://augo/smev/uslugi/1.0.0}%s' % n).text = m
+                            self.__add_element(
+                                se, 'urn://augo/smev/uslugi/1.0.0', n, m)
+            elif isinstance(v, dict):
+                se = etree.SubElement(
+                    rr, '{urn://augo/smev/uslugi/1.0.0}%s' % k)
+                for n, m in v.items():
+                    if not m:
+                        continue
+                    # etree.SubElement(
+                    #     se, '{urn://augo/smev/uslugi/1.0.0}%s' % n).text = m
+                    self.__add_element(
+                        se, 'urn://augo/smev/uslugi/1.0.0', n, m)
+            else:
+                if not v:
+                    continue
+                # etree.SubElement(
+                #     rr, '{urn://augo/smev/uslugi/1.0.0}%s' % k).text = v
+                self.__add_element(
+                    rr, 'urn://augo/smev/uslugi/1.0.0', k, v)
+        mpc = element(rr)
+
+        node = self.proxy.create_message(
+            self.proxy.service, operation,
+            {'MessageID': uuid1(), 'MessagePrimaryContent': mpc},
+            CallerInformationSystemSignature=etree.Element('Signature'))
+        res = node.find('.//{*}SenderProvidedRequestData')
+        res.set('Id', 'SIGNED_BY_CALLER')
+
+        if file_names:
+            ns = etree.QName(node.find('.//{*}MessagePrimaryContent')).namespace
+            rahl = etree.SubElement(res, '{%s}RefAttachmentHeaderList' % ns)
+            for file_name in file_names:
+                rah = etree.SubElement(rahl, '{%s}RefAttachmentHeader' % ns)
+                etree.SubElement(
+                    rah, '{%s}uuid' % ns).text = self.__upload_file(
+                    file_name, translate(basename(file_name)))
+                f_hash = self.crypto.get_file_hash(file_name)
+                etree.SubElement(rah, '{%s}Hash' % ns).text = f_hash
+                etree.SubElement(
+                    rah, '{%s}MimeType' % ns).text = guess_type(file_name)[0]
+                # etree.SubElement(
+                #     rah,
+                #     '{%s}SignaturePKCS7' % ns).text = self.crypto.get_file_sign(
+                #     file_name)
+
+        node_str = etree.tostring(node)
+        res = etree.QName(res)
+        node_str = node_str.replace(
+            b'<ns0:SenderProvidedRequestData',
+            b'<ns0:SenderProvidedRequestData xmlns:ns0="' +
+            res.namespace.encode() + b'"')
+        self.log.debug(node_str)
+        res = self.__xml_part(node_str,
+                              b'ns0:SenderProvidedRequestData')
+        res = self.__call_sign(res)
+        res = node_str.decode().replace('<Signature/>', res)
+        self.log.debug(res)
+        res = self.__send(operation, res.encode('utf-8'))
+        self.log.debug(res)
+        return res
+
     def send_respose(self, reply_to, declar_number, register_date,
                      result='FINAL', text='', applied_documents=list(),
                      ftp_user='', ftp_pass=''):
         files = []
         for doc in applied_documents:
-            from mimetypes import guess_type
             if isinstance(doc, (bytes, str)):
                 file_name = os.path.split(doc)[1]
+                # file_name = translate(file_name)
                 uuid = self.__upload_file(doc, file_name, ftp_user, ftp_pass)
                 files.append({uuid: {'name': file_name,
-                                     'type': guess_type(doc),
+                                     'type': guess_type(doc)[0],
                                      'full_name': doc}})
             if doc.file:
                 uuid = self.__upload_file(doc.file, doc.file_name, ftp_user,
                                           ftp_pass)
+                # uuid = self.__upload_file(doc.file, translate(doc.file_name),
+                #                           ftp_user, ftp_pass)
                 files.append({uuid: {'name': doc.file_name,
-                                     'type': guess_type(doc.file),
+                                     'type': guess_type(doc.file)[0],
                                      'full_name': doc.file}})
 
         operation = 'SendResponse'
@@ -328,14 +440,19 @@ class Adapter:
         res.set('Id', 'SIGNED_BY_CALLER')
 
         if files:
-            rahl = etree.SubElement(res, 'RefAttachmentHeaderList')
+            ns = etree.QName(node.find('.//{*}MessagePrimaryContent')).namespace
+            rahl = etree.SubElement(res, '{%s}RefAttachmentHeaderList' % ns)
             for uuid, file in files:
-                rah = etree.SubElement(rahl, 'RefAttachmentHeader')
-                etree.SubElement(rah, 'uuid').text = uuid
+                rah = etree.SubElement(rahl, '{%s}RefAttachmentHeader' % ns)
+                etree.SubElement(rah, '{%s}uuid' % ns).text = uuid
                 etree.SubElement(
-                    rah, 'Hash').text = self.crypto.get_file_hash(
+                    rah, '{%s}Hash' % ns).text = self.crypto.get_file_hash(
                     file['full_name'])
-                etree.SubElement(rah, 'MimeType').text = file['type']
+                etree.SubElement(rah, '{%s}MimeType' % ns).text = file['type']
+                # etree.SubElement(
+                #     rah,
+                #     '{%s}SignaturePKCS7' % ns).text = self.crypto.get_file_sign(
+                #     file['full_name'])
 
         node_str = etree.tostring(node)
         res = etree.QName(res)
@@ -358,11 +475,14 @@ class Adapter:
         method = getattr(self.crypto, method_name)
         return method(xml)
 
-    def __upload_file(self, file, file_name, ftp_user='anonymous', ftp_pass='anonymous'):
+    def __upload_file(self, file, file_name, ftp_user='anonymous',
+                      ftp_pass='anonymous'):
+        self.log.debug(file_name)
         addr = urlparse(self.ftp_addr).netloc
         with ftplib.FTP(addr, ftp_user, ftp_pass) as con:
             uuid = str(uuid1())
-            con.mkd(uuid)
+            res = con.mkd(uuid)
+            self.log.debug(res)
             con.cwd(uuid)
             with open(file, 'rb') as f:
                 res = con.storbinary('STOR ' + file_name, f)
@@ -435,14 +555,9 @@ if __name__ == '__main__':
     logging.getLogger('zeep.wsdl').setLevel(logging.INFO)
     logging.getLogger('urllib3').setLevel(logging.INFO)
 
-    import sys
-
     if len(sys.argv) < 2:
-        import os
-        from logging.handlers import TimedRotatingFileHandler
-
         handler = TimedRotatingFileHandler(
-            os.path.abspath("dmsis.log"), when='D', backupCount=0,
+            os.path.abspath("dmsic.log"), when='D', backupCount=0,
             encoding='cp1251')
         handler.setFormatter(logging.Formatter(
             '%(asctime)s %(name)s:%(module)s(%(lineno)d): %(levelname)s: '
@@ -461,10 +576,11 @@ if __name__ == '__main__':
                                   gen_xml_only=True))
     else:
         try:
-            res = a.send_respose(reply_to='eyJzaWQiOjMyNzg1LCJtaWQiOiIwOTlmNjlkMy1lYmE2LTExZTctYTIyZS1hNDVkMzZjNzcwNmYiLCJ0Y2QiOiJmMDIxM2E4My1lYmE1LTExZTctOTc4NC1mYTE2M2UxMDA3Yjl8MTExMTExMTExMTExMTExMTExMTF8VjhoUXFvLzlYMVBDckJkV010RHQ2UlUyNGdQdEdZQzlPTjlEM2d4TWQzZGdWK1ErUFo3L2o3SUJKMG5WY1BBNnZ5T1ZrczRuNHl5ZWhEQytFclYydkRSYXBVKzJMcWJtNmNHQlVGR0lRbyt2Kzl3TnpnMVlFOFI5Tnh6MmNxWmlFTzN3TUNYQlplbXNJaUVUajlNNm5JKzVaOHU4VXNnTFpyb1NoMkN1WlR3L244MS9wYU00cFMxcXlXaWE3TWRYUUJLN1gwcUpwcG80VGl0cnJOcFFqR3phUXNPUFFDSThIT3Vnc2o1QmRSNUUveTdIM1ZwZUlhQ1ZjTG5LeEtQbm5hQllyandGYzRrQUZVcW1zM3JTWjdaWitXeWNCQlpZOTZOS0hpbE10eVNYQW9PeE1Qa1dsQXA1b1hScDhhQXNoRzNIQitOV0lsVm9CRFpiaW1MTnZBPT0iLCJyaWQiOiJkMGFjYmY2Yy0xNDMzLTExZTUtOWFkZi00YWIyM2QwN2NlMzkiLCJlb2wiOjAsInNsYyI6ImF1Z29fc21ldl91c2x1Z2lfMS4wLjBfZGVjbGFyIiwibW5tIjoibXRfdGVzdCJ9',
-                                 declar_number='23156/564/5611Д',
-                                 register_date='2008-09-29',
-                                 text='В услуге отказано по причине отсутствия документов удостоверяющих личность и заявления')
+            res = a.send_respose(
+                reply_to='eyJzaWQiOjMyNzg1LCJtaWQiOiIwOTlmNjlkMy1lYmE2LTExZTctYTIyZS1hNDVkMzZjNzcwNmYiLCJ0Y2QiOiJmMDIxM2E4My1lYmE1LTExZTctOTc4NC1mYTE2M2UxMDA3Yjl8MTExMTExMTExMTExMTExMTExMTF8VjhoUXFvLzlYMVBDckJkV010RHQ2UlUyNGdQdEdZQzlPTjlEM2d4TWQzZGdWK1ErUFo3L2o3SUJKMG5WY1BBNnZ5T1ZrczRuNHl5ZWhEQytFclYydkRSYXBVKzJMcWJtNmNHQlVGR0lRbyt2Kzl3TnpnMVlFOFI5Tnh6MmNxWmlFTzN3TUNYQlplbXNJaUVUajlNNm5JKzVaOHU4VXNnTFpyb1NoMkN1WlR3L244MS9wYU00cFMxcXlXaWE3TWRYUUJLN1gwcUpwcG80VGl0cnJOcFFqR3phUXNPUFFDSThIT3Vnc2o1QmRSNUUveTdIM1ZwZUlhQ1ZjTG5LeEtQbm5hQllyandGYzRrQUZVcW1zM3JTWjdaWitXeWNCQlpZOTZOS0hpbE10eVNYQW9PeE1Qa1dsQXA1b1hScDhhQXNoRzNIQitOV0lsVm9CRFpiaW1MTnZBPT0iLCJyaWQiOiJkMGFjYmY2Yy0xNDMzLTExZTUtOWFkZi00YWIyM2QwN2NlMzkiLCJlb2wiOjAsInNsYyI6ImF1Z29fc21ldl91c2x1Z2lfMS4wLjBfZGVjbGFyIiwibW5tIjoibXRfdGVzdCJ9',
+                declar_number='23156/564/5611Д',
+                register_date='2008-09-29',
+                text='В услуге отказано по причине отсутствия документов удостоверяющих личность и заявления')
             logging.debug(res)
             res = a.get_request(
                 # node_id='099f69d3-eba6-11e7-a22e-a45d36c7706f',
@@ -472,8 +588,6 @@ if __name__ == '__main__':
                 local_name='declar')
             logging.debug(res)
             if res:
-                import json
-
                 try:
                     with open('declar.json', 'w') as j:
                         json.dump(res, j)
@@ -485,7 +599,6 @@ if __name__ == '__main__':
             logging.error(str(e), exc_info=True)
             # with open('tests/dmsis.log', 'a') as f:
             #     f.write(str(e))
-    # from datetime import date
 
     # doc = AppliedDocument
     # doc.file_name = 'fgfdgfd'
