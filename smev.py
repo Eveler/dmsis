@@ -152,7 +152,7 @@ class Adapter:
 
         declar, uuid, reply_to, files = None, None, None, {}
 
-        if 'MessagePrimaryContent' in res:
+        if res and 'MessagePrimaryContent' in res:
             xml = etree.fromstring(res)
 
             declar = Declar.parsexml(
@@ -234,27 +234,27 @@ class Adapter:
             uuid = res.Request.SenderProvidedRequestData.MessageID
             reply_to = res.Request.ReplyTo
 
-        if uuid:
-            operation = 'Ack'
-            tm = etree.Element('AckTargetMessage', Id='SIGNED_BY_CALLER',
-                               accepted='true')
-            tm.text = uuid
-            node = self.proxy.create_message(
-                self.proxy.service, operation, tm,
-                CallerInformationSystemSignature=etree.Element('Signature'))
-            res = node.find('.//{*}AckTargetMessage')
-            res.set('Id', 'SIGNED_BY_CALLER')
-            res.set('accepted', 'true')
-            res.text = uuid
-            node_str = etree.tostring(node)
-            self.log.debug(node_str)
-            res = self.__xml_part(node_str, b'ns1:AckTargetMessage')
-            res = self.__call_sign(res)
-            res = node_str.decode().replace('<Signature/>', res)
-            res = self.__send(operation, res)
-            self.log.debug(res)
-
         return declar, uuid, reply_to, files
+
+    def send_ack(self, uuid, accepted='true'):
+        operation = 'Ack'
+        tm = etree.Element('AckTargetMessage', Id='SIGNED_BY_CALLER',
+                           accepted='true')
+        tm.text = uuid
+        node = self.proxy.create_message(
+            self.proxy.service, operation, tm,
+            CallerInformationSystemSignature=etree.Element('Signature'))
+        res = node.find('.//{*}AckTargetMessage')
+        res.set('Id', 'SIGNED_BY_CALLER')
+        res.set('accepted', accepted)
+        res.text = uuid
+        node_str = etree.tostring(node)
+        self.log.debug(node_str)
+        res = self.__xml_part(node_str, b'ns1:AckTargetMessage')
+        res = self.__call_sign(res)
+        res = node_str.decode().replace('<Signature/>', res)
+        res = self.__send(operation, res)
+        self.log.debug(res)
 
     def __add_element(self, parent, ns, elem, data):
         if not data:

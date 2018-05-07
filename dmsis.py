@@ -13,7 +13,7 @@ from win32._service import SERVICE_STOP_PENDING
 from win32serviceutil import ServiceFramework, HandleCommandLine
 
 from db import Db
-from plugins.directum import IntegrationServices
+from plugins.directum import IntegrationServices, IntegrationServicesException
 from smev import Adapter
 from twisted.internet import task, reactor
 from twisted.python import log
@@ -103,8 +103,7 @@ class Integration:
 
         try:
             declar, uuid, reply_to, files = self.smev.get_request(
-                self.smev_uri,
-                self.local_name)
+                self.smev_uri, self.local_name)
             if declar:
                 try:
                     res = self.directum.add_declar(declar, files=files)
@@ -112,19 +111,35 @@ class Integration:
                                        directum_id=res)
                     logging.info('Добавлено/обновлено дело с ID = %s' % res)
                     self.directum.run_script('СтартЗадачПоМУ')
+                    self.smev.send_ack(uuid)
+                except IntegrationServicesException as e:
+                    if "Услуга не найдена" in e.message:
+                        logging.warning(
+                            "Услуга '%s' не найдена. Дело № %s от %s" %
+                            (declar.service, declar.declar_number,
+                             declar.register_date.strftime('%d.%m.%Y')))
+                        self.smev.send_ack(uuid, 'false')
+                        self.smev.send_respose(
+                            reply_to, declar.declar_number,
+                            declar.register_date.strftime('%d.%m.%Y'), 'ERROR',
+                            "Услуга '%s' не найдена" % declar.service)
                 except Exception:
                     logging.warning(
                         'Failed to send data to DIRECTUM. Saving locally.',
                         exc_info=True)
                     self.db.save_declar(declar, uuid, reply_to, files)
+                    self.smev.send_ack(uuid)
+            else:
+                logging.warning("Получен пустой ответ")
+                self.smev.send_ack(uuid, 'false')
         except Exception as e:
             self.report_error()
 
         # Send final response
         try:
             for request in self.db.all_not_done():
-                declar = self.directum.search('ДПУ',
-                                              'ИД=%s' % request.directum_id)
+                declar = self.directum.search(
+                    'ДПУ', 'ИД=%s' % request.directum_id)
 
                 # For all requests check if declar`s end date is set
                 if declar[0].get('Дата5'):
@@ -256,7 +271,7 @@ class Integration:
             from logging.handlers import TimedRotatingFileHandler
             backupcount = 7
             if "log_count" in cfg.options("main"):
-                backupcount = cfg.get("main", "log_count")
+                backupcount = int(cfg.get("main", "log_count"))
             else:
                 do_write = True
                 cfg.set("main", "log_count", "7")
@@ -296,7 +311,8 @@ class Integration:
             if 'local_name' in cfg.options('smev'):
                 self.local_name = cfg.get('smev', 'local_name')
             else:
-                self.local_name = 'directum'
+                # self.local_name = 'directum'
+                self.local_name = 'declar'
             if 'wsdl' not in cfg.options('smev'):
                 do_write = True
                 cfg.set(

@@ -1,9 +1,20 @@
 # -*- coding: utf-8 -*-
 import logging
+from sys import exc_info
 from xml.dom.minidom import Document
 from xml.etree.ElementTree import fromstring
 
 from zeep import Client
+
+
+class IntegrationServicesException(Exception):
+    def __init__(self, msg, *args, **kwargs):
+        super().__init__(msg, args, kwargs)
+
+    @property
+    def message(self):
+        tp, val, tb = exc_info()
+        return val
 
 
 class IntegrationServices:
@@ -565,7 +576,7 @@ class IntegrationServices:
                                  " or LongString like '%%%s%%'" %
                           (declar.service, declar.service))
         if not len(res):
-            raise Exception("Услуга не найдена")
+            raise IntegrationServicesException("Услуга не найдена")
         text = xml_package.createTextNode(res[0]['ИДЗапГлавРазд'])
         requisite.appendChild(text)
         section.appendChild(requisite)
