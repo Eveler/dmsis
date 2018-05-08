@@ -92,12 +92,32 @@ class Integration:
         # Send to DIRECTUM previously saved declars
         try:
             for declar, files, reply_to, uuid in self.db.all_declars_as_xsd():
-                res = self.directum.add_declar(declar, files=files)
-                self.db.add_update(uuid, declar.declar_number,
-                                   reply_to, directum_id=res)
-                logging.info('Добавлено/обновлено дело с ID = %s' % res)
-                self.directum.run_script('СтартЗадачПоМУ')
-                self.db.delete_declar(uuid)
+                try:
+                    res = self.directum.add_declar(declar, files=files)
+                    self.db.add_update(uuid, declar.declar_number,
+                                       reply_to, directum_id=res)
+                    logging.info('Добавлено/обновлено дело с ID = %s' % res)
+                    self.directum.run_script('СтартЗадачПоМУ')
+                    self.db.delete_declar(uuid)
+                except IntegrationServicesException as e:
+                    if "Услуга не найдена" in e.message:
+                        logging.warning(
+                            "Услуга '%s' не найдена. Дело № %s от %s" %
+                            (declar.service, declar.declar_number,
+                             declar.register_date.strftime('%d.%m.%Y')))
+                        self.smev.send_ack(uuid, 'false')
+                        self.smev.send_respose(
+                            reply_to, declar.declar_number,
+                            declar.register_date.strftime('%d.%m.%Y'), 'ERROR',
+                            "Услуга '%s' не найдена" % declar.service)
+                    else:
+                        logging.warning(
+                            'Failed to send saved data to DIRECTUM.',
+                            exc_info=True)
+                except:
+                    logging.warning(
+                        'Failed to send saved data to DIRECTUM.',
+                        exc_info=True)
         except Exception:
             self.report_error()
 
@@ -123,6 +143,10 @@ class Integration:
                             reply_to, declar.declar_number,
                             declar.register_date.strftime('%d.%m.%Y'), 'ERROR',
                             "Услуга '%s' не найдена" % declar.service)
+                    else:
+                        logging.warning(
+                            'Failed to send saved data to DIRECTUM.',
+                            exc_info=True)
                 except Exception:
                     logging.warning(
                         'Failed to send data to DIRECTUM. Saving locally.',

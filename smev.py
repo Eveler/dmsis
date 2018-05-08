@@ -151,6 +151,8 @@ class Adapter:
         self.log.debug(res)
 
         declar, uuid, reply_to, files = None, None, None, {}
+        if isinstance(res, bytes):
+            res = res.decode(errors='replace')
 
         if res and 'MessagePrimaryContent' in res:
             xml = etree.fromstring(res)
@@ -233,6 +235,9 @@ class Adapter:
 
             uuid = res.Request.SenderProvidedRequestData.MessageID
             reply_to = res.Request.ReplyTo
+
+        if not uuid:
+            uuid = res
 
         return declar, uuid, reply_to, files
 
@@ -514,11 +519,11 @@ class Adapter:
         res = self.proxy.service._binding.process_reply(
             self.proxy.service._client,
             self.proxy.service._binding.get(operation), response)
-        # if not res and b'--uuid:' in response.content:
-        #     res = response.content[
-        #               response.content.index(b'Content-Type:'):]
-        #     res = res[:res.index(b'--uuid:')]
-        #     self.log.debug(res)
+        if not res and b'--uuid:' in response.content:
+            res = response.content[
+                      response.content.index(b'Content-Type:'):]
+            res = res[res.index(b'--uuid:') + 7:-2]
+            self.log.debug(res)
         return res
 
     def __xml_part(self, xml_as_str, tag_name):
