@@ -286,7 +286,7 @@ class Adapter:
         element = self.proxy.get_element('ns1:MessagePrimaryContent')
         rr = etree.Element(
             '{urn://augo/smev/uslugi/1.0.0}declar',
-            nsmap={'rr': 'urn://augo/smev/uslugi/1.0.0'})
+            nsmap={'ns1': 'urn://augo/smev/uslugi/1.0.0'})
         self.log.debug(declar)
         for k, v in declar.items():
             if isinstance(v, list):
@@ -388,7 +388,7 @@ class Adapter:
         element = self.proxy.get_element('ns1:MessagePrimaryContent')
         rr = etree.Element(
             '{urn://augo/smev/uslugi/1.0.0}requestResponse',
-            nsmap={'rr': 'urn://augo/smev/uslugi/1.0.0'})
+            nsmap={'ns1': 'urn://augo/smev/uslugi/1.0.0'})
         etree.SubElement(
             rr,
             '{urn://augo/smev/uslugi/1.0.0}declar_number').text = declar_number
