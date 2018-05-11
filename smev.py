@@ -147,7 +147,6 @@ class Adapter:
             return res
 
         res = self.__send(operation, res)
-        self.log.debug(type(res))
         self.log.debug(res)
 
         declar, uuid, reply_to, files = None, None, None, {}
@@ -523,7 +522,6 @@ class Adapter:
             res = response.content[
                       response.content.index(b'Content-Type:'):]
             res = res[res.index(b'--uuid:') + 7:-2]
-            self.log.debug(res)
         return res
 
     def __xml_part(self, xml_as_str, tag_name):

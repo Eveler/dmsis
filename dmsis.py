@@ -110,6 +110,7 @@ class Integration:
                             reply_to, declar.declar_number,
                             declar.register_date.strftime('%d.%m.%Y'), 'ERROR',
                             "Услуга '%s' не найдена" % declar.service)
+                        self.db.delete_declar(uuid)
                     else:
                         logging.warning(
                             'Failed to send saved data to DIRECTUM.',
@@ -337,6 +338,7 @@ class Integration:
             else:
                 # self.local_name = 'directum'
                 self.local_name = 'declar'
+                # self.local_name = ''
             if 'wsdl' not in cfg.options('smev'):
                 do_write = True
                 cfg.set(
