@@ -123,8 +123,9 @@ class Integration:
             self.report_error()
 
         try:
-            declar, uuid, reply_to, files = self.smev.get_request(
-                self.smev_uri, self.local_name)
+            # declar, uuid, reply_to, files = self.smev.get_request(
+            #     self.smev_uri, self.local_name)
+            declar, uuid, reply_to, files = self.smev.get_request()
             if declar:
                 try:
                     res = self.directum.add_declar(declar, files=files)

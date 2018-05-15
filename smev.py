@@ -1,7 +1,6 @@
 # -*- encoding: utf-8 -*-
 
 import ftplib
-import json
 import logging
 import operator
 import os
@@ -107,7 +106,7 @@ class Adapter:
 
     # def get_request(self, uri='urn://augo/smev/uslugi/1.0.0',
     #                 local_name='directum'):
-    def get_request(self, uri=None, local_name=None, node_id=None,
+    def get_request(self, uri='', local_name='', node_id=None,
                     gen_xml_only=False):
         # if (uri and not local_name) or (not uri and local_name):
         #     raise Exception(
@@ -255,6 +254,21 @@ class Adapter:
         node_str = etree.tostring(node)
         self.log.debug(node_str)
         res = self.__xml_part(node_str, b'ns1:AckTargetMessage')
+        res = self.__call_sign(res)
+        res = node_str.decode().replace('<Signature/>', res)
+        res = self.__send(operation, res)
+        self.log.debug(res)
+
+    def get_status(self, timestamp):
+        operation = 'GetStatus'
+        node = self.proxy.create_message(
+            self.proxy.service, operation, Timestamp=timestamp,
+            CallerInformationSystemSignature=etree.Element('Signature'))
+        res = node.find('.//{*}Timestamp')
+        res.set('Id', 'SIGNED_BY_CALLER')
+        node_str = etree.tostring(node)
+        self.log.debug(node_str)
+        res = self.__xml_part(node_str, b'ns1:Timestamp')
         res = self.__call_sign(res)
         res = node_str.decode().replace('<Signature/>', res)
         res = self.__send(operation, res)
@@ -520,7 +534,7 @@ class Adapter:
             self.proxy.service._binding.get(operation), response)
         if not res and b'--uuid:' in response.content:
             res = response.content[
-                      response.content.index(b'Content-Type:'):]
+                  response.content.index(b'Content-Type:'):]
             res = res[res.index(b'--uuid:') + 7:-2]
         return res
 
@@ -553,7 +567,7 @@ class Adapter:
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG,
                         format='%(asctime)s %(levelname)s:%(module)s:%(name)s:%(lineno)d: %(message)s')
-    logging.root.handlers[0].setLevel(logging.INFO)
+    logging.root.handlers[0].setLevel(logging.DEBUG)
     logging.getLogger('zeep.xsd').setLevel(logging.INFO)
     logging.getLogger('zeep.wsdl').setLevel(logging.INFO)
     logging.getLogger('urllib3').setLevel(logging.INFO)
@@ -571,40 +585,35 @@ if __name__ == '__main__':
     a = Adapter(serial='008E BDC8 291F 0003 81E7 11E1 AF7A 5ED3 27',
                 container='smev_ep-ov',
                 wsdl="http://smev3-n0.test.gosuslugi.ru:7500/smev/v1.2/ws?wsdl",
-                ftp_addr="ftp://smev3-n0.test.gosuslugi.ru/")
+                ftp_addr="ftp://smev3-n0.test.gosuslugi.ru/",
+                crt_name='Администрация Уссурийского городского округа')
 
-    if len(sys.argv) > 1 and sys.argv[1].lower() == 'test2':
-        with open('tests/test2.xml', 'w') as f:
-            f.write(a.get_request('urn://augo/smev/uslugi/1.0.0', 'directum',
-                                  gen_xml_only=True))
-    else:
-        try:
-            res = a.send_respose(
-                reply_to='eyJzaWQiOjMyNzg1LCJtaWQiOiIwOTlmNjlkMy1lYmE2LTExZTctYTIyZS1hNDVkMzZjNzcwNmYiLCJ0Y2QiOiJmMDIxM2E4My1lYmE1LTExZTctOTc4NC1mYTE2M2UxMDA3Yjl8MTExMTExMTExMTExMTExMTExMTF8VjhoUXFvLzlYMVBDckJkV010RHQ2UlUyNGdQdEdZQzlPTjlEM2d4TWQzZGdWK1ErUFo3L2o3SUJKMG5WY1BBNnZ5T1ZrczRuNHl5ZWhEQytFclYydkRSYXBVKzJMcWJtNmNHQlVGR0lRbyt2Kzl3TnpnMVlFOFI5Tnh6MmNxWmlFTzN3TUNYQlplbXNJaUVUajlNNm5JKzVaOHU4VXNnTFpyb1NoMkN1WlR3L244MS9wYU00cFMxcXlXaWE3TWRYUUJLN1gwcUpwcG80VGl0cnJOcFFqR3phUXNPUFFDSThIT3Vnc2o1QmRSNUUveTdIM1ZwZUlhQ1ZjTG5LeEtQbm5hQllyandGYzRrQUZVcW1zM3JTWjdaWitXeWNCQlpZOTZOS0hpbE10eVNYQW9PeE1Qa1dsQXA1b1hScDhhQXNoRzNIQitOV0lsVm9CRFpiaW1MTnZBPT0iLCJyaWQiOiJkMGFjYmY2Yy0xNDMzLTExZTUtOWFkZi00YWIyM2QwN2NlMzkiLCJlb2wiOjAsInNsYyI6ImF1Z29fc21ldl91c2x1Z2lfMS4wLjBfZGVjbGFyIiwibW5tIjoibXRfdGVzdCJ9',
-                declar_number='23156/564/5611Д',
-                register_date='2008-09-29',
-                text='В услуге отказано по причине отсутствия документов удостоверяющих личность и заявления')
-            logging.debug(res)
-            res = a.get_request(
-                # node_id='099f69d3-eba6-11e7-a22e-a45d36c7706f',
-                uri='urn://augo/smev/uslugi/1.0.0',
-                local_name='declar')
-            logging.debug(res)
-            if res:
-                try:
-                    with open('declar.json', 'w') as j:
-                        json.dump(res, j)
-                except (ValueError, IOError, TypeError) as e:
-                    logging.error(str(e))
-                    with open('declar.bin', 'wb') as b:
-                        b.write(res)
-        except Exception as e:
-            logging.error(str(e), exc_info=True)
-            # with open('tests/dmsis.log', 'a') as f:
-            #     f.write(str(e))
+    # if len(sys.argv) > 1 and sys.argv[1].lower() == 'test2':
+    #     with open('tests/test2.xml', 'w') as f:
+    #         f.write(a.get_request('urn://augo/smev/uslugi/1.0.0', 'directum',
+    #                               gen_xml_only=True))
+    # else:
+    #     try:
+    #         res = a.send_respose(
+    #             reply_to='eyJzaWQiOjMyNzg1LCJtaWQiOiIwOTlmNjlkMy1lYmE2LTExZTctYTIyZS1hNDVkMzZjNzcwNmYiLCJ0Y2QiOiJmMDIxM2E4My1lYmE1LTExZTctOTc4NC1mYTE2M2UxMDA3Yjl8MTExMTExMTExMTExMTExMTExMTF8VjhoUXFvLzlYMVBDckJkV010RHQ2UlUyNGdQdEdZQzlPTjlEM2d4TWQzZGdWK1ErUFo3L2o3SUJKMG5WY1BBNnZ5T1ZrczRuNHl5ZWhEQytFclYydkRSYXBVKzJMcWJtNmNHQlVGR0lRbyt2Kzl3TnpnMVlFOFI5Tnh6MmNxWmlFTzN3TUNYQlplbXNJaUVUajlNNm5JKzVaOHU4VXNnTFpyb1NoMkN1WlR3L244MS9wYU00cFMxcXlXaWE3TWRYUUJLN1gwcUpwcG80VGl0cnJOcFFqR3phUXNPUFFDSThIT3Vnc2o1QmRSNUUveTdIM1ZwZUlhQ1ZjTG5LeEtQbm5hQllyandGYzRrQUZVcW1zM3JTWjdaWitXeWNCQlpZOTZOS0hpbE10eVNYQW9PeE1Qa1dsQXA1b1hScDhhQXNoRzNIQitOV0lsVm9CRFpiaW1MTnZBPT0iLCJyaWQiOiJkMGFjYmY2Yy0xNDMzLTExZTUtOWFkZi00YWIyM2QwN2NlMzkiLCJlb2wiOjAsInNsYyI6ImF1Z29fc21ldl91c2x1Z2lfMS4wLjBfZGVjbGFyIiwibW5tIjoibXRfdGVzdCJ9',
+    #             declar_number='23156/564/5611Д',
+    #             register_date='2008-09-29',
+    #             text='В услуге отказано по причине отсутствия документов удостоверяющих личность и заявления')
+    #         logging.debug(res)
+    #         res = a.get_request(
+    #             # node_id='099f69d3-eba6-11e7-a22e-a45d36c7706f',
+    #             uri='urn://augo/smev/uslugi/1.0.0',
+    #             local_name='declar')
+    #         logging.debug(res)
+    #         if res:
+    #             try:
+    #                 with open('declar.json', 'w') as j:
+    #                     json.dump(res, j)
+    #             except (ValueError, IOError, TypeError) as e:
+    #                 logging.error(str(e))
+    #                 with open('declar.bin', 'wb') as b:
+    #                     b.write(res)
+    #     except Exception as e:
+    #         logging.error(str(e), exc_info=True)
 
-    # doc = AppliedDocument
-    # doc.file_name = 'fgfdgfd'
-    # doc.file = 'dfdscxvcx'
-    # print(a.send_respose('fbklfblkfdgndndf', '454/5624365', date(2008, 8, 25),
-    #                      applied_documents=[doc]))
+    a.get_status(datetime(2018, 5, 11, 9, 57, 30))
