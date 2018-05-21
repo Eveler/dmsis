@@ -616,4 +616,6 @@ if __name__ == '__main__':
     #     except Exception as e:
     #         logging.error(str(e), exc_info=True)
 
-    a.get_status(datetime(2018, 5, 11, 9, 57, 30))
+    from datetime import timedelta, timezone
+    a.get_status(datetime(2018, 5, 15, 10, 4, 14, 0,
+                          tzinfo=timezone(timedelta(hours=3))))
