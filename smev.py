@@ -290,6 +290,9 @@ class Adapter:
                 else:
                     se = etree.SubElement(parent, '{%s}%s' % (ns, elem))
                     self.__add_element(se, ns, elem, v)
+        elif isinstance(data, (date, datetime)):
+            etree.SubElement(parent, '{%s}%s' % (ns, elem)).text = \
+                data.strftime('%Y-%m-%d')
         else:
             etree.SubElement(parent, '{%s}%s' % (ns, elem)).text = data
 
