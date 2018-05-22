@@ -234,21 +234,24 @@ class Db:
         self.session.commit()
 
     def save_declar(self, declar, uuid, reply_to, files):
-        a = Addresses(
-            Postal_Code=declar.object_address.Postal_Code,
-            Region=declar.object_address.Region,
-            District=declar.object_address.District,
-            City=declar.object_address.City,
-            Urban_District=declar.object_address.Urban_District,
-            Soviet_Village=declar.object_address.Soviet_Village,
-            Locality=declar.object_address.Locality,
-            Street=declar.object_address.Street,
-            House=declar.object_address.House,
-            Housing=declar.object_address.Housing,
-            Building=declar.object_address.Building,
-            Apartment=declar.object_address.Apartment,
-            Reference_point=declar.object_address.Reference_point)
-        self.session.add(a)
+        logging.debug(declar)
+        a = None
+        if declar.object_address:
+            a = Addresses(
+                Postal_Code=declar.object_address.Postal_Code,
+                Region=declar.object_address.Region,
+                District=declar.object_address.District,
+                City=declar.object_address.City,
+                Urban_District=declar.object_address.Urban_District,
+                Soviet_Village=declar.object_address.Soviet_Village,
+                Locality=declar.object_address.Locality,
+                Street=declar.object_address.Street,
+                House=declar.object_address.House,
+                Housing=declar.object_address.Housing,
+                Building=declar.object_address.Building,
+                Apartment=declar.object_address.Apartment,
+                Reference_point=declar.object_address.Reference_point)
+            self.session.add(a)
         d = Declars(declar_number=declar.declar_number, service=declar.service,
                     register_date=datetime.strptime(
                         declar.register_date.strftime('%Y-%m-%d'), '%Y-%m-%d'),
@@ -258,16 +261,19 @@ class Db:
         self.session.add(d)
         for legal_entity in declar.legal_entity:
             a = Addresses(
-                Postal_Code=legal_entity.Postal_Code,
-                Region=legal_entity.Region,
-                District=legal_entity.District, City=legal_entity.City,
-                Urban_District=legal_entity.Urban_District,
-                Soviet_Village=legal_entity.Soviet_Village,
-                Locality=legal_entity.Locality, Street=legal_entity.Street,
-                House=legal_entity.House, Housing=legal_entity.Housing,
-                Building=legal_entity.Building,
-                Apartment=legal_entity.Apartment,
-                Reference_point=legal_entity.Reference_point)
+                Postal_Code=legal_entity.address.Postal_Code,
+                Region=legal_entity.address.Region,
+                District=legal_entity.address.District,
+                City=legal_entity.address.City,
+                Urban_District=legal_entity.address.Urban_District,
+                Soviet_Village=legal_entity.address.Soviet_Village,
+                Locality=legal_entity.address.Locality,
+                Street=legal_entity.address.Street,
+                House=legal_entity.address.House,
+                Housing=legal_entity.address.Housing,
+                Building=legal_entity.address.Building,
+                Apartment=legal_entity.address.Apartment,
+                Reference_point=legal_entity.address.Reference_point)
             self.session.add(a)
             p = None
             if legal_entity.person:
@@ -345,7 +351,9 @@ class Db:
         docs = []
         for adoc in declar.AppliedDocument:
             from mimetypes import guess_type
-            found = files[adoc.file_name]
+            found = files.get(adoc.file_name)
+            if not found:
+                found = files.get(adoc.file_name.lower())
             mime_type = guess_type(found)[0]
             doc_data = None
             file_path = None

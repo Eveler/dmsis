@@ -25,27 +25,6 @@ from zeep.plugins import HistoryPlugin
 
 
 class Adapter:
-    xml_template = '<ds:Signature ' \
-                   'xmlns:ds="http://www.w3.org/2000/09/xmldsig#">' \
-                   '<ds:SignedInfo>' \
-                   '<ds:CanonicalizationMethod ' \
-                   'Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/>' \
-                   '<ds:SignatureMethod ' \
-                   'Algorithm="http://www.w3.org/2001/04/xmldsig-more#gostr34102001-gostr3411"/>' \
-                   '<ds:Reference URI="#SIGNED_BY_CALLER"><ds:Transforms>' \
-                   '<ds:Transform ' \
-                   'Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/>' \
-                   '<ds:Transform ' \
-                   'Algorithm="urn://smev-gov-ru/xmldsig/transform"/>' \
-                   '</ds:Transforms>' \
-                   '<ds:DigestMethod ' \
-                   'Algorithm="http://www.w3.org/2001/04/xmldsig-more#gostr3411"/>' \
-                   '<ds:DigestValue></ds:DigestValue></ds:Reference>' \
-                   '</ds:SignedInfo><ds:SignatureValue></ds:SignatureValue>' \
-                   '<ds:KeyInfo><ds:X509Data><ds:X509Certificate>' \
-                   '</ds:X509Certificate></ds:X509Data></ds:KeyInfo>' \
-                   '</ds:Signature>'
-
     def __init__(self,
                  wsdl="http://smev3-d.test.gosuslugi.ru:7500/smev/v1.2/ws?wsdl",
                  ftp_addr="ftp://smev3-d.test.gosuslugi.ru/",
@@ -108,10 +87,6 @@ class Adapter:
     #                 local_name='directum'):
     def get_request(self, uri='', local_name='', node_id=None,
                     gen_xml_only=False):
-        # if (uri and not local_name) or (not uri and local_name):
-        #     raise Exception(
-        #         'uri и local_name необходимо указывать одновременно')
-
         operation = 'GetRequest'
         timestamp = datetime.now()
         node = self.proxy.create_message(
@@ -203,33 +178,39 @@ class Adapter:
             #             './/{urn://augo/smev/uslugi/1.0.0}declar')))
             declar = Declar.parsexml(
                 etree.tostring(
-                    res.Request.SenderProvidedRequestData.MessagePrimaryContent._value_1))
+                    res.Request.SenderProvidedRequestData.\
+                        MessagePrimaryContent._value_1))
             if hasattr(res.Request, 'FSAttachmentsList') \
                     and res.Request.FSAttachmentsList:
-                attach_head_list = res.Request.SenderProvidedRequestData.RefAttachmentHeaderList
+                attach_files = {}
+                attach_head_list = res.Request.SenderProvidedRequestData.\
+                    RefAttachmentHeaderList.RefAttachmentHeader
                 for head in attach_head_list:
-                    files[head.uuid] = {'MimeType': head.MimeType}
-                attach_list = res.Request.FSAttachmentsList
+                    attach_files[head.uuid] = {'MimeType': head.MimeType}
+                attach_list = res.Request.FSAttachmentsList.FSAttachment
                 for attach in attach_list:
-                    files[attach.uuid]['UserName'] = str(attach.UserName)
-                    files[attach.uuid]['Password'] = str(attach.Password)
-                    files[attach.uuid]['FileName'] = str(attach.FileName)
-                for uuid, file in files.items():
+                    attach_files[attach.uuid]['UserName'] = str(attach.UserName)
+                    attach_files[attach.uuid]['Password'] = str(attach.Password)
+                    attach_files[attach.uuid]['FileName'] = str(attach.FileName)
+                for uuid, file in attach_files.items():
                     file_name = file['FileName']
                     fn, ext = path.splitext(file_name)
-                    res = self.__load_file(uuid, file['UserName'],
-                                           file['Password'],
-                                           file['FileName'])
-                    if isinstance(res, (str, bytes)):
-                        new_ext = guess_extension(file_name).lower()
+                    if fn[0] == '/':
+                        fn = fn[1:]
+                    rs = self.__load_file(uuid, file['FileName'],
+                                           file['UserName'],
+                                           file['Password'])
+                    if isinstance(rs, (str, bytes)):
+                        new_ext = guess_extension(file_name)
                         ext = ext.lower()
-                        if ext != new_ext:
-                            file_name = fn + new_ext
+                        if new_ext and ext != new_ext.lower():
+                            file_name = fn + new_ext.lower()
+                        else:
+                            file_name = fn + ext
                     else:
-                        res, e = res
+                        rs, e = rs
                         file_name = fn + '.txt'
-                    # declar.files.append({res: file_name})
-                    files[file_name] = res
+                    files[file_name] = rs
 
             uuid = res.Request.SenderProvidedRequestData.MessageID
             reply_to = res.Request.ReplyTo
@@ -274,27 +255,92 @@ class Adapter:
         res = self.__send(operation, res)
         self.log.debug(res)
 
-    def __add_element(self, parent, ns, elem, data):
+    def __add_element(self, parent, ns, elem, data, file_names=list()):
         if not data:
             return
-        if isinstance(data, dict):
-            se = etree.SubElement(parent, '{%s}%s' % (ns, elem))
-            for k, v in data.items():
-                if not v:
-                    continue
-                self.__add_element(se, ns, k, v)
-        elif isinstance(data, (list, tuple)):
-            for v in data:
-                if not isinstance(v, (dict, list, tuple)):
-                    etree.SubElement(parent, '{%s}%s' % (ns, elem)).text = v
-                else:
-                    se = etree.SubElement(parent, '{%s}%s' % (ns, elem))
-                    self.__add_element(se, ns, elem, v)
-        elif isinstance(data, (date, datetime)):
-            etree.SubElement(parent, '{%s}%s' % (ns, elem)).text = \
-                data.strftime('%Y-%m-%d')
+        se = etree.SubElement(parent, '{%s}%s' % (ns, elem))
+        if elem == 'AppliedDocument':
+            if isinstance(data, list):
+                for itm in data:
+                    for item in (
+                            'title', 'number', 'date', 'valid_until',
+                            'file_name', 'url', 'url_valid_until'):
+                        if item in itm and itm[item]:
+                            if item == 'file_name':
+                                fn = itm[item]
+                                file_names.append(fn)
+                                self.__add_element(
+                                    se, ns, item, path.basename(fn), file_names)
+                            else:
+                                self.__add_element(
+                                    se, ns, item, itm[item], file_names)
+                    if data.index(itm) < len(data) - 1:
+                        se = etree.SubElement(parent, '{%s}%s' % (ns, elem))
+            else:
+                for item in (
+                        'title', 'number', 'date', 'valid_until', 'file_name',
+                        'url', 'url_valid_until'):
+                    if item in data and data[item]:
+                        if item == 'file_name':
+                            file_names.append(item)
+                        self.__add_element(se, ns, item, data[item], file_names)
+        elif elem == 'legal_entity':
+            if isinstance(data, list):
+                for itm in data:
+                    for item in (
+                            'name', 'full_name', 'inn', 'kpp', 'address',
+                            'ogrn', 'taxRegDoc', 'govRegDoc', 'govRegDate',
+                            'phone', 'email', 'bossFio', 'buhFio', 'bank',
+                            'bankAccount', 'lastCtrlDate', 'opf', 'govRegOgv',
+                            'person'):
+                        if item in itm and itm[item]:
+                            self.__add_element(
+                                se, ns, item, itm[item], file_names)
+                    if data.index(itm) < len(data) - 1:
+                        se = etree.SubElement(parent, '{%s}%s' % (ns, elem))
+            else:
+                for item in (
+                        'name', 'full_name', 'inn', 'kpp', 'address', 'ogrn',
+                        'taxRegDoc', 'govRegDoc', 'govRegDate', 'phone',
+                        'email', 'bossFio', 'buhFio', 'bank', 'bankAccount',
+                        'lastCtrlDate', 'opf', 'govRegOgv', 'person'):
+                    if item in data and data[item]:
+                        self.__add_element(se, ns, item, data[item], file_names)
+        elif 'address' in elem:
+            for item in (
+                    'Postal_Code', 'Region', 'District', 'City',
+                    'Urban_District', 'Soviet_Village', 'Locality', 'Street',
+                    'House', 'Housing', 'Building', 'Apartment',
+                    'Reference_point'):
+                if item in data and data[item]:
+                    self.__add_element(se, ns, item, data[item], file_names)
+        elif elem in ('person', 'confidant'):
+            if isinstance(data, list):
+                for itm in data:
+                    for item in (
+                            'surname', 'first_name', 'patronymic', 'address',
+                            'fact_address', 'email', 'birthdate',
+                            'passport_serial', 'passport_number',
+                            'passport_agency', 'passport_date',
+                            'phone', 'inn', 'sex', 'snils'):
+                        if item in itm and itm[item]:
+                            self.__add_element(
+                                se, ns, item, itm[item], file_names)
+                    if data.index(itm) < len(data) - 1:
+                        se = etree.SubElement(parent, '{%s}%s' % (ns, elem))
+            else:
+                for item in (
+                        'surname', 'first_name', 'patronymic', 'address',
+                        'fact_address', 'email', 'birthdate', 'passport_serial',
+                        'passport_number', 'passport_agency', 'passport_date',
+                        'phone', 'inn', 'sex', 'snils'):
+                    if item in data and data[item]:
+                        self.__add_element(se, ns, item, data[item], file_names)
         else:
-            etree.SubElement(parent, '{%s}%s' % (ns, elem)).text = data
+            if isinstance(data, (date, datetime)):
+                se.text = data.strftime('%Y-%m-%d')
+            else:
+                se.text = data
 
     def send_request(self, declar):
         operation = 'SendRequest'
@@ -305,39 +351,14 @@ class Adapter:
             '{urn://augo/smev/uslugi/1.0.0}declar',
             nsmap={'ns1': 'urn://augo/smev/uslugi/1.0.0'})
         self.log.debug(declar)
-        for k, v in declar.items():
-            if isinstance(v, list):
-                for val in v:
-                    se = etree.SubElement(
-                        rr, '{urn://augo/smev/uslugi/1.0.0}%s' % k)
-                    for n, m in val.items():
-                        if not m:
-                            continue
-                        if n == 'file_name':
-                            file_names.append(m)
-                        else:
-                            # etree.SubElement(
-                            #     se,
-                            #     '{urn://augo/smev/uslugi/1.0.0}%s' % n).text = m
-                            self.__add_element(
-                                se, 'urn://augo/smev/uslugi/1.0.0', n, m)
-            elif isinstance(v, dict):
-                se = etree.SubElement(
-                    rr, '{urn://augo/smev/uslugi/1.0.0}%s' % k)
-                for n, m in v.items():
-                    if not m:
-                        continue
-                    # etree.SubElement(
-                    #     se, '{urn://augo/smev/uslugi/1.0.0}%s' % n).text = m
-                    self.__add_element(
-                        se, 'urn://augo/smev/uslugi/1.0.0', n, m)
-            else:
-                if not v:
-                    continue
-                # etree.SubElement(
-                #     rr, '{urn://augo/smev/uslugi/1.0.0}%s' % k).text = v
+        for item in (
+                'declar_number', 'service', 'register_date', 'end_date',
+                'object_address', 'AppliedDocument', 'legal_entity', 'person',
+                'confidant', 'Param'):
+            if item in declar and declar[item]:
                 self.__add_element(
-                    rr, 'urn://augo/smev/uslugi/1.0.0', k, v)
+                    rr, 'urn://augo/smev/uslugi/1.0.0', item, declar[item],
+                    file_names)
         mpc = element(rr)
 
         node = self.proxy.create_message(
@@ -510,22 +531,41 @@ class Adapter:
             self.log.debug(res)
         return uuid
 
-    def __load_file(self, uuid, user, passwd, file_name):
+    def __load_file(self, uuid, file_name, user='anonymous',
+                    passwd='anonymous'):
         addr = urlparse(self.ftp_addr).netloc
         f, file_path = tempfile.mkstemp()
-        try:
-            with ftplib.FTP(addr, user, passwd) as con:
-                con.cwd(uuid)
-                if file_name[0] == '/':
-                    file_name = file_name[1:]
-                close(f)
-                with open(file_path, 'wb') as f:
-                    con.retrbinary('RETR ' + file_name, f.write)
-        except ftplib.all_errors as e:
-            self.log.error(str(e))
-            write(f, str(e).encode('cp1251'))
-            close(f)
-            return file_path, e
+        do_loop = True
+        while do_loop:
+            do_loop = False
+            try:
+                with ftplib.FTP(addr, user, passwd) as con:
+                    con.cwd(uuid)
+                    if file_name[0] == '/':
+                        file_name = file_name[1:]
+                    close(f)
+                    with open(file_path, 'wb') as f:
+                        con.retrbinary('RETR ' + file_name, f.write)
+            except ftplib.all_errors as e:
+                str_e = str(e)
+                if user != 'anonymous' and passwd != 'anonymous' \
+                        and 'Login incorrect' in str_e:
+                    user, passwd = 'anonymous', 'anonymous'
+                    do_loop = True
+                elif 'No such' in str_e and uuid in str_e \
+                        and uuid != uuid.upper():
+                    uuid = uuid.upper()
+                    do_loop = True
+                elif len(uuid) > 2:
+                    uuid = '/'
+                    do_loop = True
+                else:
+                    self.log.error(str(e))
+                    write(f, str(e).encode('cp1251', errors='replace') +
+                          b' File: ' +
+                          file_name.encode('cp1251', errors='replace'))
+                    close(f)
+                    return file_path, e
         return file_path
 
     def __send(self, operation, msg):
@@ -620,5 +660,6 @@ if __name__ == '__main__':
     #         logging.error(str(e), exc_info=True)
 
     from datetime import timedelta, timezone
-    a.get_status(datetime(2018, 5, 15, 10, 4, 14, 0,
+
+    a.get_status(datetime(2018, 5, 19, 11, 25, 28,
                           tzinfo=timezone(timedelta(hours=3))))

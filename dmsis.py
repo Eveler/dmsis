@@ -123,9 +123,9 @@ class Integration:
             self.report_error()
 
         try:
-            declar, uuid, reply_to, files = self.smev.get_request(
-                self.smev_uri, self.local_name)
-            # declar, uuid, reply_to, files = self.smev.get_request()
+            # declar, uuid, reply_to, files = self.smev.get_request(
+            #     self.smev_uri, self.local_name)
+            declar, uuid, reply_to, files = self.smev.get_request()
             if declar:
                 try:
                     res = self.directum.add_declar(declar, files=files)
@@ -133,14 +133,18 @@ class Integration:
                                        directum_id=res)
                     logging.info('Добавлено/обновлено дело с ID = %s' % res)
                     self.directum.run_script('СтартЗадачПоМУ')
-                    self.smev.send_ack(uuid)
+                    try:
+                        self.smev.send_ack(uuid)
+                    except:
+                        logging.warning(
+                            'Failed to send AckRequest.', exc_info=True)
                 except IntegrationServicesException as e:
                     if "Услуга не найдена" in e.message:
                         logging.warning(
                             "Услуга '%s' не найдена. Дело № %s от %s" %
                             (declar.service, declar.declar_number,
                              declar.register_date.strftime('%d.%m.%Y')))
-                        self.smev.send_ack(uuid, 'false')
+                        self.smev.send_ack(uuid)
                         self.smev.send_respose(
                             reply_to, declar.declar_number,
                             declar.register_date.strftime('%d.%m.%Y'), 'ERROR',
@@ -157,7 +161,7 @@ class Integration:
                     self.smev.send_ack(uuid)
             else:
                 logging.warning("Получен пустой ответ")
-                self.smev.send_ack(uuid, 'false')
+                # self.smev.send_ack(uuid, 'false')
         except Exception as e:
             self.report_error()
 

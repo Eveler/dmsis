@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 import logging
-from sys import exc_info
 from xml.dom.minidom import Document
 from xml.etree.ElementTree import fromstring
+from os import path
 
 from zeep import Client
 
@@ -13,8 +13,7 @@ class IntegrationServicesException(Exception):
 
     @property
     def message(self):
-        tp, val, tb = exc_info()
-        return val
+        return self.args[0]
 
 
 class IntegrationServices:
@@ -229,7 +228,7 @@ class IntegrationServices:
         # res = self.run_script('CheckDuplicateByCode', params)
         if res[0]:
             raise Exception(str(res))
-        self.log.info('Добавлен заявител ФЛ: %s, регистрация: %s' %
+        self.log.info('Добавлен заявитель ФЛ: %s, регистрация: %s' %
                       (name, str(human.fact_address)))
         return res
 
@@ -371,7 +370,7 @@ class IntegrationServices:
                         fn, ext = path.splitext(doc.file_name)
                         with open(doc.file, 'rb') as f:
                             doc_data = (
-                            f.read(), ext[1:].lower() if ext else 'txt')
+                                f.read(), ext[1:].lower() if ext else 'txt')
                     elif hasattr(declar, 'files') and declar.files:
                         found = False
                         for file_path, file_name in declar.files:
@@ -384,13 +383,21 @@ class IntegrationServices:
                             doc_data = (
                                 f.read(), ext[1:].lower() if ext else 'txt')
                     elif files:
-                        found = files.get(doc.file_name)
                         fn, ext = path.splitext(doc.file_name)
+                        found = files.get(doc.file_name)
+                        if not found:
+                            found = files.get(doc.file_name.lower())
+                        if not found:
+                            found = files.get(doc.file_name.upper())
+                        if not found:
+                            found = files.get(fn + ext.lower())
+                        if not found:
+                            found = files.get(fn + ext.upper())
                         with open(found, 'rb') as f:
                             doc_data = (
                                 f.read(), ext[1:].lower() if ext else 'txt')
                     else:
-                        doc_data = (b'test', 'txt')
+                        doc_data = (b'No file', 'txt')
                     i += 1
                     res = self.add_doc(doc, doc_data[1], doc_data[0])
                     # bind document with declar
@@ -438,7 +445,7 @@ class IntegrationServices:
                                       (person.surname, person.first_name,
                                        person.patronymic, str(person.address)))
                     person_id = res[0].get('ИД')
-                    self.log.debug('person_id = %s' % person_id)
+                    self.log.info('ИД персоны = %s' % person_id)
                 # "Заявитель ФЛ"
                 rec = xml_package.createElement('Record')
                 rec.setAttribute("ID", str(number))
@@ -473,6 +480,7 @@ class IntegrationServices:
                                              " and Состояние='Действующая'" %
                                       ent.name)
                     ent_id = res[0].get('ИД')
+                    logging.info('ИД организации = %s' % ent_id)
                 # "Заявитель ЮЛ"
                 rec = xml_package.createElement('Record')
                 rec.setAttribute("ID", str(number))
@@ -638,9 +646,12 @@ class IntegrationServices:
                        declar.register_date.strftime('%d.%m.%Y'),
                        declar_id))
 
-        params = [('Param', None), ('Param2', declar_id)]
-        res = self.run_script('NameDPU', params)
-        self.log.debug('Создание имени дела: %s' % res)
+        try:
+            params = [('Param', None), ('Param2', declar_id)]
+            res = self.run_script('NameDPU', params)
+            self.log.debug('Создание имени дела: %s' % res)
+        except:
+            pass
 
         i = 0
         for doc in declar.AppliedDocument:
@@ -651,7 +662,7 @@ class IntegrationServices:
                 with open(doc.file, 'rb') as f:
                     doc_data = (
                         f.read(), ext[1:].lower() if ext else 'txt')
-            elif declar.files:
+            elif hasattr(declar, 'files') and declar.files:
                 found = False
                 for file_path, file_name in declar.files:
                     if file_name.lower() == doc.file_name.lower():
@@ -663,13 +674,21 @@ class IntegrationServices:
                 with open(found, 'rb') as f:
                     doc_data = (f.read(), ext[1:] if ext else 'txt')
             elif files:
-                found = files.get(doc.file_name)
                 fn, ext = path.splitext(doc.file_name)
+                found = files.get(doc.file_name)
+                if not found:
+                    found = files.get(doc.file_name.lower())
+                if not found:
+                    found = files.get(doc.file_name.upper())
+                if not found:
+                    found = files.get(fn + ext.lower())
+                if not found:
+                    found = files.get(fn + ext.upper())
                 with open(found, 'rb') as f:
                     doc_data = (
                         f.read(), ext[1:].lower() if ext else 'txt')
             else:
-                doc_data = (b'test', 'txt')
+                doc_data = (b'No file', 'txt')
             i += 1
             res = self.add_doc(doc, doc_data[1], doc_data[0])
             # bind document with declar
@@ -736,12 +755,13 @@ class IntegrationServices:
         where = search_pak.createElement('Where')
 
         elem = self.__search_crit_parser(criteria)
-        if elem.tagName != 'And' and not tp:
-            e_and = search_pak.createElement('And')
-            e_and.appendChild(elem)
-            where.appendChild(e_and)
-        else:
-            where.appendChild(elem)
+        where.appendChild(elem)
+        # if elem.tagName != 'And' and not tp:
+        #     e_and = search_pak.createElement('And')
+        #     e_and.appendChild(elem)
+        #     where.appendChild(e_and)
+        # else:
+        #     where.appendChild(elem)
 
         search.appendChild(where)
 
