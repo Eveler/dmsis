@@ -2,7 +2,7 @@
 import logging
 from xml.dom.minidom import Document
 from xml.etree.ElementTree import fromstring
-from os import path
+from os import path, remove
 
 from zeep import Client
 
@@ -348,6 +348,12 @@ class IntegrationServices:
         if len(res):
             # Добавляем отсутствующие документы
             declar_id = res[0]['ИДЗапГлавРазд']
+
+            # На всякий случай нормализуем наименование записи
+            params = [('Param', None), ('Param2', declar_id)]
+            res = self.run_script('NameDPU', params)
+            self.log.debug('Создание имени дела: %s' % res)
+
             doc_ids = []
             i = 0
             for doc in declar.AppliedDocument:
@@ -396,6 +402,7 @@ class IntegrationServices:
                         with open(found, 'rb') as f:
                             doc_data = (
                                 f.read(), ext[1:].lower() if ext else 'txt')
+                        remove(found)
                     else:
                         doc_data = (b'No file', 'txt')
                     i += 1
@@ -641,17 +648,15 @@ class IntegrationServices:
                           (declar.declar_number,
                            declar.register_date.strftime('%d.%m.%Y')))
         declar_id = res[0]['ИДЗапГлавРазд']
+
+        params = [('Param', None), ('Param2', declar_id)]
+        res = self.run_script('NameDPU', params)
+        self.log.debug('Создание имени дела: %s' % res)
+
         self.log.info('Добавлено дело № %s от %s ID = %s' %
                       (declar.declar_number,
                        declar.register_date.strftime('%d.%m.%Y'),
                        declar_id))
-
-        try:
-            params = [('Param', None), ('Param2', declar_id)]
-            res = self.run_script('NameDPU', params)
-            self.log.debug('Создание имени дела: %s' % res)
-        except:
-            pass
 
         i = 0
         for doc in declar.AppliedDocument:
@@ -687,6 +692,7 @@ class IntegrationServices:
                 with open(found, 'rb') as f:
                     doc_data = (
                         f.read(), ext[1:].lower() if ext else 'txt')
+                remove(found)
             else:
                 doc_data = (b'No file', 'txt')
             i += 1

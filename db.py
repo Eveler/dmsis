@@ -1,6 +1,7 @@
 # -*- encoding: utf-8 -*-
 import logging
 from datetime import date, datetime
+from os import path, remove
 
 from sqlalchemy import Column, Integer, String, Boolean, Date, ForeignKey, func
 from sqlalchemy.engine import create_engine
@@ -36,10 +37,13 @@ class Declars(Base):
     object_address_id = Column(ForeignKey('adresses.id'))
     documents = relationship('Documents', back_populates='declar')
     legal_entity = relationship('LegalEntity', back_populates='declar')
-    person = relationship('Individuals', back_populates='declar')
+    person = relationship('Individuals', back_populates='declar',
+                          primaryjoin='Individuals.declar_id==Declars.id')
     param = relationship('Params', back_populates='declar')
     uuid = Column(String, nullable=False, index=True)
     reply_to = Column(String)
+    confidant_id = Column(ForeignKey('persons.id'))
+    confidant = relationship('Individuals', foreign_keys=confidant_id)
 
 
 class Addresses(Base):
@@ -145,8 +149,9 @@ class Individuals(Base):
     inn = Column(String)
     sex = Column(String)
     snils = Column(String)
-    declar = relationship('Declars', back_populates='person')
     declar_id = Column(ForeignKey('declars.id'))
+    declar = relationship(
+        'Declars', back_populates='person', foreign_keys=declar_id)
     entity = relationship('LegalEntity', back_populates='person')
 
 
@@ -237,7 +242,7 @@ class Db:
         logging.debug(declar)
         a = None
         if declar.object_address:
-            a = Addresses(
+            a = self.session.query(Addresses).filter_by(
                 Postal_Code=declar.object_address.Postal_Code,
                 Region=declar.object_address.Region,
                 District=declar.object_address.District,
@@ -250,34 +255,39 @@ class Db:
                 Housing=declar.object_address.Housing,
                 Building=declar.object_address.Building,
                 Apartment=declar.object_address.Apartment,
-                Reference_point=declar.object_address.Reference_point)
-            self.session.add(a)
-        d = Declars(declar_number=declar.declar_number, service=declar.service,
-                    register_date=datetime.strptime(
-                        declar.register_date.strftime('%Y-%m-%d'), '%Y-%m-%d'),
-                    end_date=datetime.strptime(
-                        declar.end_date.strftime('%Y-%m-%d'), '%Y-%m-%d'),
-                    object_address=a, uuid=uuid, reply_to=reply_to)
-        self.session.add(d)
-        for legal_entity in declar.legal_entity:
-            a = Addresses(
-                Postal_Code=legal_entity.address.Postal_Code,
-                Region=legal_entity.address.Region,
-                District=legal_entity.address.District,
-                City=legal_entity.address.City,
-                Urban_District=legal_entity.address.Urban_District,
-                Soviet_Village=legal_entity.address.Soviet_Village,
-                Locality=legal_entity.address.Locality,
-                Street=legal_entity.address.Street,
-                House=legal_entity.address.House,
-                Housing=legal_entity.address.Housing,
-                Building=legal_entity.address.Building,
-                Apartment=legal_entity.address.Apartment,
-                Reference_point=legal_entity.address.Reference_point)
-            self.session.add(a)
-            p = None
-            if legal_entity.person:
-                person = legal_entity.person
+                Reference_point=declar.object_address.Reference_point).first()
+            if not a:
+                a = Addresses(
+                    Postal_Code=declar.object_address.Postal_Code,
+                    Region=declar.object_address.Region,
+                    District=declar.object_address.District,
+                    City=declar.object_address.City,
+                    Urban_District=declar.object_address.Urban_District,
+                    Soviet_Village=declar.object_address.Soviet_Village,
+                    Locality=declar.object_address.Locality,
+                    Street=declar.object_address.Street,
+                    House=declar.object_address.House,
+                    Housing=declar.object_address.Housing,
+                    Building=declar.object_address.Building,
+                    Apartment=declar.object_address.Apartment,
+                    Reference_point=declar.object_address.Reference_point)
+                self.session.add(a)
+        cfd = None
+        if declar.confidant:
+            person = declar.confidant
+            pa = self.session.query(Addresses).filter_by(
+                Postal_Code=person.address.Postal_Code,
+                Region=person.address.Region,
+                District=person.address.District, City=person.address.City,
+                Urban_District=person.address.Urban_District,
+                Soviet_Village=person.address.Soviet_Village,
+                Locality=person.address.Locality,
+                Street=person.address.Street,
+                House=person.address.House, Housing=person.address.Housing,
+                Building=person.address.Building,
+                Apartment=person.address.Apartment,
+                Reference_point=person.address.Reference_point).first()
+            if not pa:
                 pa = Addresses(
                     Postal_Code=person.address.Postal_Code,
                     Region=person.address.Region,
@@ -291,8 +301,23 @@ class Db:
                     Apartment=person.address.Apartment,
                     Reference_point=person.address.Reference_point)
                 self.session.add(pa)
-                pfa = None
-                if person.fact_address:
+            pfa = None
+            if person.fact_address:
+                pfa = self.session.query(Addresses).filter_by(
+                    Postal_Code=person.fact_address.Postal_Code,
+                    Region=person.fact_address.Region,
+                    District=person.fact_address.District,
+                    City=person.fact_address.City,
+                    Urban_District=person.fact_address.Urban_District,
+                    Soviet_Village=person.fact_address.Soviet_Village,
+                    Locality=person.fact_address.Locality,
+                    Street=person.fact_address.Street,
+                    House=person.fact_address.House,
+                    Housing=person.fact_address.Housing,
+                    Building=person.fact_address.Building,
+                    Apartment=person.fact_address.Apartment,
+                    Reference_point=person.fact_address.Reference_point).first()
+                if not pfa:
                     pfa = Addresses(
                         Postal_Code=person.fact_address.Postal_Code,
                         Region=person.fact_address.Region,
@@ -308,24 +333,250 @@ class Db:
                         Apartment=person.fact_address.Apartment,
                         Reference_point=person.fact_address.Reference_point)
                     self.session.add(pfa)
-                p = Individuals(
+            p = Individuals(
+                surname=person.surname, first_name=person.first_name,
+                patronymic=person.patronymic, address=pa, fact_address=pfa,
+                birthdate=datetime.strptime(
+                    person.birthdate.strftime('%Y-%m-%d'), '%Y-%m-%d')
+                if person.birthdate else None,
+                passport_serial=person.passport_serial,
+                passport_number=person.passport_number,
+                passport_agency=person.passport_agency,
+                passport_date=datetime.strptime(
+                    person.passport_date.strftime('%Y-%m-%d'), '%Y-%m-%d')
+                if person.passport_date else None,
+                inn=person.inn, sex=person.sex, snils=person.snils, declar=d)
+            self.session.add(p)
+            for phone in person.phone:
+                pp = Phones(phone=phone, person=p)
+                self.session.add(pp)
+            for email in person.email:
+                pe = Emails(email=email, person=p)
+                self.session.add(pe)
+            cfd = p
+        d = Declars(
+            declar_number=declar.declar_number, service=declar.service,
+            register_date=datetime.strptime(
+                declar.register_date.strftime('%Y-%m-%d'), '%Y-%m-%d'),
+            end_date=datetime.strptime(
+                declar.end_date.strftime('%Y-%m-%d'), '%Y-%m-%d'),
+            object_address=a, uuid=uuid, reply_to=reply_to, confidant=cfd)
+        self.session.add(d)
+        for person in declar.person:
+            pa = self.session.query(Addresses).filter_by(
+                Postal_Code=person.address.Postal_Code,
+                Region=person.address.Region,
+                District=person.address.District, City=person.address.City,
+                Urban_District=person.address.Urban_District,
+                Soviet_Village=person.address.Soviet_Village,
+                Locality=person.address.Locality,
+                Street=person.address.Street,
+                House=person.address.House, Housing=person.address.Housing,
+                Building=person.address.Building,
+                Apartment=person.address.Apartment,
+                Reference_point=person.address.Reference_point).first()
+            if not pa:
+                pa = Addresses(
+                    Postal_Code=person.address.Postal_Code,
+                    Region=person.address.Region,
+                    District=person.address.District, City=person.address.City,
+                    Urban_District=person.address.Urban_District,
+                    Soviet_Village=person.address.Soviet_Village,
+                    Locality=person.address.Locality,
+                    Street=person.address.Street,
+                    House=person.address.House, Housing=person.address.Housing,
+                    Building=person.address.Building,
+                    Apartment=person.address.Apartment,
+                    Reference_point=person.address.Reference_point)
+                self.session.add(pa)
+            pfa = None
+            if person.fact_address:
+                pfa = self.session.query(Addresses).filter_by(
+                    Postal_Code=person.fact_address.Postal_Code,
+                    Region=person.fact_address.Region,
+                    District=person.fact_address.District,
+                    City=person.fact_address.City,
+                    Urban_District=person.fact_address.Urban_District,
+                    Soviet_Village=person.fact_address.Soviet_Village,
+                    Locality=person.fact_address.Locality,
+                    Street=person.fact_address.Street,
+                    House=person.fact_address.House,
+                    Housing=person.fact_address.Housing,
+                    Building=person.fact_address.Building,
+                    Apartment=person.fact_address.Apartment,
+                    Reference_point=person.fact_address.Reference_point).first()
+                if not pfa:
+                    pfa = Addresses(
+                        Postal_Code=person.fact_address.Postal_Code,
+                        Region=person.fact_address.Region,
+                        District=person.fact_address.District,
+                        City=person.fact_address.City,
+                        Urban_District=person.fact_address.Urban_District,
+                        Soviet_Village=person.fact_address.Soviet_Village,
+                        Locality=person.fact_address.Locality,
+                        Street=person.fact_address.Street,
+                        House=person.fact_address.House,
+                        Housing=person.fact_address.Housing,
+                        Building=person.fact_address.Building,
+                        Apartment=person.fact_address.Apartment,
+                        Reference_point=person.fact_address.Reference_point)
+                    self.session.add(pfa)
+            p = Individuals(
+                surname=person.surname, first_name=person.first_name,
+                patronymic=person.patronymic, address=pa, fact_address=pfa,
+                birthdate=datetime.strptime(
+                    person.birthdate.strftime('%Y-%m-%d'), '%Y-%m-%d')
+                if person.birthdate else None,
+                passport_serial=person.passport_serial,
+                passport_number=person.passport_number,
+                passport_agency=person.passport_agency,
+                passport_date=datetime.strptime(
+                    person.passport_date.strftime('%Y-%m-%d'), '%Y-%m-%d')
+                if person.passport_date else None,
+                inn=person.inn, sex=person.sex, snils=person.snils, declar=d)
+            self.session.add(p)
+            for phone in person.phone:
+                pp = Phones(phone=phone, person=p)
+                self.session.add(pp)
+            for email in person.email:
+                pe = Emails(email=email, person=p)
+                self.session.add(pe)
+        for legal_entity in declar.legal_entity:
+            a = self.session.query(Addresses).filter_by(
+                Postal_Code=legal_entity.address.Postal_Code,
+                Region=legal_entity.address.Region,
+                District=legal_entity.address.District,
+                City=legal_entity.address.City,
+                Urban_District=legal_entity.address.Urban_District,
+                Soviet_Village=legal_entity.address.Soviet_Village,
+                Locality=legal_entity.address.Locality,
+                Street=legal_entity.address.Street,
+                House=legal_entity.address.House,
+                Housing=legal_entity.address.Housing,
+                Building=legal_entity.address.Building,
+                Apartment=legal_entity.address.Apartment,
+                Reference_point=legal_entity.address.Reference_point).first()
+            if not a:
+                a = Addresses(
+                    Postal_Code=legal_entity.address.Postal_Code,
+                    Region=legal_entity.address.Region,
+                    District=legal_entity.address.District,
+                    City=legal_entity.address.City,
+                    Urban_District=legal_entity.address.Urban_District,
+                    Soviet_Village=legal_entity.address.Soviet_Village,
+                    Locality=legal_entity.address.Locality,
+                    Street=legal_entity.address.Street,
+                    House=legal_entity.address.House,
+                    Housing=legal_entity.address.Housing,
+                    Building=legal_entity.address.Building,
+                    Apartment=legal_entity.address.Apartment,
+                    Reference_point=legal_entity.address.Reference_point)
+                self.session.add(a)
+            p = None
+            if legal_entity.person:
+                person = legal_entity.person
+                pa = self.session.query(Addresses).filter_by(
+                    Postal_Code=person.address.Postal_Code,
+                    Region=person.address.Region,
+                    District=person.address.District, City=person.address.City,
+                    Urban_District=person.address.Urban_District,
+                    Soviet_Village=person.address.Soviet_Village,
+                    Locality=person.address.Locality,
+                    Street=person.address.Street,
+                    House=person.address.House, Housing=person.address.Housing,
+                    Building=person.address.Building,
+                    Apartment=person.address.Apartment,
+                    Reference_point=person.address.Reference_point).first()
+                if not pa:
+                    pa = Addresses(
+                        Postal_Code=person.address.Postal_Code,
+                        Region=person.address.Region,
+                        District=person.address.District,
+                        City=person.address.City,
+                        Urban_District=person.address.Urban_District,
+                        Soviet_Village=person.address.Soviet_Village,
+                        Locality=person.address.Locality,
+                        Street=person.address.Street,
+                        House=person.address.House,
+                        Housing=person.address.Housing,
+                        Building=person.address.Building,
+                        Apartment=person.address.Apartment,
+                        Reference_point=person.address.Reference_point)
+                    self.session.add(pa)
+                pfa = None
+                if person.fact_address:
+                    pfa = self.session.query(Addresses).filter_by(
+                        Postal_Code=person.fact_address.Postal_Code,
+                        Region=person.fact_address.Region,
+                        District=person.fact_address.District,
+                        City=person.fact_address.City,
+                        Urban_District=person.fact_address.Urban_District,
+                        Soviet_Village=person.fact_address.Soviet_Village,
+                        Locality=person.fact_address.Locality,
+                        Street=person.fact_address.Street,
+                        House=person.fact_address.House,
+                        Housing=person.fact_address.Housing,
+                        Building=person.fact_address.Building,
+                        Apartment=person.fact_address.Apartment,
+                        Reference_point=person.fact_address.Reference_point
+                    ).first()
+                    if not pfa:
+                        pfa = Addresses(
+                            Postal_Code=person.fact_address.Postal_Code,
+                            Region=person.fact_address.Region,
+                            District=person.fact_address.District,
+                            City=person.fact_address.City,
+                            Urban_District=person.fact_address.Urban_District,
+                            Soviet_Village=person.fact_address.Soviet_Village,
+                            Locality=person.fact_address.Locality,
+                            Street=person.fact_address.Street,
+                            House=person.fact_address.House,
+                            Housing=person.fact_address.Housing,
+                            Building=person.fact_address.Building,
+                            Apartment=person.fact_address.Apartment,
+                            Reference_point=person.fact_address.Reference_point)
+                        self.session.add(pfa)
+                p = self.session.query(Individuals).filter_by(
                     surname=person.surname, first_name=person.first_name,
                     patronymic=person.patronymic, address=pa, fact_address=pfa,
                     birthdate=datetime.strptime(
-                        person.birthdate.strftime('%Y-%m-%d'), '%Y-%m-%d'),
+                        person.birthdate.strftime('%Y-%m-%d'), '%Y-%m-%d')
+                    if person.birthdate else None,
                     passport_serial=person.passport_serial,
                     passport_number=person.passport_number,
                     passport_agency=person.passport_agency,
                     passport_date=datetime.strptime(
-                        person.passport_date.strftime('%Y-%m-%d'),
-                        '%Y-%m-%d'), inn=person.inn, sex=person.sex,
-                    snils=person.snils)
+                        person.passport_date.strftime('%Y-%m-%d'), '%Y-%m-%d')
+                    if person.passport_date else None,
+                    inn=person.inn, sex=person.sex, snils=person.snils).first()
+                if not p:
+                    p = Individuals(
+                        surname=person.surname, first_name=person.first_name,
+                        patronymic=person.patronymic, address=pa,
+                        fact_address=pfa,
+                        birthdate=datetime.strptime(
+                            person.birthdate.strftime('%Y-%m-%d'), '%Y-%m-%d')
+                        if person.birthdate else None,
+                        passport_serial=person.passport_serial,
+                        passport_number=person.passport_number,
+                        passport_agency=person.passport_agency,
+                        passport_date=datetime.strptime(
+                            person.passport_date.strftime('%Y-%m-%d'),
+                            '%Y-%m-%d') if person.passport_date else None,
+                        inn=person.inn, sex=person.sex, snils=person.snils)
+                    self.session.add(p)
                 for phone in person.phone:
-                    pp = Phones(phone=phone, person=p)
-                    self.session.add(pp)
+                    pp = self.session.query(Phones).filter_by(
+                        phone=phone, person=p).first()
+                    if not pp:
+                        pp = Phones(phone=phone, person=p)
+                        self.session.add(pp)
                 for email in person.email:
-                    pe = Emails(email=email, person=p)
-                    self.session.add(pe)
+                    pe = self.session.query(Emails).filter_by(
+                        email=email, person=p).first()
+                    if not pe:
+                        pe = Emails(email=email, person=p)
+                        self.session.add(pe)
             l = LegalEntity(
                 name=legal_entity.name, full_name=legal_entity.full_name,
                 inn=legal_entity.inn, kpp=legal_entity.kpp,
@@ -333,14 +584,15 @@ class Db:
                 taxRegDoc=legal_entity.taxRegDoc,
                 govRegDoc=legal_entity.govRegDoc,
                 govRegDate=datetime.strptime(
-                    legal_entity.govRegDate.strftime('%Y-%m-%d'),
-                    '%Y-%m-%d'), bossFio=legal_entity.bossFio,
-                buhFio=legal_entity.buhFio, bank=legal_entity.bank,
-                bankAccount=legal_entity.bankAccount,
+                    legal_entity.govRegDate.strftime('%Y-%m-%d'), '%Y-%m-%d')
+                if legal_entity.govRegDate else None,
+                bossFio=legal_entity.bossFio, buhFio=legal_entity.buhFio,
+                bank=legal_entity.bank, bankAccount=legal_entity.bankAccount,
                 lastCtrlDate=datetime.strptime(
-                    legal_entity.lastCtrlDate.strftime('%Y-%m-%d'),
-                    '%Y-%m-%d'), opf=legal_entity.opf,
-                govRegOgv=legal_entity.govRegOgv, person=p, declar=d)
+                    legal_entity.lastCtrlDate.strftime('%Y-%m-%d'), '%Y-%m-%d')
+                if legal_entity.lastCtrlDate else None,
+                opf=legal_entity.opf, govRegOgv=legal_entity.govRegOgv,
+                person=p, declar=d)
             self.session.add(l)
             for phone in legal_entity.phone:
                 ep = Phones(phone=phone, entity=l)
@@ -351,15 +603,28 @@ class Db:
         docs = []
         for adoc in declar.AppliedDocument:
             from mimetypes import guess_type
+            fn, ext = path.splitext(adoc.file_name)
             found = files.get(adoc.file_name)
             if not found:
                 found = files.get(adoc.file_name.lower())
-            mime_type = guess_type(found)[0]
+            if not found:
+                found = files.get(adoc.file_name.upper())
+            if not found:
+                found = files.get(fn + ext.lower())
+            if not found:
+                found = files.get(fn + ext.upper())
+            fn, ext1 = path.splitext(found)
+            mime_type = guess_type(found + ext if not ext1 else '')[0]
             doc_data = None
             file_path = None
-            from os import path
             if path.getsize(found) > 1000000 - 2048:
-                maxid = self.session.query(func.max(Documents.id)).first() + 1
+                maxid = self.session.query(func.max(Documents.id)).first()
+                if not maxid or not maxid[0]:
+                    maxid = 1
+                elif isinstance(maxid, (tuple, list)):
+                    maxid = maxid[0] + 1
+                else:
+                    maxid += 1
                 from os import makedirs
                 if not path.exists('storage'):
                     makedirs('storage')
@@ -389,6 +654,7 @@ class Db:
                             declar=d)
             self.session.add(doc)
             docs.append(doc)
+            remove(found)
         for param in declar.Param:
             p = Params(type=param.attr('type'), param_id=param.attr('id'),
                        label=param.attr('label'),
