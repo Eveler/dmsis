@@ -369,7 +369,6 @@ class IntegrationServices:
                             (doc.title, doc.date.strftime('%d.%m.%Y'))
                 res = self.search('ТКД_ПРОЧИЕ', s_str, tp=self.DOC)
                 if not len(res):
-                    from os import path
                     if doc_getter:
                         doc_data = doc_getter(doc.url, doc.file_name)
                     elif hasattr(doc, 'file') and doc.file:
@@ -674,7 +673,6 @@ class IntegrationServices:
                         found = file_path
                 if not found:
                     found, file_name = declar.files[i]
-                from os import path
                 fn, ext = path.splitext(doc.file_name)
                 with open(found, 'rb') as f:
                     doc_data = (f.read(), ext[1:] if ext else 'txt')
