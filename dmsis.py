@@ -21,6 +21,8 @@ from twisted.python import log
 
 class Integration:
     def __init__(self, use_config=True, config_path='./dmsis.ini'):
+        self.__smev = None
+        self.__directum = None
         logging.basicConfig(
             format='%(asctime)s %(name)s:%(module)s(%(lineno)d): '
                    '%(levelname)s: %(message)s', level=logging.INFO)

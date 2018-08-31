@@ -152,12 +152,13 @@ class IntegrationServices:
         section.appendChild(requisite)
 
         # "Отчество"
-        requisite = xml_package.createElement("Requisite")
-        requisite.setAttribute("Name", u"Дополнение3")
-        requisite.setAttribute("Type", "String")
-        text = xml_package.createTextNode(human.patronymic)
-        requisite.appendChild(text)
-        section.appendChild(requisite)
+        if human.patronymic:
+            requisite = xml_package.createElement("Requisite")
+            requisite.setAttribute("Name", u"Дополнение3")
+            requisite.setAttribute("Type", "String")
+            text = xml_package.createTextNode(human.patronymic)
+            requisite.appendChild(text)
+            section.appendChild(requisite)
 
         # "Адрес проживания"
         if human.fact_address:
@@ -229,7 +230,7 @@ class IntegrationServices:
         if res[0]:
             raise Exception(str(res))
         self.log.info('Добавлен заявитель ФЛ: %s, регистрация: %s' %
-                      (name, str(human.fact_address)))
+                      (name, str(human.address)))
         return res
 
     def add_legal_entity(self, entity):
@@ -432,24 +433,42 @@ class IntegrationServices:
             section7.setAttribute('Index', '7')
             number = 1
             for person in declar.person:
-                res = self.search('ПРС', "Дополнение='%s' and Дополнение2='%s' "
-                                         "and Дополнение3='%s' "
-                                         "and Расписание='%s'"
-                                         " and Состояние='Действующая'" %
-                                  (person.surname, person.first_name,
-                                   person.patronymic, str(person.address)))
+                if person.patronymic:
+                    res = self.search('ПРС', "Дополнение='%s' "
+                                             "and Дополнение2='%s' "
+                                             "and Дополнение3='%s' "
+                                             "and Расписание='%s' "
+                                             "and Состояние='Действующая'" %
+                                      (person.surname, person.first_name,
+                                       person.patronymic, str(person.address)))
+                else:
+                    res = self.search('ПРС', "Дополнение='%s' "
+                                             "and Дополнение2='%s' "
+                                             "and Расписание='%s' "
+                                             "and Состояние='Действующая'" %
+                                      (person.surname, person.first_name,
+                                       str(person.address)))
                 self.log.debug('res = %s' % res)
                 if res:
                     person_id = res[0].get('ИД')
                 else:
                     self.add_individual(person)
-                    res = self.search('ПРС',
-                                      "Дополнение='%s' and Дополнение2='%s' "
-                                      "and Дополнение3='%s' "
-                                      "and Расписание='%s'"
-                                      " and Состояние='Действующая'" %
-                                      (person.surname, person.first_name,
-                                       person.patronymic, str(person.address)))
+                    if person.patronymic:
+                        res = self.search('ПРС', "Дополнение='%s' "
+                                                 "and Дополнение2='%s' "
+                                                 "and Дополнение3='%s' "
+                                                 "and Расписание='%s' "
+                                                 "and Состояние='Действующая'" %
+                                          (person.surname, person.first_name,
+                                           person.patronymic,
+                                           str(person.address)))
+                    else:
+                        res = self.search('ПРС', "Дополнение='%s' "
+                                                 "and Дополнение2='%s' "
+                                                 "and Расписание='%s' "
+                                                 "and Состояние='Действующая'" %
+                                          (person.surname, person.first_name,
+                                           str(person.address)))
                     person_id = res[0].get('ИД')
                     self.log.info('ИД персоны = %s' % person_id)
                 # "Заявитель ФЛ"
