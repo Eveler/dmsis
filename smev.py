@@ -29,7 +29,7 @@ class Adapter:
                  wsdl="http://smev3-d.test.gosuslugi.ru:7500/smev/v1.2/ws?wsdl",
                  ftp_addr="ftp://smev3-d.test.gosuslugi.ru/",
                  history=False, method='sharp', serial=None, container=None,
-                 crt_name=None):
+                 crt_name=None, strict=True):
         self.log = logging.getLogger('smev.adapter')
         self.log.setLevel(logging.root.level)
         self.ftp_addr = ftp_addr
@@ -41,9 +41,9 @@ class Adapter:
 
         if history:
             self.history = HistoryPlugin()
-            self.proxy = Client(wsdl, plugins=[self.history])
+            self.proxy = Client(wsdl, plugins=[self.history], strict=strict)
         else:
-            self.proxy = Client(wsdl)
+            self.proxy = Client(wsdl, strict=strict)
 
     def dump(self):
         res = "Prefixes:\n"
@@ -627,7 +627,7 @@ if __name__ == '__main__':
 
     a = Adapter(serial='008E BDC8 291F 0003 81E7 11E1 AF7A 5ED3 27',
                 container='smev_ep-ov',
-                wsdl="http://smev3-n0.test.gosuslugi.ru:7500/smev/v1.2/ws?wsdl",
+                wsdl="http://172.20.3.12:7500/smev/v1.2/ws?wsdl",
                 ftp_addr="ftp://smev3-n0.test.gosuslugi.ru/",
                 crt_name='Администрация Уссурийского городского округа')
 
@@ -659,7 +659,9 @@ if __name__ == '__main__':
     #     except Exception as e:
     #         logging.error(str(e), exc_info=True)
 
-    from datetime import timedelta, timezone
+    # from datetime import timedelta, timezone
+    #
+    # a.get_status(datetime(2018, 5, 19, 11, 25, 28,
+    #                       tzinfo=timezone(timedelta(hours=3))))
 
-    a.get_status(datetime(2018, 5, 19, 11, 25, 28,
-                          tzinfo=timezone(timedelta(hours=3))))
+    a.send_respose('eyJzaWQiOjM0OTEzLCJtaWQiOiJlMWY5ZWZmOC04OGUyLTExZTgtODA5Yy05OGU3ZjQ1MzE0ZWEiLCJ0Y2QiOiJiMzYxMTM5Ny04OGUyLTExZTgtOWJlZS0wMDUwNTY4OTIyMjd8MTExMTExMTExMTExMTExMTExMTF8ZndLZlFQTWc1V3R1T1ZwMmpPUG41dHlGYk1ma0g4YzdhVnh0YkExN3lNUXlpSVZXbUpuWTYzdm1VelM2TGI2ZjVLNjdwMzZ2YlRWeHAzZitVeTVIMUVaajdQVHYyZnY2a3QrNWxYUmpZK1lWeSt0UmFSUjJ4SjdlYUJXci9WRm5Mei9TZ21tRUdiOEhTMGxTTnVUWkU4cjQrcnBTREVKYWtEeklDaUhGbmloZzkydW5vcUxheXF6aEtXdmVqc0xOS3JzRkNCMCsvaDl1RWxjRk9BMXphSTFxeWpvZTR0L3VNa2pqV09iQjQvK1A5YWluMk8zd1k5dTA3UmlyOUZJaHE3c293TXYrL0FvU0FIWk9ZNHc3dTZ3M2d1VlJJVzhUZUpRRlV4SzBOMnh1Ry9SVEh0Smc0SytTWE1nbGU5SERtbWI2THlaTTMvazBrUHdaOG9hTk9RPT0iLCJyaWQiOiJkMGFjYmY2Yy0xNDMzLTExZTUtOWFkZi00YWIyM2QwN2NlMzkiLCJlb2wiOjAsInNsYyI6ImF1Z29fc21ldl91c2x1Z2lfMS4wLjBfZGVjbGFyIiwibW5tIjoidGVzdHJvaXYwOCJ9', '23156/564/5611Д', datetime(2008, 9, 29), text='Услуга предоставлена')

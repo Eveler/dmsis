@@ -320,6 +320,7 @@ class Integration:
             loglevel = cfg.get("main", "loglevel").upper()
             logging.info("Set logging level to '%s'", loglevel)
             logging.root.setLevel(loglevel)
+            logging.getLogger('urllib3.connectionpool').setLevel(logging.ERROR)
             if 'mail_addr' not in cfg.options('main'):
                 do_write = True
                 cfg.set('main', 'mail_addr', 'ioib@adm-ussuriisk.ru')
