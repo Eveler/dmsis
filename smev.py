@@ -31,7 +31,7 @@ class Adapter:
                  wsdl="http://smev3-d.test.gosuslugi.ru:7500/smev/v1.2/ws?wsdl",
                  ftp_addr="ftp://smev3-d.test.gosuslugi.ru/",
                  history=False, method='sharp', serial=None, container=None,
-                 crt_name=None):
+                 crt_name=None, strict=True):
         self.log = logging.getLogger('smev.adapter')
         self.log.setLevel(logging.root.level)
         self.ftp_addr = ftp_addr
@@ -43,9 +43,9 @@ class Adapter:
 
         if history:
             self.history = HistoryPlugin()
-            self.proxy = Client(wsdl, plugins=[self.history])
+            self.proxy = Client(wsdl, plugins=[self.history], strict=strict)
         else:
-            self.proxy = Client(wsdl)
+            self.proxy = Client(wsdl, strict=strict)
 
     def dump(self):
         res = "Prefixes:\n"
