@@ -21,6 +21,8 @@ from twisted.python import log
 
 class Integration:
     def __init__(self, use_config=True, config_path='./dmsis.ini'):
+        self.__smev = None
+        self.__directum = None
         logging.basicConfig(
             format='%(asctime)s %(name)s:%(module)s(%(lineno)d): '
                    '%(levelname)s: %(message)s', level=logging.INFO)
@@ -318,14 +320,16 @@ class Integration:
             loglevel = cfg.get("main", "loglevel").upper()
             logging.info("Set logging level to '%s'", loglevel)
             logging.root.setLevel(loglevel)
+            logging.getLogger('urllib3.connectionpool').setLevel(logging.ERROR)
             if 'mail_addr' not in cfg.options('main'):
                 do_write = True
                 cfg.set('main', 'mail_addr', 'ioib@adm-ussuriisk.ru')
             self.mail_addr = cfg.get('main', 'mail_addr')
-            if 'mail_server' not in cfg.options('main'):
-                do_write = True
-                cfg.set('main', 'mail_server', '192.168.1.6')
-            self.mail_server = cfg.get('main', 'mail_server')
+            # if 'mail_server' not in cfg.options('main'):
+            #     do_write = True
+            #     cfg.set('main', 'mail_server', '192.168.1.6')
+            if 'mail_server' in cfg.options('main'):
+                self.mail_server = cfg.get('main', 'mail_server')
 
             if not cfg.has_section("smev"):
                 do_write = True

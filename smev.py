@@ -9,12 +9,14 @@ import tempfile
 from datetime import datetime, date
 from logging.handlers import TimedRotatingFileHandler
 from mimetypes import guess_type, guess_extension
-from os import close, write, path
+from os import close, write, path, remove
 from os.path import basename
 from urllib.parse import urlparse
 from uuid import uuid1
 
 # from datetime import date
+from zipfile import ZipFile, ZIP_DEFLATED
+
 import six
 from declar import Declar
 from lxml import etree, objectify
@@ -140,6 +142,7 @@ class Adapter:
                     self.__xml_part(res, b'RefAttachmentHeaderList'))
                 for head in attach_head_list.getchildren():
                     files[head.uuid] = {'MimeType': head.MimeType}
+                    files[head.uuid]['SignaturePKCS7'] = head.SignaturePKCS7
                 attach_list = objectify.fromstring(
                     self.__xml_part(res, b'FSAttachmentsList'))
                 for attach in attach_list.getchildren():
@@ -160,6 +163,9 @@ class Adapter:
                     else:
                         res, e = res
                         file_name = fn + '.txt'
+                    sig = file.get('SignaturePKCS7')
+                    if sig:
+                        res = self.__make_zip(file_name, res, sig)
                     declar.files.append({res: file_name})
 
             uuid = xml.find('.//{*}MessageID').text
@@ -187,6 +193,9 @@ class Adapter:
                     RefAttachmentHeaderList.RefAttachmentHeader
                 for head in attach_head_list:
                     attach_files[head.uuid] = {'MimeType': head.MimeType}
+                    if hasattr(head, 'SignaturePKCS7') and head.SignaturePKCS7:
+                        attach_files[head.uuid]['SignaturePKCS7'] = \
+                            head.SignaturePKCS7
                 attach_list = res.Request.FSAttachmentsList.FSAttachment
                 for attach in attach_list:
                     attach_files[attach.uuid]['UserName'] = str(attach.UserName)
@@ -201,16 +210,45 @@ class Adapter:
                                            file['UserName'],
                                            file['Password'])
                     if isinstance(rs, (str, bytes)):
-                        new_ext = guess_extension(file_name)
+                        new_ext = guess_extension(file['MimeType'])
                         ext = ext.lower()
-                        if new_ext and ext != new_ext.lower():
+                        if new_ext and not ext:
                             file_name = fn + new_ext.lower()
                         else:
                             file_name = fn + ext
                     else:
                         rs, e = rs
-                        file_name = fn + '.txt'
+                        new_ext = guess_extension(file['MimeType'])
+                        file_name = fn + new_ext if new_ext else '.txt'
+                    sig = file.get('SignaturePKCS7')
+                    if sig:
+                        rs = self.__make_zip(file_name, rs, sig)
                     files[file_name] = rs
+            if hasattr(res, 'AttachmentContentList') \
+                    and res.AttachmentContentList:
+                attach_files = {}
+                attach_head_list = res.Request.SenderProvidedRequestData. \
+                    AttachmentHeaderList.AttachmentHeader
+                for head in attach_head_list:
+                    attach_files[head.contentId] = {'MimeType': head.MimeType}
+                    if hasattr(head, 'SignaturePKCS7') and head.SignaturePKCS7:
+                        attach_files[head.contentId]['SignaturePKCS7'] = \
+                            head.SignaturePKCS7
+                attach_list = res.AttachmentContentList.AttachmentContent
+                i = 1
+                for attach in attach_list:
+                    mime_type = attach_files[attach.Id]['MimeType']
+                    file_name = str('file' + str(i))
+                    i += 1
+                    ext = guess_extension(mime_type)
+                    file_name = file_name + ext if ext else '.txt'
+                    f, fn = tempfile.mkstemp()
+                    write(f, attach.Content)
+                    close(f)
+                    sig = attach_files[attach.Id].get('SignaturePKCS7')
+                    if sig:
+                        fn = self.__make_zip(file_name, fn, sig)
+                    files[file_name] = fn
 
             uuid = res.Request.SenderProvidedRequestData.MessageID
             reply_to = res.Request.ReplyTo
@@ -531,6 +569,19 @@ class Adapter:
             self.log.debug(res)
         return uuid
 
+    def __make_zip(self, file_name, file_path, sig):
+        f, f_p = tempfile.mkstemp()
+        close(f)
+        zip = ZipFile(f_p, mode='w', compression=ZIP_DEFLATED)
+        if file_name[0] == '/':
+            file_name = file_name[1:]
+        # fn = file_name.encode('utf8').decode('cp866')
+        zip.write(file_path, file_name)
+        zip.writestr(file_name + '.sig', sig)
+        zip.close()
+        remove(file_path)
+        return f_p
+
     def __load_file(self, uuid, file_name, user='anonymous',
                     passwd='anonymous'):
         addr = urlparse(self.ftp_addr).netloc
@@ -540,6 +591,7 @@ class Adapter:
             do_loop = False
             try:
                 with ftplib.FTP(addr, user, passwd) as con:
+                    con.encoding = 'utf-8'
                     con.cwd(uuid)
                     if file_name[0] == '/':
                         file_name = file_name[1:]
@@ -627,7 +679,7 @@ if __name__ == '__main__':
 
     a = Adapter(serial='008E BDC8 291F 0003 81E7 11E1 AF7A 5ED3 27',
                 container='smev_ep-ov',
-                wsdl="http://smev3-n0.test.gosuslugi.ru:7500/smev/v1.2/ws?wsdl",
+                wsdl="http://172.20.3.12:7500/smev/v1.2/ws?wsdl",
                 ftp_addr="ftp://smev3-n0.test.gosuslugi.ru/",
                 crt_name='Администрация Уссурийского городского округа')
 
@@ -659,7 +711,9 @@ if __name__ == '__main__':
     #     except Exception as e:
     #         logging.error(str(e), exc_info=True)
 
-    from datetime import timedelta, timezone
+    # from datetime import timedelta, timezone
+    #
+    # a.get_status(datetime(2018, 5, 19, 11, 25, 28,
+    #                       tzinfo=timezone(timedelta(hours=3))))
 
-    a.get_status(datetime(2018, 5, 19, 11, 25, 28,
-                          tzinfo=timezone(timedelta(hours=3))))
+    a.send_respose('eyJzaWQiOjM0OTEzLCJtaWQiOiJlMWY5ZWZmOC04OGUyLTExZTgtODA5Yy05OGU3ZjQ1MzE0ZWEiLCJ0Y2QiOiJiMzYxMTM5Ny04OGUyLTExZTgtOWJlZS0wMDUwNTY4OTIyMjd8MTExMTExMTExMTExMTExMTExMTF8ZndLZlFQTWc1V3R1T1ZwMmpPUG41dHlGYk1ma0g4YzdhVnh0YkExN3lNUXlpSVZXbUpuWTYzdm1VelM2TGI2ZjVLNjdwMzZ2YlRWeHAzZitVeTVIMUVaajdQVHYyZnY2a3QrNWxYUmpZK1lWeSt0UmFSUjJ4SjdlYUJXci9WRm5Mei9TZ21tRUdiOEhTMGxTTnVUWkU4cjQrcnBTREVKYWtEeklDaUhGbmloZzkydW5vcUxheXF6aEtXdmVqc0xOS3JzRkNCMCsvaDl1RWxjRk9BMXphSTFxeWpvZTR0L3VNa2pqV09iQjQvK1A5YWluMk8zd1k5dTA3UmlyOUZJaHE3c293TXYrL0FvU0FIWk9ZNHc3dTZ3M2d1VlJJVzhUZUpRRlV4SzBOMnh1Ry9SVEh0Smc0SytTWE1nbGU5SERtbWI2THlaTTMvazBrUHdaOG9hTk9RPT0iLCJyaWQiOiJkMGFjYmY2Yy0xNDMzLTExZTUtOWFkZi00YWIyM2QwN2NlMzkiLCJlb2wiOjAsInNsYyI6ImF1Z29fc21ldl91c2x1Z2lfMS4wLjBfZGVjbGFyIiwibW5tIjoidGVzdHJvaXYwOCJ9', '23156/564/5611Д', datetime(2008, 9, 29), text='Услуга предоставлена')
