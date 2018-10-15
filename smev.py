@@ -31,7 +31,7 @@ class Adapter:
                  wsdl="http://smev3-d.test.gosuslugi.ru:7500/smev/v1.2/ws?wsdl",
                  ftp_addr="ftp://smev3-d.test.gosuslugi.ru/",
                  history=False, method='sharp', serial=None, container=None,
-                 crt_name=None, strict=True):
+                 crt_name=None):
         self.log = logging.getLogger('smev.adapter')
         self.log.setLevel(logging.root.level)
         self.ftp_addr = ftp_addr
@@ -43,9 +43,9 @@ class Adapter:
 
         if history:
             self.history = HistoryPlugin()
-            self.proxy = Client(wsdl, plugins=[self.history], strict=strict)
+            self.proxy = Client(wsdl, plugins=[self.history])
         else:
-            self.proxy = Client(wsdl, strict=strict)
+            self.proxy = Client(wsdl)
 
     def dump(self):
         res = "Prefixes:\n"
@@ -441,7 +441,7 @@ class Adapter:
 
     def send_respose(self, reply_to, declar_number, register_date,
                      result='FINAL', text='', applied_documents=list(),
-                     ftp_user='', ftp_pass=''):
+                     ftp_user='anonymous', ftp_pass='anonymous'):
         files = []
         for doc in applied_documents:
             if isinstance(doc, (bytes, str)):
@@ -522,13 +522,15 @@ class Adapter:
         if files:
             ns = etree.QName(node.find('.//{*}MessagePrimaryContent')).namespace
             rahl = etree.SubElement(res, '{%s}RefAttachmentHeaderList' % ns)
-            for uuid, file in files:
+            for item in files:
+                uuid, file = item.popitem()
                 rah = etree.SubElement(rahl, '{%s}RefAttachmentHeader' % ns)
                 etree.SubElement(rah, '{%s}uuid' % ns).text = uuid
                 etree.SubElement(
                     rah, '{%s}Hash' % ns).text = self.crypto.get_file_hash(
                     file['full_name'])
-                etree.SubElement(rah, '{%s}MimeType' % ns).text = file['type']
+                etree.SubElement(rah, '{%s}MimeType' % ns).text = \
+                    file['type'] if file['type'] else guess_type(file['name'])[0]
                 # etree.SubElement(
                 #     rah,
                 #     '{%s}SignaturePKCS7' % ns).text = self.crypto.get_file_sign(
@@ -560,6 +562,7 @@ class Adapter:
         self.log.debug(file_name)
         addr = urlparse(self.ftp_addr).netloc
         with ftplib.FTP(addr, ftp_user, ftp_pass) as con:
+            con.encoding = 'utf-8'
             uuid = str(uuid1())
             res = con.mkd(uuid)
             self.log.debug(res)
@@ -662,10 +665,10 @@ class Adapter:
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG,
                         format='%(asctime)s %(levelname)s:%(module)s:%(name)s:%(lineno)d: %(message)s')
-    logging.root.handlers[0].setLevel(logging.DEBUG)
-    logging.getLogger('zeep.xsd').setLevel(logging.INFO)
-    logging.getLogger('zeep.wsdl').setLevel(logging.INFO)
-    logging.getLogger('urllib3').setLevel(logging.INFO)
+    # logging.root.handlers[0].setLevel(logging.DEBUG)
+    # logging.getLogger('zeep.xsd').setLevel(logging.INFO)
+    # logging.getLogger('zeep.wsdl').setLevel(logging.INFO)
+    # logging.getLogger('urllib3').setLevel(logging.INFO)
 
     if len(sys.argv) < 2:
         handler = TimedRotatingFileHandler(
@@ -677,43 +680,47 @@ if __name__ == '__main__':
         logging.root.addHandler(handler)
         handler.setLevel(logging.DEBUG)
 
-    a = Adapter(serial='008E BDC8 291F 0003 81E7 11E1 AF7A 5ED3 27',
-                container='smev_ep-ov',
+    a = Adapter(serial='028E BDC8 291F 0020 81E8 1169 B503 61CC B6',
+                container='ep_ov2018',
                 wsdl="http://172.20.3.12:7500/smev/v1.2/ws?wsdl",
-                ftp_addr="ftp://smev3-n0.test.gosuslugi.ru/",
+                ftp_addr="ftp://172.20.3.12/",
                 crt_name='Администрация Уссурийского городского округа')
 
-    # if len(sys.argv) > 1 and sys.argv[1].lower() == 'test2':
-    #     with open('tests/test2.xml', 'w') as f:
-    #         f.write(a.get_request('urn://augo/smev/uslugi/1.0.0', 'directum',
-    #                               gen_xml_only=True))
-    # else:
-    #     try:
-    #         res = a.send_respose(
-    #             reply_to='eyJzaWQiOjMyNzg1LCJtaWQiOiIwOTlmNjlkMy1lYmE2LTExZTctYTIyZS1hNDVkMzZjNzcwNmYiLCJ0Y2QiOiJmMDIxM2E4My1lYmE1LTExZTctOTc4NC1mYTE2M2UxMDA3Yjl8MTExMTExMTExMTExMTExMTExMTF8VjhoUXFvLzlYMVBDckJkV010RHQ2UlUyNGdQdEdZQzlPTjlEM2d4TWQzZGdWK1ErUFo3L2o3SUJKMG5WY1BBNnZ5T1ZrczRuNHl5ZWhEQytFclYydkRSYXBVKzJMcWJtNmNHQlVGR0lRbyt2Kzl3TnpnMVlFOFI5Tnh6MmNxWmlFTzN3TUNYQlplbXNJaUVUajlNNm5JKzVaOHU4VXNnTFpyb1NoMkN1WlR3L244MS9wYU00cFMxcXlXaWE3TWRYUUJLN1gwcUpwcG80VGl0cnJOcFFqR3phUXNPUFFDSThIT3Vnc2o1QmRSNUUveTdIM1ZwZUlhQ1ZjTG5LeEtQbm5hQllyandGYzRrQUZVcW1zM3JTWjdaWitXeWNCQlpZOTZOS0hpbE10eVNYQW9PeE1Qa1dsQXA1b1hScDhhQXNoRzNIQitOV0lsVm9CRFpiaW1MTnZBPT0iLCJyaWQiOiJkMGFjYmY2Yy0xNDMzLTExZTUtOWFkZi00YWIyM2QwN2NlMzkiLCJlb2wiOjAsInNsYyI6ImF1Z29fc21ldl91c2x1Z2lfMS4wLjBfZGVjbGFyIiwibW5tIjoibXRfdGVzdCJ9',
-    #             declar_number='23156/564/5611Д',
-    #             register_date='2008-09-29',
-    #             text='В услуге отказано по причине отсутствия документов удостоверяющих личность и заявления')
-    #         logging.debug(res)
-    #         res = a.get_request(
-    #             # node_id='099f69d3-eba6-11e7-a22e-a45d36c7706f',
-    #             uri='urn://augo/smev/uslugi/1.0.0',
-    #             local_name='declar')
-    #         logging.debug(res)
-    #         if res:
-    #             try:
-    #                 with open('declar.json', 'w') as j:
-    #                     json.dump(res, j)
-    #             except (ValueError, IOError, TypeError) as e:
-    #                 logging.error(str(e))
-    #                 with open('declar.bin', 'wb') as b:
-    #                     b.write(res)
-    #     except Exception as e:
-    #         logging.error(str(e), exc_info=True)
+    try:
+        # a.send_ack('5bf287aa-c87c-11e8-9897-005056a21514')
+        # a.send_respose(
+        #     'eyJzaWQiOjM0NzQ2LCJtaWQiOiI1YmYyODdhYS1jODdjLTExZTgtOTg5Ny0wMDUwNTZhMjE1MTQiLCJlb2wiOjAsInNsYyI6ImF1Z29fc21ldl91c2x1Z2lfMS4wLjBfZGVjbGFyIiwibW5tIjoiMjUwMjAxIn0=',
+        #     '00/2018/14282', datetime(2018, 10, 5), text='Услуга предоставлена')
 
-    # from datetime import timedelta, timezone
-    #
-    # a.get_status(datetime(2018, 5, 19, 11, 25, 28,
-    #                       tzinfo=timezone(timedelta(hours=3))))
+        class Ad:
+            title = 'письмо исх.'
+            number = ''
+            date = datetime.now().strftime('%Y-%m-%d')
+            valid_until = None
+            url = ''
+            url_valid_until = ''
 
-    a.send_respose('eyJzaWQiOjM0OTEzLCJtaWQiOiJlMWY5ZWZmOC04OGUyLTExZTgtODA5Yy05OGU3ZjQ1MzE0ZWEiLCJ0Y2QiOiJiMzYxMTM5Ny04OGUyLTExZTgtOWJlZS0wMDUwNTY4OTIyMjd8MTExMTExMTExMTExMTExMTExMTF8ZndLZlFQTWc1V3R1T1ZwMmpPUG41dHlGYk1ma0g4YzdhVnh0YkExN3lNUXlpSVZXbUpuWTYzdm1VelM2TGI2ZjVLNjdwMzZ2YlRWeHAzZitVeTVIMUVaajdQVHYyZnY2a3QrNWxYUmpZK1lWeSt0UmFSUjJ4SjdlYUJXci9WRm5Mei9TZ21tRUdiOEhTMGxTTnVUWkU4cjQrcnBTREVKYWtEeklDaUhGbmloZzkydW5vcUxheXF6aEtXdmVqc0xOS3JzRkNCMCsvaDl1RWxjRk9BMXphSTFxeWpvZTR0L3VNa2pqV09iQjQvK1A5YWluMk8zd1k5dTA3UmlyOUZJaHE3c293TXYrL0FvU0FIWk9ZNHc3dTZ3M2d1VlJJVzhUZUpRRlV4SzBOMnh1Ry9SVEh0Smc0SytTWE1nbGU5SERtbWI2THlaTTMvazBrUHdaOG9hTk9RPT0iLCJyaWQiOiJkMGFjYmY2Yy0xNDMzLTExZTUtOWFkZi00YWIyM2QwN2NlMzkiLCJlb2wiOjAsInNsYyI6ImF1Z29fc21ldl91c2x1Z2lfMS4wLjBfZGVjbGFyIiwibW5tIjoidGVzdHJvaXYwOCJ9', '23156/564/5611Д', datetime(2008, 9, 29), text='Услуга предоставлена')
+        # a.send_ack('8ea257e8-c7a0-11e8-a9b5-005056a21514')
+        ad = Ad()
+        ad.file = 'C:/Users/Администратор/AppData/Local/Temp/1/tmp_zo7d1dm'
+        ad.file_name = 'Список запросов 23-09-2018.zip'
+        a.send_respose(
+            'eyJzaWQiOjM0NzQ2LCJtaWQiOiI4ZWEyNTdlOC1jN2EwLTExZTgtYTliNS0wMDUwNTZhMjE1MTQiLCJlb2wiOjAsInNsYyI6ImF1Z29fc21ldl91c2x1Z2lfMS4wLjBfZGVjbGFyIiwibW5tIjoiMjUwMjAxIn0=',
+            '00/2018/14255', datetime(2018, 10, 4), text='Услуга предоставлена',
+            applied_documents=[ad])
+
+        # a.send_ack('f005381a-cb89-11e8-98d3-005056a21514')
+        ad = Ad()
+        ad.file = 'C:/Users/Администратор/AppData/Local/Temp/1/tmpn1x_t5l2'
+        ad.file_name = 'заявление ТЕПЛО.pdf'
+        a.send_respose(
+            'eyJzaWQiOjM0NzQ2LCJtaWQiOiJmMDA1MzgxYS1jYjg5LTExZTgtOThkMy0wMDUwNTZhMjE1MTQiLCJlb2wiOjAsInNsYyI6ImF1Z29fc21ldl91c2x1Z2lfMS4wLjBfZGVjbGFyIiwibW5tIjoiMjUwMjAxIn0=',
+            '00/2018/14339', datetime(2018, 10, 9), text='Услуга предоставлена',
+            applied_documents=[ad])
+
+        # a.send_ack('ad19ec3c-cb91-11e8-82eb-005056a21514')
+        a.send_respose(
+            'eyJzaWQiOjM0NzQ2LCJtaWQiOiJhZDE5ZWMzYy1jYjkxLTExZTgtODJlYi0wMDUwNTZhMjE1MTQiLCJlb2wiOjAsInNsYyI6ImF1Z29fc21ldl91c2x1Z2lfMS4wLjBfZGVjbGFyIiwibW5tIjoiMjUwMjAxIn0=',
+            '00/2018/14342', datetime(2018, 10, 9), text='Услуга предоставлена')
+    except Exception as e:
+        logging.error(str(e), exc_info=True)
