@@ -483,32 +483,27 @@ class Adapter:
                 ad = etree.SubElement(
                     rr, '{urn://augo/smev/uslugi/1.0.0}AppliedDocument')
                 etree.SubElement(
-                    ad,
-                    '{urn://augo/smev/uslugi/1.0.0}title').text = \
-                    doc.title
+                    ad, '{urn://augo/smev/uslugi/1.0.0}title').text = doc.title
                 etree.SubElement(
-                    ad,
-                    '{urn://augo/smev/uslugi/1.0.0}number').text = \
-                    doc.number
+                    ad, '{urn://augo/smev/uslugi/1.0.0}number'
+                ).text = doc.number
                 etree.SubElement(
-                    ad,
-                    '{urn://augo/smev/uslugi/1.0.0}date').text = \
-                    doc.date
-                etree.SubElement(
-                    ad,
-                    '{urn://augo/smev/uslugi/1.0.0}valid_until').text = \
-                    doc.valid_until
-                etree.SubElement(
-                    ad,
-                    '{urn://augo/smev/uslugi/1.0.0}file_name').text = \
-                    doc.file_name
-                etree.SubElement(
-                    ad,
-                    '{urn://augo/smev/uslugi/1.0.0}url').text = doc.url
-                etree.SubElement(
-                    ad,
-                    '{urn://augo/smev/uslugi/1.0.0}url_valid_until').text = \
-                    doc.url_valid_until
+                    ad, '{urn://augo/smev/uslugi/1.0.0}date').text = doc.date
+                if hasattr(doc, 'valid_until') and doc.valid_until:
+                    etree.SubElement(
+                        ad, '{urn://augo/smev/uslugi/1.0.0}valid_until'
+                    ).text = doc.valid_until
+                if hasattr(doc, 'file_name') and doc.file_name:
+                    etree.SubElement(
+                        ad, '{urn://augo/smev/uslugi/1.0.0}file_name'
+                    ).text = doc.file_name
+                if hasattr(doc, 'url') and doc.url:
+                    etree.SubElement(
+                        ad, '{urn://augo/smev/uslugi/1.0.0}url').text = doc.url
+                if hasattr(doc, 'url_valid_until') and doc.url_valid_until:
+                    etree.SubElement(
+                        ad, '{urn://augo/smev/uslugi/1.0.0}url_valid_until'
+                    ).text = doc.url_valid_until
 
         mpc = element(rr)
         node = self.proxy.create_message(
@@ -663,12 +658,24 @@ class Adapter:
 
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.DEBUG,
-                        format='%(asctime)s %(levelname)s:%(module)s:%(name)s:%(lineno)d: %(message)s')
+    loglevel = logging.DEBUG
+    logging.basicConfig(level=loglevel,
+	    format='%(asctime)s %(levelname)s:%(module)s:%(name)s:%(lineno)d: %(message)s')
     # logging.root.handlers[0].setLevel(logging.DEBUG)
     # logging.getLogger('zeep.xsd').setLevel(logging.INFO)
     # logging.getLogger('zeep.wsdl').setLevel(logging.INFO)
     # logging.getLogger('urllib3').setLevel(logging.INFO)
+    from logging.handlers import TimedRotatingFileHandler
+    backupcount = 7
+    handler = TimedRotatingFileHandler(
+        os.path.abspath("dmsis.log"), when='D',
+        backupCount=backupcount, encoding='cp1251')
+    handler.setFormatter(logging.Formatter(
+        '%(asctime)s %(name)s:%(module)s(%(lineno)d): %(levelname)s: '
+        '%(message)s'))
+    logging.root.addHandler(handler)
+    logging.info("Set logging level to '%s'", loglevel)
+    logging.root.setLevel(loglevel)
 
     if len(sys.argv) < 2:
         handler = TimedRotatingFileHandler(
@@ -687,7 +694,7 @@ if __name__ == '__main__':
                 crt_name='Администрация Уссурийского городского округа')
 
     try:
-        # a.send_ack('5bf287aa-c87c-11e8-9897-005056a21514')
+        # # a.send_ack('5bf287aa-c87c-11e8-9897-005056a21514')
         # a.send_respose(
         #     'eyJzaWQiOjM0NzQ2LCJtaWQiOiI1YmYyODdhYS1jODdjLTExZTgtOTg5Ny0wMDUwNTZhMjE1MTQiLCJlb2wiOjAsInNsYyI6ImF1Z29fc21ldl91c2x1Z2lfMS4wLjBfZGVjbGFyIiwibW5tIjoiMjUwMjAxIn0=',
         #     '00/2018/14282', datetime(2018, 10, 5), text='Услуга предоставлена')
@@ -698,29 +705,45 @@ if __name__ == '__main__':
             date = datetime.now().strftime('%Y-%m-%d')
             valid_until = None
             url = ''
-            url_valid_until = ''
+            url_valid_until = None
 
-        # a.send_ack('8ea257e8-c7a0-11e8-a9b5-005056a21514')
+        # # a.send_ack('8ea257e8-c7a0-11e8-a9b5-005056a21514')
+        # ad = Ad()
+        # ad.file = 'C:/Users/Администратор/AppData/Local/Temp/1/tmp_zo7d1dm'
+        # ad.file_name = 'Список запросов 23-09-2018.zip'
+        # a.send_respose(
+        #     'eyJzaWQiOjM0NzQ2LCJtaWQiOiI4ZWEyNTdlOC1jN2EwLTExZTgtYTliNS0wMDUwNTZhMjE1MTQiLCJlb2wiOjAsInNsYyI6ImF1Z29fc21ldl91c2x1Z2lfMS4wLjBfZGVjbGFyIiwibW5tIjoiMjUwMjAxIn0=',
+        #     '00/2018/14255', datetime(2018, 10, 4), text='Услуга предоставлена',
+        #     applied_documents=[ad])
+        #
+        # # a.send_ack('f005381a-cb89-11e8-98d3-005056a21514')
+        # ad = Ad()
+        # ad.file = 'C:/Users/Администратор/AppData/Local/Temp/1/tmpn1x_t5l2'
+        # ad.file_name = 'заявление ТЕПЛО.pdf'
+        # a.send_respose(
+        #     'eyJzaWQiOjM0NzQ2LCJtaWQiOiJmMDA1MzgxYS1jYjg5LTExZTgtOThkMy0wMDUwNTZhMjE1MTQiLCJlb2wiOjAsInNsYyI6ImF1Z29fc21ldl91c2x1Z2lfMS4wLjBfZGVjbGFyIiwibW5tIjoiMjUwMjAxIn0=',
+        #     '00/2018/14339', datetime(2018, 10, 9), text='Услуга предоставлена',
+        #     applied_documents=[ad])
+        #
+        # # a.send_ack('ad19ec3c-cb91-11e8-82eb-005056a21514')
+        # a.send_respose(
+        #     'eyJzaWQiOjM0NzQ2LCJtaWQiOiJhZDE5ZWMzYy1jYjkxLTExZTgtODJlYi0wMDUwNTZhMjE1MTQiLCJlb2wiOjAsInNsYyI6ImF1Z29fc21ldl91c2x1Z2lfMS4wLjBfZGVjbGFyIiwibW5tIjoiMjUwMjAxIn0=',
+        #     '00/2018/14342', datetime(2018, 10, 9), text='Услуга предоставлена')
+
+
+        # a.send_ack('d5973856-d10c-11e8-b6de-005056a21514')
         ad = Ad()
-        ad.file = 'C:/Users/Администратор/AppData/Local/Temp/1/tmp_zo7d1dm'
-        ad.file_name = 'Список запросов 23-09-2018.zip'
+        ad.file = 'C:\\Users\\836D~1\\AppData\\Local\\Temp\\1\\tmp3vq849b_'
+        ad.file_name = 'заявление ТЕПЛО.zip'
+        ad2 = Ad()
+        ad2.file = 'C:\\Users\\836D~1\\AppData\\Local\\Temp\\1\\tmpevq8juvz'
+        ad2.file_name = '3_Руководство пользователя ВС ГЭПС.zip'
+        ad3 = Ad()
+        ad3.file = 'C:\\Users\\836D~1\\AppData\\Local\\Temp\\1\\tmpurz0d7nl'
+        ad3.file_name = 'zajcevispravlbiletohot758 1.zip'
         a.send_respose(
-            'eyJzaWQiOjM0NzQ2LCJtaWQiOiI4ZWEyNTdlOC1jN2EwLTExZTgtYTliNS0wMDUwNTZhMjE1MTQiLCJlb2wiOjAsInNsYyI6ImF1Z29fc21ldl91c2x1Z2lfMS4wLjBfZGVjbGFyIiwibW5tIjoiMjUwMjAxIn0=',
-            '00/2018/14255', datetime(2018, 10, 4), text='Услуга предоставлена',
-            applied_documents=[ad])
-
-        # a.send_ack('f005381a-cb89-11e8-98d3-005056a21514')
-        ad = Ad()
-        ad.file = 'C:/Users/Администратор/AppData/Local/Temp/1/tmpn1x_t5l2'
-        ad.file_name = 'заявление ТЕПЛО.pdf'
-        a.send_respose(
-            'eyJzaWQiOjM0NzQ2LCJtaWQiOiJmMDA1MzgxYS1jYjg5LTExZTgtOThkMy0wMDUwNTZhMjE1MTQiLCJlb2wiOjAsInNsYyI6ImF1Z29fc21ldl91c2x1Z2lfMS4wLjBfZGVjbGFyIiwibW5tIjoiMjUwMjAxIn0=',
-            '00/2018/14339', datetime(2018, 10, 9), text='Услуга предоставлена',
-            applied_documents=[ad])
-
-        # a.send_ack('ad19ec3c-cb91-11e8-82eb-005056a21514')
-        a.send_respose(
-            'eyJzaWQiOjM0NzQ2LCJtaWQiOiJhZDE5ZWMzYy1jYjkxLTExZTgtODJlYi0wMDUwNTZhMjE1MTQiLCJlb2wiOjAsInNsYyI6ImF1Z29fc21ldl91c2x1Z2lfMS4wLjBfZGVjbGFyIiwibW5tIjoiMjUwMjAxIn0=',
-            '00/2018/14342', datetime(2018, 10, 9), text='Услуга предоставлена')
+            'eyJzaWQiOjM0NzQ2LCJtaWQiOiJkNTk3Mzg1Ni1kMTBjLTExZTgtYjZkZS0wMDUwNTZhMjE1MTQiLCJlb2wiOjAsInNsYyI6ImF1Z29fc21ldl91c2x1Z2lfMS4wLjBfZGVjbGFyIiwibW5tIjoiMjUwMjAxIn0=',
+            '00/2018/14441', datetime(2018, 11, 30),
+            text='Услуга предоставлена', applied_documents=[ad, ad2, ad3])
     except Exception as e:
         logging.error(str(e), exc_info=True)
