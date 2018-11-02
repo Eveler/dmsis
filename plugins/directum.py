@@ -606,7 +606,7 @@ class IntegrationServices:
         requisite.setAttribute("Type", "Reference")
         requisite.setAttribute("ReferenceName", u"ВМУ")
         res = self.search('ВМУ', "Наименование like '%%%s%%'"
-                                 " or LongString like '%%%s%%'" %
+                                 " or LongString='%s'" %
                           (declar.service, declar.service))
         if not len(res):
             raise IntegrationServicesException("Услуга не найдена")
