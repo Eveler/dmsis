@@ -608,7 +608,7 @@ class IntegrationServices:
         res = self.search('ВМУ', "Наименование like '%%%s%%'"
                                  " or LongString like '%%%s%%'"
 								 " or КСтрока='%s'" %
-                          (declar.service, declar.service))
+                          (declar.service, declar.service, declar.service))
         if not len(res):
             raise IntegrationServicesException("Услуга не найдена")
         text = xml_package.createTextNode(res[0]['ИДЗапГлавРазд'])
