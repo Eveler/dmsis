@@ -91,8 +91,8 @@ class Crypto:
             csptest_path = 'C:\\Program Files\\Crypto Pro\\CSP\\csptest.exe'
         hashtmp_f, hashtmp_fn = tempfile.mkstemp()
         os.close(hashtmp_f)
-        args = [csptest_path, 'csptest.exe', '-keyset', '-hash',
-                'GOST', '-container', self.__container, '-keytype', 'exchange',
+        args = [csptest_path, '-keyset', '-hash', 'GOST', '-container',
+                self.__container, '-keytype', 'exchange',
                 '-in', os.path.abspath(file_path), '-hashout', hashtmp_fn]
         try:
             out = subprocess.check_output(args, stderr=subprocess.STDOUT)
@@ -117,7 +117,7 @@ class Crypto:
             csptest_path = 'C:\\Program Files\\Crypto Pro\\CSP\\csptest.exe'
         signtmp_f, signtmp_fn = tempfile.mkstemp()
         os.close(signtmp_f)
-        args = [csptest_path, 'csptest.exe', '-sfsign', '-sign',
+        args = [csptest_path, '-sfsign', '-sign',
                 '-my', crt_name if crt_name else self.__crt_name, '-detached',
                 '-in', os.path.abspath(file_path), '-out', signtmp_fn, '-add',
                 '-base64', '-addsigtime']

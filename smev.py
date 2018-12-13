@@ -223,6 +223,7 @@ class Adapter:
                     sig = file.get('SignaturePKCS7')
                     if sig:
                         rs = self.__make_zip(file_name, rs, sig)
+                        file_name = file_name[:-4] + '.zip'
                     files[file_name] = rs
             if hasattr(res, 'AttachmentContentList') \
                     and res.AttachmentContentList:

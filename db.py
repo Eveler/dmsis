@@ -3,7 +3,8 @@ import logging
 from datetime import date, datetime
 from os import path, remove
 
-from sqlalchemy import Column, Integer, String, Boolean, Date, ForeignKey, func
+from sqlalchemy import Column, Integer, String, Boolean, Date, ForeignKey, func, \
+    or_
 from sqlalchemy.engine import create_engine
 from sqlalchemy.ext.declarative.api import declarative_base
 from sqlalchemy.orm import relationship
@@ -22,7 +23,7 @@ class Requests(Base):
     directum_id = Column(Integer)
     reply_to = Column(String)
     last_status = Column(String)
-    done = Column(Boolean, index=True)
+    done = Column(Boolean, index=True, default=False)
 
 
 class Declars(Base):
@@ -210,7 +211,9 @@ class Db:
         return self.session.query(Requests).all()
 
     def all_not_done(self):
-        return self.session.query(Requests).filter(Requests.done != True).all()
+        requests = self.session.query(Requests).filter(
+            or_(Requests.done != True, Requests.done == None)).all()
+        return requests
 
     def change_status(self, status, uuid, declar_num):
         if not status:
@@ -603,16 +606,19 @@ class Db:
         docs = []
         for adoc in declar.AppliedDocument:
             from mimetypes import guess_type
-            fn, ext = path.splitext(adoc.file_name)
-            found = files.get(adoc.file_name)
+            file_name = adoc.file_name if adoc.file_name else adoc.url
+            fn, ext = path.splitext(file_name)
+            found = files.get(file_name)
             if not found:
-                found = files.get(adoc.file_name.lower())
+                found = files.get(file_name.lower())
             if not found:
-                found = files.get(adoc.file_name.upper())
+                found = files.get(file_name.upper())
             if not found:
                 found = files.get(fn + ext.lower())
             if not found:
                 found = files.get(fn + ext.upper())
+            if not found:
+                found = files.get(fn + '.zip')
             fn, ext1 = path.splitext(found)
             mime_type = guess_type(found + ext if not ext1 else '')[0]
             doc_data = None
@@ -648,7 +654,7 @@ class Db:
                             valid_until=datetime.strptime(
                                 adoc.valid_until.strftime('%Y-%m-%d'),
                                 '%Y-%m-%d')
-                            if adoc.valid_until else None,
+                            if adoc.valid_until else None, url=adoc.url,
                             file_name=adoc.file_name, mime_type=mime_type,
                             body=doc_data, file_path=file_path, declar_id=d.id,
                             declar=d)
@@ -888,8 +894,11 @@ class Db:
         self.session.commit()
         self.session.execute('VACUUM FULL')
 
-    def __del__(self):
+    def vacuum(self):
         self.session.execute('VACUUM FULL')
+
+    def __del__(self):
+        self.vacuum()
 
 
 if __name__ == '__main__':

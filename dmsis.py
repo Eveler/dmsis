@@ -36,12 +36,14 @@ class Integration:
             self.smev_uri = 'urn://augo/smev/uslugi/1.0.0'
             self.local_name = 'directum'
             self.cert_method = 'sharp'
-            self.mail_server, self.ftp_user, self.ftp_pass = None, None, None
+            self.mail_server = None
+            self.ftp_user, self.ftp_pass = 'anonymous', 'anonymous'
 
         try:
             self.__smev = Adapter(self.smev_wsdl, self.smev_ftp,
                                   method=self.cert_method,
-                                  crt_name=self.crt_name)
+                                  crt_name=self.crt_name,
+                                  container=self.container)
         except Exception:
             self.report_error()
 
@@ -72,7 +74,8 @@ class Integration:
             try:
                 self.__smev = Adapter(self.smev_wsdl, self.smev_ftp,
                                       method=self.cert_method,
-                                      crt_name=self.crt_name)
+                                      crt_name=self.crt_name,
+                                      container=self.container)
             except Exception:
                 self.report_error()
 
@@ -99,8 +102,8 @@ class Integration:
                     self.db.add_update(uuid, declar.declar_number,
                                        reply_to, directum_id=res)
                     logging.info('Добавлено/обновлено дело с ID = %s' % res)
-                    self.directum.run_script('СтартЗадачПоМУ')
                     self.db.delete_declar(uuid)
+                    self.directum.run_script('СтартЗадачПоМУ')
                 except IntegrationServicesException as e:
                     if "Услуга не найдена" in e.message:
                         logging.warning(
@@ -124,48 +127,49 @@ class Integration:
         except Exception:
             self.report_error()
 
-        try:
-            # declar, uuid, reply_to, files = self.smev.get_request(
-            #     self.smev_uri, self.local_name)
-            declar, uuid, reply_to, files = self.smev.get_request()
-            if declar:
-                try:
-                    res = self.directum.add_declar(declar, files=files)
-                    self.db.add_update(uuid, declar.declar_number, reply_to,
-                                       directum_id=res)
-                    logging.info('Добавлено/обновлено дело с ID = %s' % res)
-                    self.directum.run_script('СтартЗадачПоМУ')
+        declar = 1
+        while declar:
+            try:
+                declar, uuid, reply_to, files = self.smev.get_request()
+                if declar:
                     try:
-                        self.smev.send_ack(uuid)
-                    except:
+                        res = self.directum.add_declar(declar, files=files)
+                        self.db.add_update(uuid, declar.declar_number, reply_to,
+                                           directum_id=res)
+                        logging.info('Добавлено/обновлено дело с ID = %s' % res)
+                        self.directum.run_script('СтартЗадачПоМУ')
+                        try:
+                            self.smev.send_ack(uuid)
+                        except:
+                            logging.warning(
+                                'Failed to send AckRequest.', exc_info=True)
+                    except IntegrationServicesException as e:
+                        if "Услуга не найдена" in e.message:
+                            logging.warning(
+                                "Услуга '%s' не найдена. Дело № %s от %s" %
+                                (declar.service, declar.declar_number,
+                                 declar.register_date.strftime('%d.%m.%Y')))
+                            self.smev.send_ack(uuid)
+                            self.smev.send_respose(
+                                reply_to, declar.declar_number,
+                                declar.register_date.strftime('%d.%m.%Y'), 'ERROR',
+                                "Услуга '%s' не найдена" % declar.service)
+                        else:
+                            logging.warning(
+                                'Failed to send saved data to DIRECTUM.',
+                                exc_info=True)
+                    except Exception:
                         logging.warning(
-                            'Failed to send AckRequest.', exc_info=True)
-                except IntegrationServicesException as e:
-                    if "Услуга не найдена" in e.message:
-                        logging.warning(
-                            "Услуга '%s' не найдена. Дело № %s от %s" %
-                            (declar.service, declar.declar_number,
-                             declar.register_date.strftime('%d.%m.%Y')))
-                        self.smev.send_ack(uuid)
-                        self.smev.send_respose(
-                            reply_to, declar.declar_number,
-                            declar.register_date.strftime('%d.%m.%Y'), 'ERROR',
-                            "Услуга '%s' не найдена" % declar.service)
-                    else:
-                        logging.warning(
-                            'Failed to send saved data to DIRECTUM.',
+                            'Failed to send data to DIRECTUM. Saving locally.',
                             exc_info=True)
-                except Exception:
-                    logging.warning(
-                        'Failed to send data to DIRECTUM. Saving locally.',
-                        exc_info=True)
-                    self.db.save_declar(declar, uuid, reply_to, files)
-                    self.smev.send_ack(uuid)
-            else:
-                logging.warning("Получен пустой ответ")
-                # self.smev.send_ack(uuid, 'false')
-        except Exception as e:
-            self.report_error()
+                        self.db.save_declar(declar, uuid, reply_to, files)
+                        self.smev.send_ack(uuid)
+                else:
+                    # logging.warning("Получен пустой ответ")
+                    # self.smev.send_ack(uuid, 'false')
+                    pass
+            except Exception as e:
+                self.report_error()
 
         # Send final response
         try:
@@ -185,37 +189,41 @@ class Integration:
                     # Search newest procedure with document bound
                     # for that declar
                     procs = self.directum.search(
-                        'ПРОУ', 'Kod2=%s' % request.declar_number,
+                        'ПРОУ',
+                        "Kod2=%s AND ProcState <> 'Исключена вручную'" % request.declar_num,
                         order_by='Дата4', ascending=False)
                     for proc in procs:
                         if proc.get(
-                                'Ведущая аналитика') == request.directum_id:
-                            docs = self.directum.get_bind_docs(
-                                'ПРОУ', proc.get('ИДЗапГлавРазд'))
-                            for doc in docs:
-                                doc_id = doc.get('ID')
-                                ad = Ad()
-                                # Get only last version
-                                versions = self.directum.get_doc_versions(
-                                    doc_id)
-                                data = self.directum.get_doc(
-                                    doc_id, versions[0])
-                                file, file_n = mkstemp()
-                                os.write(file, data)
-                                os.close(file)
-                                ad.file = file_n
-                                ad.date = doc.get('ISBEDocCreateDate')
-                                ad.file_name = doc.get(
-                                    'ID') + '.' + doc.get(
-                                    'Extension').lower()
-                                ad.number = doc.get(
-                                    'Дополнение') if doc.get(
-                                    'Дополнение') else doc.get('NumberEDoc')
-                                ad.title = doc.get('ISBEDocName')
-                                applied_docs.append(ad)
-                            if docs:
-                                found = True
-                                break
+                                'Ведущая аналитика') == str(request.directum_id):
+                            try:
+                                docs = self.directum.get_bind_docs(
+                                    'ПРОУ', proc.get('ИДЗапГлавРазд'))
+                                for doc in docs:
+                                    doc_id = doc.get('ID')
+                                    ad = Ad()
+                                    # Get only last version
+                                    versions = self.directum.get_doc_versions(
+                                        doc_id)
+                                    data = self.directum.get_doc(
+                                        doc_id, versions[0])
+                                    file, file_n = mkstemp()
+                                    os.write(file, data)
+                                    os.close(file)
+                                    ad.file = file_n
+                                    ad.date = doc.get('ISBEDocCreateDate')
+                                    ad.file_name = doc.get(
+                                        'ID') + '.' + doc.get(
+                                        'Extension').lower()
+                                    ad.number = doc.get(
+                                        'Дополнение') if doc.get(
+                                        'Дополнение') else doc.get('NumberEDoc')
+                                    ad.title = doc.get('ISBEDocName')
+                                    applied_docs.append(ad)
+                                if docs:
+                                    found = True
+                                    break
+                            except:
+                                logging.warning('', exc_info=True)
 
                     # Get bound docs from declar if there is no procedures
                     # with docs bound
@@ -224,46 +232,51 @@ class Integration:
                             'ДПУ', request.directum_id)
                         ad = Ad()
                         for doc in docs:
-                            if doc.get('TKED') in (
-                                    'КИК', 'ИК1', 'ИК2', 'ПСИ'):
-                                if ad.date > doc.get('ISBEDocCreateDate'):
-                                    doc_id = doc.get('ID')
-                                    if ad.file:
-                                        os.remove(ad.file)
-                                    file, file_n = mkstemp()
-                                    ad.file = file_n
-                                    ad.date = doc.get('ISBEDocCreateDate')
-                                    ad.file_name = doc.get(
-                                        'ID') + '.' + doc.get(
-                                        'Extension').lower()
-                                    ad.number = doc.get(
-                                        'Дополнение') if doc.get(
-                                        'Дополнение') else doc.get(
-                                        'NumberEDoc')
-                                    ad.title = doc.get('ISBEDocName')
-                        # Get only last version
-                        versions = self.directum.get_doc_versions(
-                            doc_id)
-                        data = self.directum.get_doc(
-                            doc_id, versions[0])
-                        os.write(ad.file, data)
-                        os.close(ad.file)
-                        applied_docs.append(ad)
+                            if doc.get('TKED') in ('КИК', 'ИК1', 'ИК2', 'ПСИ'):
+                                # if ad.date > doc.get('ISBEDocCreateDate'):
+                                doc_id = doc.get('ID')
+                                file, file_n = mkstemp()
+                                ad.file = file_n
+                                ad.date = doc.get('ISBEDocCreateDate')
+                                ad.file_name = doc.get(
+                                    'ID') + '.' + doc.get(
+                                    'Extension').lower()
+                                add = doc.get('Дополнение')
+                                ad.number = add if add else doc.get(
+                                    'NumberEDoc')
+                                ad.title = doc.get('ISBEDocName')
+                                # Get only last version
+                                versions = self.directum.get_doc_versions(
+                                    doc_id)
+                                data = self.directum.get_doc(
+                                    doc_id, versions[0])
+                                os.write(file, data)
+                                os.close(file)
+                                applied_docs.append(ad)
 
                     text = 'Услуга предоставлена'
-                    if declar[0].get('СтатусУслуги'):
-                        state = self.directum.search(
-                            'СОУ', 'Kod=%s' % declar[0].get('СтатусУслуги'))
-                        if state[0].get('Наименование'):
-                            text += '. Статус: %s' % \
-                                    state[0].get('Наименование')
+                    # if declar[0].get('СтатусУслуги'):
+                    #     state = self.directum.search(
+                    #         'СОУ',
+                    #         'ИД=%s' % declar[0].get('СтатусУслуги'))
+                    #     if state[0].get('Наименование'):
+                    #         text += '. Статус: %s' % \
+                    #                 state[0].get('Наименование')
 
-                    self.smev.send_respose(
-                        request.reply_to, request.declar_num,
-                        request.declar_date, text=text,
-                        applied_documents=applied_docs,
-                        ftp_user=self.ftp_user,
-                        ftp_pass=self.ftp_pass)
+                    try:
+                        self.smev.send_respose(
+                            request.reply_to, request.declar_num,
+                            request.declar_date, text=text,
+                            applied_documents=applied_docs,
+                            ftp_user=self.ftp_user,
+                            ftp_pass=self.ftp_pass)
+                    except:
+                        for ad in applied_docs:
+                            try:
+                                os.remove(ad.file)
+                            except:
+                                pass
+                        raise
                     # self.db.delete(request.uuid)
                     request.done = True
                     self.db.commit()
@@ -380,11 +393,11 @@ class Integration:
             if 'ftp_user' in cfg.options('smev'):
                 self.ftp_user = cfg.get('smev', 'ftp_user')
             else:
-                self.ftp_user = None
+                self.ftp_user = 'anonymous'
             if 'ftp_pass' in cfg.options('smev'):
                 self.ftp_pass = cfg.get('smev', 'ftp_pass')
             else:
-                self.ftp_pass = None
+                self.ftp_pass = 'anonymous'
 
             if not cfg.has_section("directum"):
                 do_write = True
@@ -451,6 +464,9 @@ class Integration:
                     value, trace)
                 logging.error(msg)
 
+    def __del__(self):
+        self.db.vacuum()
+
 
 class Service(ServiceFramework):
     _svc_name_ = 'dmsis'
@@ -487,10 +503,16 @@ def main():
                           conflict_handler="resolve")
     parser.print_version()
     parser.add_option("-r", "--run", action="store_true", dest="run",
-                      help="Just run program. Don`t work as win32service")
+                      help="Just run program. Don`t work as win32service.")
+    parser.add_option("-o", "--once", action="store_true", dest="once",
+                      help="Do the job and exit. Don`t use Twisted manager and "
+                           "don`t run continuously.")
     # parser.add_option("--startup")
     (options, args) = parser.parse_args()
-    if options.run:
+    if options.once and options.run:
+        a = Integration()
+        a.step()
+    elif options.run:
         run()
     else:
         HandleCommandLine(Service)

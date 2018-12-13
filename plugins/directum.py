@@ -46,6 +46,8 @@ class IntegrationServices:
             editor = "ACROREAD"
         elif "XLS" in data_format:
             editor = "EXCEL"
+        elif "DOC" in data_format:
+            editor = "WORD2007"
         elif data_format == "ZIP":
             editor = "WINZIP"
 
@@ -351,72 +353,105 @@ class IntegrationServices:
             declar_id = res[0]['ИДЗапГлавРазд']
 
             # На всякий случай нормализуем наименование записи
-            params = [('Param', None), ('Param2', declar_id)]
-            res = self.run_script('NameDPU', params)
-            self.log.debug('Создание имени дела: %s' % res)
+            # params = [('Param', None), ('Param2', declar_id)]
+            # res = self.run_script('NameDPU', params)
+            # self.log.debug('Создание имени дела: %s' % res)
 
             doc_ids = []
             i = 0
-            for doc in declar.AppliedDocument:
-                if doc.number:
-                    s_str = "ISBEDocName like '%%%s%%' and NumberEDoc='%s' " \
-                            "and Дата4='%s'" % \
-                            (doc.title, doc.number,
-                             doc.date.strftime('%d.%m.%Y'))
-                else:
-                    s_str = "ISBEDocName like '%%%s%%' and " \
-                            "(NumberEDoc='' or NumberEDoc is null) " \
-                            "and Дата4='%s'" % \
-                            (doc.title, doc.date.strftime('%d.%m.%Y'))
-                res = self.search('ТКД_ПРОЧИЕ', s_str, tp=self.DOC)
-                if not len(res):
-                    if doc_getter:
-                        doc_data = doc_getter(doc.url, doc.file_name)
-                    elif hasattr(doc, 'file') and doc.file:
-                        fn, ext = path.splitext(doc.file_name)
-                        with open(doc.file, 'rb') as f:
-                            doc_data = (
-                                f.read(), ext[1:].lower() if ext else 'txt')
-                    elif hasattr(declar, 'files') and declar.files:
-                        found = False
-                        for file_path, file_name in declar.files:
-                            if file_name.lower() == doc.file_name.lower():
-                                found = file_path
-                        if not found:
-                            found, file_name = declar.files[i]
-                        fn, ext = path.splitext(doc.file_name)
-                        with open(found, 'rb') as f:
-                            doc_data = (
-                                f.read(), ext[1:].lower() if ext else 'txt')
-                    elif files:
-                        fn, ext = path.splitext(doc.file_name)
-                        found = files.get(doc.file_name)
-                        if not found:
-                            found = files.get(doc.file_name.lower())
-                        if not found:
-                            found = files.get(doc.file_name.upper())
-                        if not found:
-                            found = files.get(fn + ext.lower())
-                        if not found:
-                            found = files.get(fn + ext.upper())
-                        with open(found, 'rb') as f:
-                            doc_data = (
-                                f.read(), ext[1:].lower() if ext else 'txt')
-                        remove(found)
+            if declar.AppliedDocument:
+                for doc in declar.AppliedDocument:
+                    if doc.number:
+                        s_str = "ISBEDocName like '%%%s%%' and NumberEDoc='%s' " \
+                                "and Дата4='%s'" % \
+                                (doc.title, doc.number,
+                                 doc.date.strftime('%d.%m.%Y'))
                     else:
-                        doc_data = (b'No file', 'txt')
-                    i += 1
+                        s_str = "ISBEDocName like '%%%s%%' and " \
+                                "(NumberEDoc='' or NumberEDoc is null) " \
+                                "and Дата4='%s'" % \
+                                (doc.title, doc.date.strftime('%d.%m.%Y'))
+                    res = self.search('ТКД_ПРОЧИЕ', s_str, tp=self.DOC)
+                    if not len(res):
+                        if doc_getter:
+                            doc_data = doc_getter(doc.url, doc.file_name)
+                        elif hasattr(doc, 'file') and doc.file:
+                            fn, ext = path.splitext(doc.file_name)
+                            with open(doc.file, 'rb') as f:
+                                doc_data = (
+                                    f.read(), ext[1:].lower() if ext else 'txt')
+                        elif hasattr(declar, 'files') and declar.files:
+                            found = False
+                            for file_path, file_name in declar.files:
+                                if file_name.lower() == doc.file_name.lower():
+                                    found = file_path
+                            if not found:
+                                found, file_name = declar.files[i]
+                            fn, ext = path.splitext(doc.file_name)
+                            with open(found, 'rb') as f:
+                                doc_data = (
+                                    f.read(), ext[1:].lower() if ext else 'txt')
+                        elif files:
+                            file_name = doc.file_name if doc.file_name else doc.url
+                            fn, ext = path.splitext(file_name)
+                            found = files.get(file_name)
+                            if not found:
+                                found = files.get(file_name.lower())
+                            if not found:
+                                found = files.get(file_name.upper())
+                            if not found:
+                                found = files.get(fn + ext.lower())
+                            if not found:
+                                found = files.get(fn + ext.upper())
+                            if not found:
+                                found = files.get(fn + '.zip')
+                                ext = '.zip'
+                            with open(found, 'rb') as f:
+                                doc_data = (
+                                    f.read(), ext[1:].lower() if ext else 'txt')
+                            remove(found)
+                        else:
+                            doc_data = (b'No file', 'txt')
+                        i += 1
+                        res = self.add_doc(doc, doc_data[1], doc_data[0])
+                        # bind document with declar
+                        params = [('ID', declar_id), ('DocID', res)]
+                        self.run_script('BindEDocDPbyID', params)
+                        doc_ids.append(str(res))
+            else:
+                for file_name, file_path in files:
+                    fn, ext = path.splitext(file_name)
+                    with open(file_path, 'rb') as f:
+                        doc_data = (
+                            f.read(), ext[1:].lower() if ext else 'txt')
+                    remove(file_path)
+
+                    class D:
+                        pass
+
+                    doc = D()
+                    doc.number = ''
+                    from datetime import date
+                    doc.date = date.today()
+                    doc.title = fn
                     res = self.add_doc(doc, doc_data[1], doc_data[0])
                     # bind document with declar
                     params = [('ID', declar_id), ('DocID', res)]
                     self.run_script('BindEDocDPbyID', params)
                     doc_ids.append(str(res))
+
             # Send notification about new docs
             if doc_ids:
                 params = [('ID', declar_id),
                           ('Doc_IDs', ';'.join(doc_ids))]
                 res = self.run_script('notification_add_docs', params)
                 self.log.info('Отправлено уведомление ID = %s' % res)
+            else:
+                for file_name, file_path in files:
+                    try:
+                        remove(file_path)
+                    except:
+                        pass
             return declar_id
 
         # Add new
@@ -561,7 +596,8 @@ class IntegrationServices:
         requisite.setAttribute("Name", u"СпособДост")
         requisite.setAttribute("Type", "Reference")
         requisite.setAttribute("ReferenceName", u"СДК")
-        text = xml_package.createTextNode("826965")
+        # text = xml_package.createTextNode("826965") # Автоматическая доставка из МФЦ
+        text = xml_package.createTextNode("4673938") # СМЭВ
         requisite.appendChild(text)
         section.appendChild(requisite)
 
@@ -607,7 +643,7 @@ class IntegrationServices:
         requisite.setAttribute("ReferenceName", u"ВМУ")
         res = self.search('ВМУ', "Наименование like '%%%s%%'"
                                  " or LongString like '%%%s%%'"
-								 " or КСтрока='%s'" %
+                                 " or КСтрока='%s'" %
                           (declar.service, declar.service, declar.service))
         if not len(res):
             raise IntegrationServicesException("Услуга не найдена")
@@ -678,46 +714,72 @@ class IntegrationServices:
                        declar_id))
 
         i = 0
-        for doc in declar.AppliedDocument:
-            if doc_getter:
-                doc_data = doc_getter(doc.url, doc.file_name)
-            elif hasattr(doc, 'file') and doc.file:
-                fn, ext = path.splitext(doc.file_name)
-                with open(doc.file, 'rb') as f:
+        if declar.AppliedDocument:
+            for doc in declar.AppliedDocument:
+                if doc_getter:
+                    doc_data = doc_getter(doc.url, doc.file_name)
+                elif hasattr(doc, 'file') and doc.file:
+                    fn, ext = path.splitext(doc.file_name)
+                    with open(doc.file, 'rb') as f:
+                        doc_data = (
+                            f.read(), ext[1:].lower() if ext else 'txt')
+                elif hasattr(declar, 'files') and declar.files:
+                    found = False
+                    for file_path, file_name in declar.files:
+                        if file_name.lower() == doc.file_name.lower():
+                            found = file_path
+                    if not found:
+                        found, file_name = declar.files[i]
+                    fn, ext = path.splitext(doc.file_name)
+                    with open(found, 'rb') as f:
+                        doc_data = (f.read(), ext[1:] if ext else 'txt')
+                elif files:
+                    file_name = doc.file_name if doc.file_name else doc.url
+                    fn, ext = path.splitext(file_name)
+                    found = files.get(file_name)
+                    if not found:
+                        found = files.get(file_name.lower())
+                    if not found:
+                        found = files.get(file_name.upper())
+                    if not found:
+                        found = files.get(fn + ext.lower())
+                    if not found:
+                        found = files.get(fn + ext.upper())
+                    if not found:
+                        found = files.get(fn + '.zip')
+                        ext = '.zip'
+                    with open(found, 'rb') as f:
+                        doc_data = (
+                            f.read(), ext[1:].lower() if ext else 'txt')
+                    remove(found)
+                else:
+                    doc_data = (b'No file', 'txt')
+                i += 1
+                res = self.add_doc(doc, doc_data[1], doc_data[0])
+                # bind document with declar
+                params = [('ID', declar_id), ('DocID', res)]
+                self.run_script('BindEDocDPbyID', params)
+        else:
+            for file_name, file_path in files:
+                fn, ext = path.splitext(file_name)
+                with open(file_path, 'rb') as f:
                     doc_data = (
                         f.read(), ext[1:].lower() if ext else 'txt')
-            elif hasattr(declar, 'files') and declar.files:
-                found = False
-                for file_path, file_name in declar.files:
-                    if file_name.lower() == doc.file_name.lower():
-                        found = file_path
-                if not found:
-                    found, file_name = declar.files[i]
-                fn, ext = path.splitext(doc.file_name)
-                with open(found, 'rb') as f:
-                    doc_data = (f.read(), ext[1:] if ext else 'txt')
-            elif files:
-                fn, ext = path.splitext(doc.file_name)
-                found = files.get(doc.file_name)
-                if not found:
-                    found = files.get(doc.file_name.lower())
-                if not found:
-                    found = files.get(doc.file_name.upper())
-                if not found:
-                    found = files.get(fn + ext.lower())
-                if not found:
-                    found = files.get(fn + ext.upper())
-                with open(found, 'rb') as f:
-                    doc_data = (
-                        f.read(), ext[1:].lower() if ext else 'txt')
-                remove(found)
-            else:
-                doc_data = (b'No file', 'txt')
-            i += 1
-            res = self.add_doc(doc, doc_data[1], doc_data[0])
-            # bind document with declar
-            params = [('ID', declar_id), ('DocID', res)]
-            self.run_script('BindEDocDPbyID', params)
+                remove(file_path)
+
+                class D:
+                    pass
+
+                doc = D()
+                doc.number = ''
+                from datetime import date
+                doc.date = date.today()
+                doc.title = fn
+                res = self.add_doc(doc, doc_data[1], doc_data[0])
+                # bind document with declar
+                params = [('ID', declar_id), ('DocID', res)]
+                self.run_script('BindEDocDPbyID', params)
+
         return declar_id
 
     def get_entity(self, name, eid):
@@ -840,6 +902,7 @@ class IntegrationServices:
                  '<>': 'NEq', '>': 'Gt', '<': 'Lt', 'is null': 'IsNull',
                  'is not null': 'IsNotNull', 'contains': 'Contains'}
         doc = Document()
+        criteria = criteria.replace('\n', ' ').replace('\r', ' ')
         # if criteria[0] == '(' and criteria.endswith(')'):
         #     criteria = criteria[1:-1]
         # Cut strings from criteria
@@ -862,7 +925,7 @@ class IntegrationServices:
             elem.appendChild(self.__search_crit_parser(quoted[1:-1].strip()))
             doc.unlink()
             return elem
-        if 'and' in criteria.lower():
+        if ' and ' in criteria.lower():
             if 'AND' in criteria:
                 first, second = criteria.split('AND', 1)
             elif 'And' in criteria:
@@ -877,7 +940,7 @@ class IntegrationServices:
                 elem.appendChild(self.__search_crit_parser(second))
             doc.unlink()
             return elem
-        if 'or' in criteria.lower():
+        if ' or ' in criteria.lower():
             if 'OR' in criteria:
                 first, second = criteria.split('OR', 1)
             elif 'Or' in criteria:
@@ -892,7 +955,7 @@ class IntegrationServices:
                 elem.appendChild(self.__search_crit_parser(second))
             doc.unlink()
             return elem
-        if 'is null' in criteria.lower():
+        if ' is null' in criteria.lower():
             if 'IS NULL' in criteria:
                 first, second = criteria.split('IS NULL', 1)
             elif 'Is null' in criteria:
@@ -908,7 +971,7 @@ class IntegrationServices:
             elem.setAttribute('Requisite', first)
             doc.unlink()
             return elem
-        if 'is not null' in criteria.lower():
+        if ' is not null' in criteria.lower():
             if 'IS NOT NULL' in criteria:
                 first, second = criteria.split('IS NOT NULL', 1)
             elif 'Is not null' in criteria:
