@@ -898,13 +898,11 @@ class IntegrationServices:
                 v = v[1:-1]
             return v
 
-        opers = {'like': 'Like', '>=': 'GEq', '<=': 'LEq', '=': 'Eq',
-                 '<>': 'NEq', '>': 'Gt', '<': 'Lt', 'is null': 'IsNull',
-                 'is not null': 'IsNotNull', 'contains': 'Contains'}
+        opers = ({'like': 'Like'}, {'>=': 'GEq'}, {'<=': 'LEq'}, {'=': 'Eq'},
+                 {'<>': 'NEq'}, {'>': 'Gt'}, {'<': 'Lt'}, {'is null': 'IsNull'},
+                 {'is not null': 'IsNotNull'}, {'contains': 'Contains'})
         doc = Document()
         criteria = criteria.replace('\n', ' ').replace('\r', ' ')
-        # if criteria[0] == '(' and criteria.endswith(')'):
-        #     criteria = criteria[1:-1]
         # Cut strings from criteria
         c_no_str = criteria
         while "'" in c_no_str:
@@ -926,12 +924,12 @@ class IntegrationServices:
             doc.unlink()
             return elem
         if ' and ' in criteria.lower():
-            if 'AND' in criteria:
-                first, second = criteria.split('AND', 1)
-            elif 'And' in criteria:
-                first, second = criteria.split('And', 1)
+            if ' AND ' in criteria:
+                first, second = criteria.split(' AND ', 1)
+            elif ' And ' in criteria:
+                first, second = criteria.split(' And ', 1)
             else:
-                first, second = criteria.split('and', 1)
+                first, second = criteria.split(' and ', 1)
             first, second = first.strip(), second.strip()
             elem = doc.createElement('And')
             if first:
@@ -941,12 +939,12 @@ class IntegrationServices:
             doc.unlink()
             return elem
         if ' or ' in criteria.lower():
-            if 'OR' in criteria:
-                first, second = criteria.split('OR', 1)
-            elif 'Or' in criteria:
-                first, second = criteria.split('Or', 1)
+            if ' OR ' in criteria:
+                first, second = criteria.split(' OR ', 1)
+            elif ' Or ' in criteria:
+                first, second = criteria.split(' Or ', 1)
             else:
-                first, second = criteria.split('or', 1)
+                first, second = criteria.split(' or ', 1)
             first, second = first.strip(), second.strip()
             elem = doc.createElement('Or')
             if first:
@@ -956,46 +954,48 @@ class IntegrationServices:
             doc.unlink()
             return elem
         if ' is null' in criteria.lower():
-            if 'IS NULL' in criteria:
-                first, second = criteria.split('IS NULL', 1)
-            elif 'Is null' in criteria:
-                first, second = criteria.split('Is null', 1)
-            elif 'is Null' in criteria:
-                first, second = criteria.split('is Null', 1)
-            elif 'Is Null' in criteria:
-                first, second = criteria.split('Is Null', 1)
+            if ' IS NULL' in criteria:
+                first, second = criteria.split(' IS NULL', 1)
+            elif ' Is null' in criteria:
+                first, second = criteria.split(' Is null', 1)
+            elif ' is Null' in criteria:
+                first, second = criteria.split(' is Null', 1)
+            elif ' Is Null' in criteria:
+                first, second = criteria.split(' Is Null', 1)
             else:
-                first, second = criteria.split('is null', 1)
+                first, second = criteria.split(' is null', 1)
             first, second = first.strip(), second.strip()
             elem = doc.createElement('IsNull')
             elem.setAttribute('Requisite', first)
             doc.unlink()
             return elem
         if ' is not null' in criteria.lower():
-            if 'IS NOT NULL' in criteria:
-                first, second = criteria.split('IS NOT NULL', 1)
-            elif 'Is not null' in criteria:
-                first, second = criteria.split('Is not null', 1)
-            elif 'is not Null' in criteria:
-                first, second = criteria.split('is not Null', 1)
-            elif 'Is not Null' in criteria:
-                first, second = criteria.split('Is not Null', 1)
-            elif 'Is Not Null' in criteria:
-                first, second = criteria.split('Is Not Null', 1)
+            if ' IS NOT NULL' in criteria:
+                first, second = criteria.split(' IS NOT NULL', 1)
+            elif ' Is not null' in criteria:
+                first, second = criteria.split(' Is not null', 1)
+            elif ' is not Null' in criteria:
+                first, second = criteria.split(' is not Null', 1)
+            elif ' Is not Null' in criteria:
+                first, second = criteria.split(' Is not Null', 1)
+            elif ' Is Not Null' in criteria:
+                first, second = criteria.split(' Is Not Null', 1)
             else:
-                first, second = criteria.split('is not null', 1)
+                first, second = criteria.split(' is not null', 1)
             first, second = first.strip(), second.strip()
             elem = doc.createElement('IsNotNull')
             elem.setAttribute('Requisite', first)
             doc.unlink()
             return elem
-        for oper in opers.keys():
-            if oper in criteria.lower():
-                idx = criteria.lower().index(oper)
-                elem = doc.createElement(opers.get(oper))
+        for oper in opers:
+            key = list(oper)[0]
+            val = oper[key]
+            if key in criteria.lower():
+                idx = criteria.lower().index(key)
+                elem = doc.createElement(val)
                 elem.setAttribute('Requisite', criteria[:idx].strip())
                 elem.setAttribute('Value',
-                                  get_val(criteria, idx + len(oper)))
+                                  get_val(criteria, idx + len(key)))
                 doc.unlink()
                 return elem
 

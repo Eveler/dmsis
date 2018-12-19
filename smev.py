@@ -469,11 +469,12 @@ class Adapter:
         etree.SubElement(
             rr,
             '{urn://augo/smev/uslugi/1.0.0}declar_number').text = declar_number
+        from dateutil.parser import parse
         etree.SubElement(
-            rr,
-            '{urn://augo/smev/uslugi/1.0.0}register_date').text = \
-            register_date.strftime('%Y-%m-%d') if isinstance(
-                register_date, (date, datetime)) else register_date
+            rr, '{urn://augo/smev/uslugi/1.0.0}register_date'
+        ).text = register_date.strftime('%Y-%m-%d') if isinstance(
+            register_date, (date, datetime)) else parse(
+            register_date).strftime('%Y-%m-%d')
         etree.SubElement(rr,
                          '{urn://augo/smev/uslugi/1.0.0}result').text = result
         if text:
@@ -484,12 +485,16 @@ class Adapter:
                 ad = etree.SubElement(
                     rr, '{urn://augo/smev/uslugi/1.0.0}AppliedDocument')
                 etree.SubElement(
-                    ad, '{urn://augo/smev/uslugi/1.0.0}title').text = doc.title
+                    ad, '{urn://augo/smev/uslugi/1.0.0}title').text = \
+                    doc.title if doc.title else ' '
                 etree.SubElement(
                     ad, '{urn://augo/smev/uslugi/1.0.0}number'
-                ).text = doc.number
+                ).text = doc.number if doc.number else 'б/н'
                 etree.SubElement(
-                    ad, '{urn://augo/smev/uslugi/1.0.0}date').text = doc.date
+                    ad, '{urn://augo/smev/uslugi/1.0.0}date'
+                ).text = doc.date.strftime('%Y-%m-%d') if isinstance(
+                    doc.date, (date, datetime)) else parse(
+                    doc.date).strftime('%Y-%m-%d')
                 if hasattr(doc, 'valid_until') and doc.valid_until:
                     etree.SubElement(
                         ad, '{urn://augo/smev/uslugi/1.0.0}valid_until'

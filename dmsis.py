@@ -190,7 +190,7 @@ class Integration:
                     # for that declar
                     procs = self.directum.search(
                         'ПРОУ',
-                        "Kod2=%s AND ProcState <> 'Исключена вручную'" % request.declar_num,
+                        "Kod2=%s AND ProcState<>'Исключена вручную'" % request.declar_num,
                         order_by='Дата4', ascending=False)
                     for proc in procs:
                         if proc.get(
