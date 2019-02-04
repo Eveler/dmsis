@@ -178,78 +178,82 @@ class Adapter:
                 and hasattr(res.Request.SenderProvidedRequestData,
                             'MessagePrimaryContent') \
                 and res.Request.SenderProvidedRequestData.MessagePrimaryContent:
-            # declar = Declar.parsexml(
-            #     etree.tostring(
-            #         res.Request.SenderProvidedRequestData.MessagePrimaryContent.find(
-            #             './/{urn://augo/smev/uslugi/1.0.0}declar')))
             declar = Declar.parsexml(
                 etree.tostring(
                     res.Request.SenderProvidedRequestData.\
                         MessagePrimaryContent._value_1))
-            if hasattr(res.Request, 'FSAttachmentsList') \
-                    and res.Request.FSAttachmentsList:
-                attach_files = {}
-                attach_head_list = res.Request.SenderProvidedRequestData.\
-                    RefAttachmentHeaderList.RefAttachmentHeader
-                for head in attach_head_list:
-                    attach_files[head.uuid] = {'MimeType': head.MimeType}
-                    if hasattr(head, 'SignaturePKCS7') and head.SignaturePKCS7:
-                        attach_files[head.uuid]['SignaturePKCS7'] = \
-                            head.SignaturePKCS7
-                attach_list = res.Request.FSAttachmentsList.FSAttachment
-                for attach in attach_list:
-                    attach_files[attach.uuid]['UserName'] = str(attach.UserName)
-                    attach_files[attach.uuid]['Password'] = str(attach.Password)
-                    attach_files[attach.uuid]['FileName'] = str(attach.FileName)
-                for uuid, file in attach_files.items():
-                    file_name = file['FileName']
-                    fn, ext = path.splitext(file_name)
-                    if fn[0] == '/':
-                        fn = fn[1:]
-                    rs = self.__load_file(uuid, file['FileName'],
-                                           file['UserName'],
-                                           file['Password'])
-                    if isinstance(rs, (str, bytes)):
-                        new_ext = guess_extension(file['MimeType'])
-                        ext = ext.lower()
-                        if new_ext and not ext:
-                            file_name = fn + new_ext.lower()
+            try:
+                if hasattr(res.Request, 'FSAttachmentsList') \
+                        and res.Request.FSAttachmentsList:
+                    attach_files = {}
+                    attach_head_list = res.Request.SenderProvidedRequestData.\
+                        RefAttachmentHeaderList.RefAttachmentHeader
+                    for head in attach_head_list:
+                        attach_files[head.uuid] = {'MimeType': head.MimeType}
+                        if hasattr(head, 'SignaturePKCS7') and head.SignaturePKCS7:
+                            attach_files[head.uuid]['SignaturePKCS7'] = \
+                                head.SignaturePKCS7
+                    attach_list = res.Request.FSAttachmentsList.FSAttachment
+                    for attach in attach_list:
+                        attach_files[attach.uuid]['UserName'] = str(attach.UserName)
+                        attach_files[attach.uuid]['Password'] = str(attach.Password)
+                        attach_files[attach.uuid]['FileName'] = str(attach.FileName)
+                    for uuid, file in attach_files.items():
+                        file_name = file['FileName']
+                        fn, ext = path.splitext(file_name)
+                        if fn[0] == '/':
+                            fn = fn[1:]
+                        rs = self.__load_file(uuid, file['FileName'],
+                                               file['UserName'],
+                                               file['Password'])
+                        if isinstance(rs, (str, bytes)):
+                            new_ext = guess_extension(file['MimeType'])
+                            ext = ext.lower()
+                            if new_ext and not ext:
+                                file_name = fn + new_ext.lower()
+                            else:
+                                file_name = fn + ext
                         else:
-                            file_name = fn + ext
-                    else:
-                        rs, e = rs
-                        new_ext = guess_extension(file['MimeType'])
-                        file_name = fn + new_ext if new_ext else '.txt'
-                    sig = file.get('SignaturePKCS7')
-                    if sig:
-                        rs = self.__make_zip(file_name, rs, sig)
-                        file_name = file_name[:-4] + '.zip'
-                    files[file_name] = rs
-            if hasattr(res, 'AttachmentContentList') \
-                    and res.AttachmentContentList:
-                attach_files = {}
-                attach_head_list = res.Request.SenderProvidedRequestData. \
-                    AttachmentHeaderList.AttachmentHeader
-                for head in attach_head_list:
-                    attach_files[head.contentId] = {'MimeType': head.MimeType}
-                    if hasattr(head, 'SignaturePKCS7') and head.SignaturePKCS7:
-                        attach_files[head.contentId]['SignaturePKCS7'] = \
-                            head.SignaturePKCS7
-                attach_list = res.AttachmentContentList.AttachmentContent
-                i = 1
-                for attach in attach_list:
-                    mime_type = attach_files[attach.Id]['MimeType']
-                    file_name = str('file' + str(i))
-                    i += 1
-                    ext = guess_extension(mime_type)
-                    file_name = file_name + ext if ext else '.txt'
-                    f, fn = tempfile.mkstemp()
-                    write(f, attach.Content)
-                    close(f)
-                    sig = attach_files[attach.Id].get('SignaturePKCS7')
-                    if sig:
-                        fn = self.__make_zip(file_name, fn, sig)
-                    files[file_name] = fn
+                            rs, e = rs
+                            new_ext = guess_extension(file['MimeType'])
+                            file_name = fn + new_ext if new_ext else '.txt'
+                        sig = file.get('SignaturePKCS7')
+                        if sig:
+                            rs = self.__make_zip(file_name, rs, sig)
+                            file_name = file_name[:-4] + '.zip'
+                        files[file_name] = rs
+                if hasattr(res, 'AttachmentContentList') \
+                        and res.AttachmentContentList:
+                    attach_files = {}
+                    attach_head_list = res.Request.SenderProvidedRequestData. \
+                        AttachmentHeaderList.AttachmentHeader
+                    for head in attach_head_list:
+                        attach_files[head.contentId] = {'MimeType': head.MimeType}
+                        if hasattr(head, 'SignaturePKCS7') and head.SignaturePKCS7:
+                            attach_files[head.contentId]['SignaturePKCS7'] = \
+                                head.SignaturePKCS7
+                    attach_list = res.AttachmentContentList.AttachmentContent
+                    i = 1
+                    for attach in attach_list:
+                        mime_type = attach_files[attach.Id]['MimeType']
+                        file_name = str('file' + str(i))
+                        i += 1
+                        ext = guess_extension(mime_type)
+                        file_name = file_name + ext if ext else '.txt'
+                        f, fn = tempfile.mkstemp()
+                        write(f, attach.Content)
+                        close(f)
+                        sig = attach_files[attach.Id].get('SignaturePKCS7')
+                        if sig:
+                            fn = self.__make_zip(file_name, fn, sig)
+                        files[file_name] = fn
+            except:
+                for file_name, file_path in files.items():
+                    try:
+                        remove(file_path)
+                    except:
+                        pass
+                raise
 
             uuid = res.Request.SenderProvidedRequestData.MessageID
             reply_to = res.Request.ReplyTo

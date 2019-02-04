@@ -348,7 +348,7 @@ class Db:
                 passport_date=datetime.strptime(
                     person.passport_date.strftime('%Y-%m-%d'), '%Y-%m-%d')
                 if person.passport_date else None,
-                inn=person.inn, sex=person.sex, snils=person.snils, declar=d)
+                inn=person.inn, sex=person.sex, snils=person.snils)
             self.session.add(p)
             for phone in person.phone:
                 pp = Phones(phone=phone, person=p)
@@ -661,14 +661,17 @@ class Db:
             self.session.add(doc)
             docs.append(doc)
             remove(found)
+        # TODO: Correctly parse declar.Param
+        #  (<ns3:Param id="object_type" label="Вид объекта услуги" type="String">Значение</ns3:Param>)
         for param in declar.Param:
-            p = Params(type=param.attr('type'), param_id=param.attr('id'),
-                       label=param.attr('label'),
-                       row_number=param.attr('rowNumber'),
-                       col_number=param.attr('colNumber'),
-                       row_delimiter=param.attr('rowDelimiter'),
-                       col_delimiter=param.attr('colDelimiter'),
-                       value=param, declar_id=d.id, declar=d)
+            if not isinstance(param, (str, bytes, bytearray)):
+                p = Params(type=param.attr('type'), param_id=param.attr('id'),
+                           label=param.attr('label'),
+                           row_number=param.attr('rowNumber'),
+                           col_number=param.attr('colNumber'),
+                           row_delimiter=param.attr('rowDelimiter'),
+                           col_delimiter=param.attr('colDelimiter'),
+                           value=param, declar_id=d.id, declar=d)
             self.session.add(p)
         self.session.commit()
 

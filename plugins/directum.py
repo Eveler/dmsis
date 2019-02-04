@@ -328,6 +328,51 @@ class IntegrationServices:
         self.log.info('Добавлен заявитель ЮЛ: %s' % entity.name)
         return res
 
+    def __upload_doc(self, doc_getter, doc, files, declar_id, declar):
+        if doc_getter:
+            doc_data = doc_getter(doc.url, doc.file_name)
+        elif hasattr(doc, 'file') and doc.file:
+            fn, ext = path.splitext(doc.file_name)
+            with open(doc.file, 'rb') as f:
+                doc_data = (
+                    f.read(), ext[1:].lower() if ext else 'txt')
+        elif hasattr(declar, 'files') and declar.files:
+            found = False
+            for file_path, file_name in declar.files:
+                if file_name.lower() == doc.file_name.lower():
+                    found = file_path
+            if not found:
+                found, file_name = declar.files[i]
+            fn, ext = path.splitext(doc.file_name)
+            with open(found, 'rb') as f:
+                doc_data = (f.read(), ext[1:] if ext else 'txt')
+        elif files:
+            file_name = doc.file_name if doc.file_name else doc.url
+            fn, ext = path.splitext(file_name)
+            found = files.get(file_name)
+            if not found:
+                found = files.get(file_name.lower())
+            if not found:
+                found = files.get(file_name.upper())
+            if not found:
+                found = files.get(fn + ext.lower())
+            if not found:
+                found = files.get(fn + ext.upper())
+            if not found:
+                found = files.get(fn + '.zip')
+                ext = '.zip'
+            with open(found, 'rb') as f:
+                doc_data = (
+                    f.read(), ext[1:].lower() if ext else 'txt')
+            remove(found)
+        else:
+            doc_data = (b'No file', 'txt')
+        res = self.add_doc(doc, doc_data[1], doc_data[0])
+        # bind document with declar
+        params = [('ID', declar_id), ('DocID', res)]
+        self.run_script('BindEDocDPbyID', params)
+        return res
+
     def add_declar(self, declar, files={}, doc_getter=None,
                    subdivision="106759", reg_place="108279"):
         """
@@ -358,7 +403,6 @@ class IntegrationServices:
             # self.log.debug('Создание имени дела: %s' % res)
 
             doc_ids = []
-            i = 0
             if declar.AppliedDocument:
                 for doc in declar.AppliedDocument:
                     if doc.number:
@@ -373,53 +417,10 @@ class IntegrationServices:
                                 (doc.title, doc.date.strftime('%d.%m.%Y'))
                     res = self.search('ТКД_ПРОЧИЕ', s_str, tp=self.DOC)
                     if not len(res):
-                        if doc_getter:
-                            doc_data = doc_getter(doc.url, doc.file_name)
-                        elif hasattr(doc, 'file') and doc.file:
-                            fn, ext = path.splitext(doc.file_name)
-                            with open(doc.file, 'rb') as f:
-                                doc_data = (
-                                    f.read(), ext[1:].lower() if ext else 'txt')
-                        elif hasattr(declar, 'files') and declar.files:
-                            found = False
-                            for file_path, file_name in declar.files:
-                                if file_name.lower() == doc.file_name.lower():
-                                    found = file_path
-                            if not found:
-                                found, file_name = declar.files[i]
-                            fn, ext = path.splitext(doc.file_name)
-                            with open(found, 'rb') as f:
-                                doc_data = (
-                                    f.read(), ext[1:].lower() if ext else 'txt')
-                        elif files:
-                            file_name = doc.file_name if doc.file_name else doc.url
-                            fn, ext = path.splitext(file_name)
-                            found = files.get(file_name)
-                            if not found:
-                                found = files.get(file_name.lower())
-                            if not found:
-                                found = files.get(file_name.upper())
-                            if not found:
-                                found = files.get(fn + ext.lower())
-                            if not found:
-                                found = files.get(fn + ext.upper())
-                            if not found:
-                                found = files.get(fn + '.zip')
-                                ext = '.zip'
-                            with open(found, 'rb') as f:
-                                doc_data = (
-                                    f.read(), ext[1:].lower() if ext else 'txt')
-                            remove(found)
-                        else:
-                            doc_data = (b'No file', 'txt')
-                        i += 1
-                        res = self.add_doc(doc, doc_data[1], doc_data[0])
-                        # bind document with declar
-                        params = [('ID', declar_id), ('DocID', res)]
-                        self.run_script('BindEDocDPbyID', params)
-                        doc_ids.append(str(res))
+                        doc_ids.append(str(self.__upload_doc(
+                            doc_getter, doc, files, declar_id, declar)))
             else:
-                for file_name, file_path in files:
+                for file_name, file_path in files.items():
                     fn, ext = path.splitext(file_name)
                     with open(file_path, 'rb') as f:
                         doc_data = (
@@ -447,7 +448,7 @@ class IntegrationServices:
                 res = self.run_script('notification_add_docs', params)
                 self.log.info('Отправлено уведомление ID = %s' % res)
             else:
-                for file_name, file_path in files:
+                for file_name, file_path in files.items():
                     try:
                         remove(file_path)
                     except:
@@ -707,58 +708,27 @@ class IntegrationServices:
         params = [('Param', None), ('Param2', declar_id)]
         res = self.run_script('NameDPU', params)
         self.log.debug('Создание имени дела: %s' % res)
+        # try:
+        #     params = [('Param', None), ('Param2', declar_id)]
+        #     res = self.run_script('NameDPU', params)
+        #     self.log.debug('Создание имени дела: %s' % res)
+        # except:
+        #     self.log.error('NameDPU', exc_info=True)
+        #     self.proxy.service.ReferencesUpdate(XMLPackage=package, ISCode='',
+        #                                         FullSync=True)
+        #     res = self.search('ДПУ', "Дополнение3='%s' and Дата='%s'" %
+        #                       (declar.declar_number,
+        #                        declar.register_date.strftime('%d.%m.%Y')))
+        #     declar_id = res[0]['ИДЗапГлавРазд']
 
         self.log.info('Добавлено дело № %s от %s ID = %s' %
                       (declar.declar_number,
                        declar.register_date.strftime('%d.%m.%Y'),
                        declar_id))
 
-        i = 0
         if declar.AppliedDocument:
             for doc in declar.AppliedDocument:
-                if doc_getter:
-                    doc_data = doc_getter(doc.url, doc.file_name)
-                elif hasattr(doc, 'file') and doc.file:
-                    fn, ext = path.splitext(doc.file_name)
-                    with open(doc.file, 'rb') as f:
-                        doc_data = (
-                            f.read(), ext[1:].lower() if ext else 'txt')
-                elif hasattr(declar, 'files') and declar.files:
-                    found = False
-                    for file_path, file_name in declar.files:
-                        if file_name.lower() == doc.file_name.lower():
-                            found = file_path
-                    if not found:
-                        found, file_name = declar.files[i]
-                    fn, ext = path.splitext(doc.file_name)
-                    with open(found, 'rb') as f:
-                        doc_data = (f.read(), ext[1:] if ext else 'txt')
-                elif files:
-                    file_name = doc.file_name if doc.file_name else doc.url
-                    fn, ext = path.splitext(file_name)
-                    found = files.get(file_name)
-                    if not found:
-                        found = files.get(file_name.lower())
-                    if not found:
-                        found = files.get(file_name.upper())
-                    if not found:
-                        found = files.get(fn + ext.lower())
-                    if not found:
-                        found = files.get(fn + ext.upper())
-                    if not found:
-                        found = files.get(fn + '.zip')
-                        ext = '.zip'
-                    with open(found, 'rb') as f:
-                        doc_data = (
-                            f.read(), ext[1:].lower() if ext else 'txt')
-                    remove(found)
-                else:
-                    doc_data = (b'No file', 'txt')
-                i += 1
-                res = self.add_doc(doc, doc_data[1], doc_data[0])
-                # bind document with declar
-                params = [('ID', declar_id), ('DocID', res)]
-                self.run_script('BindEDocDPbyID', params)
+                self.__upload_doc(doc_getter, doc, files, declar_id, declar)
         else:
             for file_name, file_path in files:
                 fn, ext = path.splitext(file_name)
