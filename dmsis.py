@@ -137,7 +137,12 @@ class Integration:
                         self.db.add_update(uuid, declar.declar_number, reply_to,
                                            directum_id=res)
                         logging.info('Добавлено/обновлено дело с ID = %s' % res)
-                        self.directum.run_script('СтартЗадачПоМУ')
+                        try:
+                            self.directum.run_script('СтартЗадачПоМУ')
+                        except:
+                            logging.warning(
+                                'Error while run diretum`s'
+                                ' script "СтартЗадачПоМУ"', exc_info=True)
                         try:
                             self.smev.send_ack(uuid)
                         except:
@@ -282,6 +287,8 @@ class Integration:
                     self.db.commit()
         except Exception as e:
             self.report_error()
+
+        self.db.vacuum()
 
     def parse_config(self, config_path):
         """
