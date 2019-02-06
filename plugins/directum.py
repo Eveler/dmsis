@@ -259,6 +259,7 @@ class IntegrationServices:
         requisite.setAttribute("Name", u"Наименование")
         requisite.setAttribute("Type", "String")
         text = xml_package.createTextNode(
+            '' if not entity.name else
             entity.name if len(entity.name) < 50 else entity.name[:49])
         requisite.appendChild(text)
         section.appendChild(requisite)
@@ -278,6 +279,7 @@ class IntegrationServices:
         requisite.setAttribute("Name", u"ИНН")
         requisite.setAttribute("Type", "String")
         text = xml_package.createTextNode(
+            '' if not entity.inn else
             entity.inn if len(entity.inn) < 15 else entity.inn[:14])
         requisite.appendChild(text)
         section.appendChild(requisite)
@@ -287,6 +289,7 @@ class IntegrationServices:
         requisite.setAttribute("Name", u"Ед_Изм")
         requisite.setAttribute("Type", "String")
         text = xml_package.createTextNode(
+            '' if not entity.kpp else
             entity.kpp if len(entity.kpp) < 10 else entity.kpp[:9])
         requisite.appendChild(text)
         section.appendChild(requisite)
@@ -297,7 +300,7 @@ class IntegrationServices:
         requisite.setAttribute("Type", "String")
         addr = str(entity.address)
         text = xml_package.createTextNode(
-            addr if len(addr) < 255 else addr[:254])
+            '' if not addr else addr if len(addr) < 255 else addr[:254])
         requisite.appendChild(text)
         section.appendChild(requisite)
 
