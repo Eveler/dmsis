@@ -620,7 +620,7 @@ class Adapter:
                     uuid = '/'
                     do_loop = True
                 else:
-                    self.log.error(str(e))
+                    self.log.error(str(e), exc_info=True)
                     write(f, str(e).encode('cp1251', errors='replace') +
                           b' File: ' +
                           file_name.encode('cp1251', errors='replace'))

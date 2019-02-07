@@ -79,7 +79,8 @@ class Address(xsd.ComplexType):
             res += (', ' if res else '') + self.Urban_District
         if self.Soviet_Village:
             res += (', ' if res else '') + self.Soviet_Village
-        res += (', ' if res else '') + self.Locality
+        if self.Locality:
+            res += (', ' if res else '') + self.Locality
         if self.Street:
             res += ', ' + self.Street
         if self.House:

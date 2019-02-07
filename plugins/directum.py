@@ -258,9 +258,9 @@ class IntegrationServices:
         requisite = xml_package.createElement("Requisite")
         requisite.setAttribute("Name", u"Наименование")
         requisite.setAttribute("Type", "String")
+        name = entity.name if entity.name else entity.full_name
         text = xml_package.createTextNode(
-            '' if not entity.name else
-            entity.name if len(entity.name) < 50 else entity.name[:49])
+            name if len(name) < 50 else name[len(name) - 49:])
         requisite.appendChild(text)
         section.appendChild(requisite)
 
@@ -328,10 +328,11 @@ class IntegrationServices:
                                                   FullSync=True)
         if res[0]:
             raise Exception(str(res))
-        self.log.info('Добавлен заявитель ЮЛ: %s' % entity.name)
+        self.log.info('Добавлен заявитель ЮЛ: %s' %
+                      (entity.name if entity.name else entity.full_name))
         return res
 
-    def __upload_doc(self, doc_getter, doc, files, declar_id, declar):
+    def __upload_doc(self, doc_getter, doc, files, declar_id, declar, i=0):
         if doc_getter:
             doc_data = doc_getter(doc.url, doc.file_name)
         elif hasattr(doc, 'file') and doc.file:
@@ -418,6 +419,7 @@ class IntegrationServices:
                                 "(NumberEDoc='' or NumberEDoc is null) " \
                                 "and Дата4='%s'" % \
                                 (doc.title, doc.date.strftime('%d.%m.%Y'))
+                    s_str = s_str.replace('"', '\\"')
                     res = self.search('ТКД_ПРОЧИЕ', s_str, tp=self.DOC)
                     if not len(res):
                         doc_ids.append(str(self.__upload_doc(
@@ -533,16 +535,24 @@ class IntegrationServices:
             section6.setAttribute('Index', '6')
             number = 1
             for ent in declar.legal_entity:
-                res = self.search('ОРГ', "Наименование='%s'"
-                                         " and Состояние='Действующая'" %
-                                  ent.name)
+                query_str = ''
+                if ent.full_name:
+                    query_str = "LongString='%s'" % ent.full_name
+                if ent.name:
+                    query_str = (query_str + ' or ' if query_str else '') + \
+                                "Наименование='%s'" % ent.name
+                if ent.inn:
+                    query_str = "(ИНН like '%%%s'" % ent.inn + (
+                        ' or (' + query_str + ')' if query_str else '') + ')'
+                query_str = query_str.replace('"', '\\"')
+                res = self.search('ОРГ',
+                                  query_str + " and Состояние='Действующая'")
                 if res:
                     ent_id = res[0].get('ИД')
                 else:
                     self.add_legal_entity(ent)
-                    res = self.search('ОРГ', "Наименование='%s'"
-                                             " and Состояние='Действующая'" %
-                                      ent.name)
+                    res = self.search(
+                        'ОРГ', query_str + " and Состояние='Действующая'")
                     ent_id = res[0].get('ИД')
                     logging.info('ИД организации = %s' % ent_id)
                 # "Заявитель ЮЛ"
@@ -872,8 +882,8 @@ class IntegrationServices:
             return v
 
         opers = ({'like': 'Like'}, {'>=': 'GEq'}, {'<=': 'LEq'}, {'=': 'Eq'},
-                 {'<>': 'NEq'}, {'>': 'Gt'}, {'<': 'Lt'}, {'is null': 'IsNull'},
-                 {'is not null': 'IsNotNull'}, {'contains': 'Contains'})
+                 {'<>': 'NEq'}, {'>': 'Gt'}, {'<': 'Lt'},
+                 {'contains': 'Contains'})
         doc = Document()
         criteria = criteria.replace('\n', ' ').replace('\r', ' ')
         # Cut strings from criteria
@@ -885,81 +895,55 @@ class IntegrationServices:
             c_no_str = first + second
         if '(' in c_no_str:
             idx = criteria.index('(')
-            idx2 = criteria.index(')')
+            idx2 = criteria.find(')')
             cnt = criteria.count('(', idx + 1, idx2)
             while cnt:
-                idx2 = criteria.index(')', __end=idx2 - 1)
-                cnt = criteria.count('(', idx + 1, idx2)
-            quoted = criteria[idx:criteria.index(')') + 1]
-            criteria = criteria.replace(quoted, '').strip()
+                oldidx = idx2
+                idx2 = criteria.find(')', 0, idx2 - 1)
+                if idx2 < 0:
+                    cnt = 0
+                    idx2 = oldidx
+                else:
+                    cnt = criteria.count('(', idx + 1, idx2)
+            if idx2 < 0:
+                quoted = criteria[idx:]
+            else:
+                quoted = criteria[idx:idx2 + 1]
+            criteria = criteria.replace(quoted, '')
             elem = self.__search_crit_parser(criteria)
-            elem.appendChild(self.__search_crit_parser(quoted[1:-1].strip()))
+            elem.appendChild(self.__search_crit_parser(quoted[1:].strip()))
             doc.unlink()
             return elem
-        if ' and ' in criteria.lower():
-            if ' AND ' in criteria:
-                first, second = criteria.split(' AND ', 1)
-            elif ' And ' in criteria:
-                first, second = criteria.split(' And ', 1)
-            else:
-                first, second = criteria.split(' and ', 1)
-            first, second = first.strip(), second.strip()
-            elem = doc.createElement('And')
-            if first:
-                elem.appendChild(self.__search_crit_parser(first))
-            if second:
-                elem.appendChild(self.__search_crit_parser(second))
-            doc.unlink()
-            return elem
-        if ' or ' in criteria.lower():
-            if ' OR ' in criteria:
-                first, second = criteria.split(' OR ', 1)
-            elif ' Or ' in criteria:
-                first, second = criteria.split(' Or ', 1)
-            else:
-                first, second = criteria.split(' or ', 1)
-            first, second = first.strip(), second.strip()
-            elem = doc.createElement('Or')
-            if first:
-                elem.appendChild(self.__search_crit_parser(first))
-            if second:
-                elem.appendChild(self.__search_crit_parser(second))
-            doc.unlink()
-            return elem
-        if ' is null' in criteria.lower():
-            if ' IS NULL' in criteria:
-                first, second = criteria.split(' IS NULL', 1)
-            elif ' Is null' in criteria:
-                first, second = criteria.split(' Is null', 1)
-            elif ' is Null' in criteria:
-                first, second = criteria.split(' is Null', 1)
-            elif ' Is Null' in criteria:
-                first, second = criteria.split(' Is Null', 1)
-            else:
-                first, second = criteria.split(' is null', 1)
-            first, second = first.strip(), second.strip()
-            elem = doc.createElement('IsNull')
-            elem.setAttribute('Requisite', first)
-            doc.unlink()
-            return elem
-        if ' is not null' in criteria.lower():
-            if ' IS NOT NULL' in criteria:
-                first, second = criteria.split(' IS NOT NULL', 1)
-            elif ' Is not null' in criteria:
-                first, second = criteria.split(' Is not null', 1)
-            elif ' is not Null' in criteria:
-                first, second = criteria.split(' is not Null', 1)
-            elif ' Is not Null' in criteria:
-                first, second = criteria.split(' Is not Null', 1)
-            elif ' Is Not Null' in criteria:
-                first, second = criteria.split(' Is Not Null', 1)
-            else:
-                first, second = criteria.split(' is not null', 1)
-            first, second = first.strip(), second.strip()
-            elem = doc.createElement('IsNotNull')
-            elem.setAttribute('Requisite', first)
-            doc.unlink()
-            return elem
+        logics = {'and': 'And', 'or': 'Or'}
+        for logic, txt in logics.items():
+            logic = ' %s ' % logic
+            if logic in criteria.lower():
+                idx = criteria.lower().index(logic)
+                first = criteria[:idx]
+                second = criteria[idx + len(logic):]
+                first, second = first.strip(), second.strip()
+                elem = doc.createElement(txt)
+                if first:
+                    first = self.__search_crit_parser(first)
+                    if first:
+                        elem.appendChild(first)
+                if second:
+                    second = self.__search_crit_parser(second)
+                    if second:
+                        elem.appendChild(second)
+                doc.unlink()
+                return elem
+        logics = {'is null': 'IsNull', 'is not null': 'IsNotNull'}
+        for logic, txt in logics.items():
+            logic = ' %s' % logic
+            if logic in criteria.lower():
+                idx = criteria.lower().index(logic)
+                first = criteria[:idx]
+                first = first.strip()
+                elem = doc.createElement('IsNotNull')
+                elem.setAttribute('Requisite', first)
+                doc.unlink()
+                return elem
         for oper in opers:
             key = list(oper)[0]
             val = oper[key]
