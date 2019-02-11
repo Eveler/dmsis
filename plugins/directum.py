@@ -180,12 +180,16 @@ class IntegrationServices:
         section.appendChild(requisite)
 
         # "Телефон"
-        requisite = xml_package.createElement("Requisite")
-        requisite.setAttribute("Name", u"Строка")
-        requisite.setAttribute("Type", "String")
-        text = xml_package.createTextNode(', '.join(human.phone))
-        requisite.appendChild(text)
-        section.appendChild(requisite)
+        try:
+            text = ', '.join(human.phone)
+            requisite = xml_package.createElement("Requisite")
+            requisite.setAttribute("Name", u"Строка")
+            requisite.setAttribute("Type", "String")
+            text = xml_package.createTextNode(text)
+            requisite.appendChild(text)
+            section.appendChild(requisite)
+        except TypeError:
+            pass
 
         # "e-mail"
         requisite = xml_package.createElement("Requisite")
@@ -474,21 +478,25 @@ class IntegrationServices:
             section7.setAttribute('Index', '7')
             number = 1
             for person in declar.person:
+                query_str = \
+                    "Дополнение='%s' and Дополнение2='%s'" \
+                    " and Состояние='Действующая' and" \
+                    " (Расписание='%s' or Расписание=''" \
+                    " or Расписание is null)" % \
+                    (person.surname, person.first_name, str(person.address))
                 if person.patronymic:
-                    res = self.search('ПРС', "Дополнение='%s' "
-                                             "and Дополнение2='%s' "
-                                             "and Дополнение3='%s' "
-                                             "and Расписание='%s' "
-                                             "and Состояние='Действующая'" %
-                                      (person.surname, person.first_name,
-                                       person.patronymic, str(person.address)))
-                else:
-                    res = self.search('ПРС', "Дополнение='%s' "
-                                             "and Дополнение2='%s' "
-                                             "and Расписание='%s' "
-                                             "and Состояние='Действующая'" %
-                                      (person.surname, person.first_name,
-                                       str(person.address)))
+                    query_str = "Дополнение3='%s' and " % person.patronymic +\
+                                query_str
+                res = self.search('ПРС', query_str)
+                if not res:
+                    query_str = \
+                        "Дополнение='%s' and Дополнение2='%s'" \
+                        " and Состояние='Действующая'" % \
+                        (person.surname, person.first_name)
+                    if person.patronymic:
+                        query_str = "Дополнение3='%s' and " \
+                                    % person.patronymic + query_str
+                    res = self.search('ПРС', query_str)
                 self.log.debug('res = %s' % res)
                 if res:
                     person_id = res[0].get('ИД')

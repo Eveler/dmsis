@@ -275,6 +275,9 @@ class Integration:
                             applied_documents=applied_docs,
                             ftp_user=self.ftp_user,
                             ftp_pass=self.ftp_pass)
+                        logging.info(
+                            'Результат услуги отправлен. Дело № %s от %s' %
+                            (request.declar_num, request.declar_date))
                     except:
                         for ad in applied_docs:
                             try:
@@ -287,6 +290,7 @@ class Integration:
                     self.db.commit()
         except Exception as e:
             self.report_error()
+            self.db.rollback()
 
         self.db.vacuum()
 
