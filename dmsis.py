@@ -126,6 +126,7 @@ class Integration:
                         exc_info=True)
         except Exception:
             self.report_error()
+            self.db.rollback()
 
         declar = 1
         while declar:
@@ -175,6 +176,7 @@ class Integration:
                     pass
             except Exception as e:
                 self.report_error()
+                self.db.rollback()
 
         # Send final response
         try:
