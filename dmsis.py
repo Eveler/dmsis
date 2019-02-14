@@ -43,7 +43,8 @@ class Integration:
             self.__smev = Adapter(self.smev_wsdl, self.smev_ftp,
                                   method=self.cert_method,
                                   crt_name=self.crt_name,
-                                  container=self.container)
+                                  container=self.container,
+                                  serial=self.crt_serial)
         except Exception:
             self.report_error()
 

@@ -502,22 +502,25 @@ class IntegrationServices:
                     person_id = res[0].get('ИД')
                 else:
                     self.add_individual(person)
+                    query_str = \
+                        "Дополнение='%s' and Дополнение2='%s'" \
+                        " and Состояние='Действующая' and" \
+                        " (Расписание='%s' or Расписание=''" \
+                        " or Расписание is null)" % \
+                        (person.surname, person.first_name, str(person.address))
                     if person.patronymic:
-                        res = self.search('ПРС', "Дополнение='%s' "
-                                                 "and Дополнение2='%s' "
-                                                 "and Дополнение3='%s' "
-                                                 "and Расписание='%s' "
-                                                 "and Состояние='Действующая'" %
-                                          (person.surname, person.first_name,
-                                           person.patronymic,
-                                           str(person.address)))
-                    else:
-                        res = self.search('ПРС', "Дополнение='%s' "
-                                                 "and Дополнение2='%s' "
-                                                 "and Расписание='%s' "
-                                                 "and Состояние='Действующая'" %
-                                          (person.surname, person.first_name,
-                                           str(person.address)))
+                        query_str = "Дополнение3='%s' and " % person.patronymic + \
+                                    query_str
+                    res = self.search('ПРС', query_str)
+                    if not res:
+                        query_str = \
+                            "Дополнение='%s' and Дополнение2='%s'" \
+                            " and Состояние='Действующая'" % \
+                            (person.surname, person.first_name)
+                        if person.patronymic:
+                            query_str = "Дополнение3='%s' and " \
+                                        % person.patronymic + query_str
+                        res = self.search('ПРС', query_str)
                     person_id = res[0].get('ИД')
                     self.log.info('ИД персоны = %s' % person_id)
                 # "Заявитель ФЛ"
