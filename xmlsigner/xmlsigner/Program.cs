@@ -29,7 +29,7 @@ namespace xmlsigner
 			xmlStr = Console.In.ReadToEnd();
 			
 //			Console.Write("xmlStr = '" + xmlStr + "'\n");
-//			Console.Write("serial = '" + serial + "'");
+			Console.Write("serial = '" + serial + "'");
 			
 //			xmlStr = "<soap-env:Envelope xmlns:soap-env=\"http://schemas.xmlsoap.org/soap/envelope/\"><soap-env:Body>" +
 //				"<ns0:GetRequestRequest xmlns:ns0=\"urn://x-artefacts-smev-gov-ru/services/message-exchange/types/1.2\">" +

@@ -130,21 +130,17 @@ class Integration:
             self.db.rollback()
 
         declar = 1
+        received = False
         while declar:
             try:
                 declar, uuid, reply_to, files = self.smev.get_request()
                 if declar:
+                    received = True
                     try:
                         res = self.directum.add_declar(declar, files=files)
                         self.db.add_update(uuid, declar.declar_number, reply_to,
                                            directum_id=res)
                         logging.info('Добавлено/обновлено дело с ID = %s' % res)
-                        try:
-                            self.directum.run_script('СтартЗадачПоМУ')
-                        except:
-                            logging.warning(
-                                'Error while run diretum`s'
-                                ' script "СтартЗадачПоМУ"', exc_info=True)
                         try:
                             self.smev.send_ack(uuid)
                         except:
@@ -178,6 +174,13 @@ class Integration:
             except Exception as e:
                 self.report_error()
                 self.db.rollback()
+        if received:
+            try:
+                self.directum.run_script('СтартЗадачПоМУ')
+            except:
+                logging.warning(
+                    'Error while run directum`s script "СтартЗадачПоМУ"',
+                    exc_info=True)
 
         # Send final response
         try:
@@ -281,6 +284,11 @@ class Integration:
                         logging.info(
                             'Результат услуги отправлен. Дело № %s от %s' %
                             (request.declar_num, request.declar_date))
+                        if applied_docs:
+                            logging.info('Прикрепрены документы:')
+                        for doc in applied_docs:
+                            logging.info('%s от %s № %s' %
+                                         (doc.title, doc.date, doc.number))
                     except:
                         for ad in applied_docs:
                             try:
