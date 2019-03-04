@@ -642,9 +642,9 @@ class Db:
                     file_path = path.join('storage', str(maxid)[:-4])
                     if not path.exists(file_path):
                         makedirs(file_path)
-                    file_path = path.join(file_path, adoc.file_name)
+                    file_path = path.join(file_path, file_name)
                 else:
-                    file_path = path.join('storage', adoc.file_name)
+                    file_path = path.join('storage', file_name)
                 copy2(found, file_path)
             else:
                 with open(found, 'rb') as f:
@@ -713,7 +713,7 @@ class Db:
                 House=object_address.House, Housing=object_address.Housing,
                 Building=object_address.Building,
                 Apartment=object_address.Apartment,
-                Reference_point=object_address.Reference_point)
+                Reference_point=object_address.Reference_point) if object_address else None
             docs = [AppliedDocument(
                 title=doc.title, number=doc.number, date=doc.date,
                 valid_until=doc.valid_until, file_name=doc.file_name,
@@ -879,20 +879,29 @@ class Db:
 
     def delete_declar(self, uuid):
         for d in self.session.query(Declars).filter_by(uuid=uuid).all():
-            self.session.delete(d.object_address)
+            if d.object_address:
+                self.session.delete(d.object_address)
             for doc in d.documents:
                 if doc.file_path:
                     from os import remove
-                    remove(doc.file_path)
-                self.session.delete(doc)
+                    try:
+                        remove(doc.file_path)
+                    except:
+                        pass
+                if doc:
+                    self.session.delete(doc)
             for entity in d.legal_entity:
                 self.session.delete(entity)
             for person in d.person:
                 self.session.delete(person)
             for param in d.param:
                 self.session.delete(param)
+            self.session.delete(d)
         self.session.commit()
-        self.session.execute('VACUUM FULL')
+        try:
+            self.session.execute('VACUUM FULL')
+        except:
+            pass
 
     def _clear(self):
         for req in self.all():

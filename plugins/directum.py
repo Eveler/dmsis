@@ -172,12 +172,13 @@ class IntegrationServices:
             section.appendChild(requisite)
 
         # "Адрес регистрации"
-        requisite = xml_package.createElement("Requisite")
-        requisite.setAttribute("Name", u"Расписание")
-        requisite.setAttribute("Type", "String")
-        text = xml_package.createTextNode(str(human.address))
-        requisite.appendChild(text)
-        section.appendChild(requisite)
+        if human.address:
+            requisite = xml_package.createElement("Requisite")
+            requisite.setAttribute("Name", u"Расписание")
+            requisite.setAttribute("Type", "String")
+            text = xml_package.createTextNode(str(human.address))
+            requisite.appendChild(text)
+            section.appendChild(requisite)
 
         # "Телефон"
         try:
@@ -192,12 +193,17 @@ class IntegrationServices:
             pass
 
         # "e-mail"
-        requisite = xml_package.createElement("Requisite")
-        requisite.setAttribute("Name", u"Строка2")
-        requisite.setAttribute("Type", "String")
-        text = xml_package.createTextNode(', '.join(human.email))
-        requisite.appendChild(text)
-        section.appendChild(requisite)
+        try:
+            text = ', '.join(human.email)
+            if text:
+                requisite = xml_package.createElement("Requisite")
+                requisite.setAttribute("Name", u"Строка2")
+                requisite.setAttribute("Type", "String")
+                text = xml_package.createTextNode(text)
+                requisite.appendChild(text)
+                section.appendChild(requisite)
+        except TypeError:
+            pass
 
         # "Дата рождения"
         if human.birthdate:

@@ -104,7 +104,6 @@ class Integration:
                                        reply_to, directum_id=res)
                     logging.info('Добавлено/обновлено дело с ID = %s' % res)
                     self.db.delete_declar(uuid)
-                    self.directum.run_script('СтартЗадачПоМУ')
                 except IntegrationServicesException as e:
                     if "Услуга не найдена" in e.message:
                         logging.warning(
@@ -125,6 +124,12 @@ class Integration:
                     logging.warning(
                         'Failed to send saved data to DIRECTUM.',
                         exc_info=True)
+            try:
+                self.directum.run_script('СтартЗадачПоМУ')
+            except:
+                logging.warning(
+                    'Error while run directum`s script "СтартЗадачПоМУ"',
+                    exc_info=True)
         except Exception:
             self.report_error()
             self.db.rollback()
