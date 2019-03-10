@@ -36,6 +36,7 @@ class Integration:
             self.smev_uri = 'urn://augo/smev/uslugi/1.0.0'
             self.local_name = 'directum'
             self.cert_method = 'sharp'
+            self.crt_serial = None
             self.mail_server = None
             self.ftp_user, self.ftp_pass = 'anonymous', 'anonymous'
 
@@ -76,7 +77,8 @@ class Integration:
                 self.__smev = Adapter(self.smev_wsdl, self.smev_ftp,
                                       method=self.cert_method,
                                       crt_name=self.crt_name,
-                                      container=self.container)
+                                      container=self.container,
+                                      serial=self.crt_serial)
             except Exception:
                 self.report_error()
 
