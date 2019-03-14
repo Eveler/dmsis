@@ -912,16 +912,33 @@ class IntegrationServices:
             c_no_str = first + second
         if '(' in c_no_str:
             idx = criteria.index('(')
-            idx2 = criteria.find(')')
-            cnt = criteria.count('(', idx + 1, idx2)
-            while cnt:
-                oldidx = idx2
-                idx2 = criteria.find(')', 0, idx2 - 1)
+            idx2 = criteria.rfind(')')
+            cnt, cnt2 = 1, 0
+            while cnt or cnt2:
+                q_idx = criteria.find("'", idx + 1)
+                q_idx2 = criteria.rfind("'", idx + 1, idx2 - 1)
+                oldidx = idx
+                idx = criteria.find('(', idx + 1, idx2 - 1)
+                if idx < 0:
+                    idx = oldidx
+                if q_idx < 0:
+                    q_idx = idx
+                oldidx2 = idx2
+                idx2 = criteria.rfind(')', idx + 1, idx2 - 1)
                 if idx2 < 0:
+                    idx2 = oldidx2
+                if q_idx2 < 0:
+                    q_idx2 = idx2
+                if q_idx < idx:
                     cnt = 0
-                    idx2 = oldidx
+                    idx = oldidx
                 else:
-                    cnt = criteria.count('(', idx + 1, idx2)
+                    cnt = criteria.count('(', idx + 1, idx2 - 1)
+                if q_idx2 > idx2:
+                    cnt2 = 0
+                    idx2 = oldidx2
+                else:
+                    cnt2 = criteria.count(')', idx + 1, idx2 - 1)
             if idx2 < 0:
                 quoted = criteria[idx:]
             else:
