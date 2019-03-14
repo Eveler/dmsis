@@ -595,6 +595,7 @@ class Adapter:
         addr = urlparse(self.ftp_addr).netloc
         f, file_path = tempfile.mkstemp()
         do_loop = True
+        max_try = 7
         while do_loop:
             do_loop = False
             try:
@@ -620,12 +621,22 @@ class Adapter:
                     uuid = '/'
                     do_loop = True
                 else:
-                    self.log.error(str(e), exc_info=True)
-                    write(f, str(e).encode('cp1251', errors='replace') +
-                          b' File: ' +
-                          file_name.encode('cp1251', errors='replace'))
-                    close(f)
-                    return file_path, e
+                    if max_try:
+                        max_try -= 1
+                        do_loop = True
+                    else:
+                        self.log.error(str(e), exc_info=True)
+                        from sys import exc_info
+                        from traceback import format_exception
+                        etype, value, tb = exc_info()
+                        trace = ''.join(format_exception(etype, value, tb))
+                        msg = ("%s" + "\n" + "*" * 70 + "\n%s\n" + "*" * 70) % (
+                            value, trace)
+                        write(f, str(msg).encode('cp1251', errors='replace') +
+                              b'\nFile: ' +
+                              file_name.encode('cp1251', errors='replace'))
+                        close(f)
+                        return file_path, e
         return file_path
 
     def __send(self, operation, msg):
