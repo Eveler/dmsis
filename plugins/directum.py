@@ -278,9 +278,9 @@ class IntegrationServices:
         requisite = xml_package.createElement("Requisite")
         requisite.setAttribute("Name", u"LongString")
         requisite.setAttribute("Type", "String")
+        name = entity.full_name if entity.full_name else entity.name
         text = xml_package.createTextNode(
-            entity.full_name
-            if len(entity.full_name) < 1024 else entity.full_name[:1023])
+            name if len(name) < 1024 else name[:1023])
         requisite.appendChild(text)
         section.appendChild(requisite)
 
