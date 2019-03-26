@@ -196,7 +196,7 @@ class Integration:
                     'ДПУ', 'ИД=%s' % request.directum_id)
 
                 # For all requests check if declar`s end date is set
-                if declar[0].get('Дата5'):
+                if declar and declar[0].get('Дата5'):
                     # Stub class for document info
                     class Ad(object):
                         pass
