@@ -5,6 +5,7 @@ from xml.etree.ElementTree import fromstring
 from os import path, remove
 
 from zeep import Client
+from zeep.exceptions import Fault
 
 
 class IntegrationServicesException(Exception):
@@ -678,7 +679,9 @@ class IntegrationServices:
                           (declar.service, declar.service, declar.service))
         if not len(res):
             raise IntegrationServicesException("Услуга не найдена")
-        text = xml_package.createTextNode(res[0]['ИДЗапГлавРазд'])
+        text = xml_package.createTextNode(
+            res[0].get('ИДЗапГлавРазд')
+            if res[0].get('ИДЗапГлавРазд') else res[0].get('ИД'))
         requisite.appendChild(text)
         section.appendChild(requisite)
 
