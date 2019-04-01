@@ -560,17 +560,17 @@ class IntegrationServices:
                     query_str = (query_str + ' or ' if query_str else '') + \
                                 "Наименование='%s'" % ent.name
                 if ent.inn:
-                    query_str = "(ИНН like '%%%s'" % ent.inn + (
-                        ' or (' + query_str + ')' if query_str else '') + ')'
+                    query_str = "ИНН like '%%%s'" % ent.inn + (
+                        ' or ' + query_str if query_str else '')
                 query_str = query_str.replace('"', '\\"')
-                res = self.search('ОРГ',
-                                  query_str + " and Состояние='Действующая'")
+                res = self.search(
+                    'ОРГ', "(" + query_str + ") and Состояние='Действующая'")
                 if res:
                     ent_id = res[0].get('ИД')
                 else:
                     self.add_legal_entity(ent)
                     res = self.search(
-                        'ОРГ', query_str + " and Состояние='Действующая'")
+                        'ОРГ', "(" + query_str + ") and Состояние='Действующая'")
                     ent_id = res[0].get('ИД')
                     logging.info('ИД организации = %s' % ent_id)
                 # "Заявитель ЮЛ"

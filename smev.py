@@ -605,8 +605,8 @@ class Adapter:
                     if file_name[0] == '/':
                         file_name = file_name[1:]
                     close(f)
-                    with open(file_path, 'wb') as f:
-                        con.retrbinary('RETR ' + file_name, f.write)
+                    with open(file_path, 'wb') as fo:
+                        con.retrbinary('RETR ' + file_name, fo.write)
             except ftplib.all_errors as e:
                 str_e = str(e)
                 if user != 'anonymous' and passwd != 'anonymous' \
