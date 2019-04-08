@@ -215,8 +215,9 @@ class Adapter:
                                 file_name = fn + ext
                         else:
                             rs, e = rs
-                            new_ext = guess_extension(file['MimeType'])
-                            file_name = fn + new_ext if new_ext else '.txt'
+                            # new_ext = guess_extension(file['MimeType'])
+                            # file_name = fn + new_ext if new_ext else '.txt'
+                            file_name = fn + '.txt'
                         sig = file.get('SignaturePKCS7')
                         if sig:
                             rs = self.__make_zip(file_name, rs, sig)
@@ -596,15 +597,22 @@ class Adapter:
         f, file_path = tempfile.mkstemp()
         do_loop = True
         max_try = 12
+        closed = False
+        encoding = 'utf-8'
+        encodings = ['cp1251', 'cp866']
         while do_loop:
             do_loop = False
             try:
                 with ftplib.FTP(addr, user, passwd) as con:
-                    con.encoding = 'utf-8'
+                    con.encoding = encoding
                     con.cwd(uuid)
+                    # lst = con.mlsd()
+                    # lst = con.nlst(uuid)
                     if file_name[0] == '/':
                         file_name = file_name[1:]
-                    close(f)
+                    if not closed:
+                        close(f)
+                        closed = True
                     with open(file_path, 'wb') as fo:
                         con.retrbinary('RETR ' + file_name, fo.write)
             except ftplib.all_errors as e:
@@ -620,19 +628,27 @@ class Adapter:
                 elif len(uuid) > 2:
                     uuid = '/'
                     do_loop = True
+                elif 'No such' in str_e:
+                    if encodings:
+                        encoding = encodings.pop()
+                        do_loop = True
                 else:
                     if max_try:
                         max_try -= 1
                         do_loop = True
                     else:
-                        self.log.error(str(e), exc_info=True)
+                        try:
+                            self.log.error(str_e, exc_info=True)
+                        except UnicodeEncodeError:
+                            self.log.error(str_e)
                         from sys import exc_info
                         from traceback import format_exception
                         etype, value, tb = exc_info()
                         trace = ''.join(format_exception(etype, value, tb))
                         msg = ("%s" + "\n" + "*" * 70 + "\n%s\n" + "*" * 70) % (
                             value, trace)
-                        close(f)
+                        if not closed:
+                            close(f)
                         with open(file_path, 'wb') as fo:
                             fo.write(
                                 str(msg).encode('cp1251', errors='replace') +

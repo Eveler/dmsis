@@ -294,8 +294,10 @@ class Integration:
                         if applied_docs:
                             logging.info('Прикрепрены документы:')
                         for doc in applied_docs:
-                            logging.info('%s от %s № %s' %
-                                         (doc.title, doc.date, doc.number))
+                            logging.info(
+                                '%s от %s № %s' %
+                                (doc.title, doc.date[:19],
+                                 doc.number if doc.number else 'б/н'))
                     except:
                         for ad in applied_docs:
                             try:
@@ -528,7 +530,7 @@ def main():
 
     from optparse import OptionParser
 
-    parser = OptionParser(version="%prog ver. 1.0",
+    parser = OptionParser(version="%prog ver. 1.03",
                           conflict_handler="resolve")
     parser.print_version()
     parser.add_option("-r", "--run", action="store_true", dest="run",
