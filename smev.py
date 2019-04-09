@@ -567,15 +567,23 @@ class Adapter:
                       ftp_pass='anonymous'):
         self.log.debug(file_name)
         addr = urlparse(self.ftp_addr).netloc
-        with ftplib.FTP(addr, ftp_user, ftp_pass) as con:
-            con.encoding = 'utf-8'
-            uuid = str(uuid1())
-            res = con.mkd(uuid)
-            self.log.debug(res)
-            con.cwd(uuid)
-            with open(file, 'rb') as f:
-                res = con.storbinary('STOR ' + file_name, f)
-            self.log.debug(res)
+        max_try = 12
+        do_loop = True
+        while do_loop:
+            try:
+                with ftplib.FTP(addr, ftp_user, ftp_pass) as con:
+                    con.encoding = 'utf-8'
+                    uuid = str(uuid1())
+                    res = con.mkd(uuid)
+                    self.log.debug(res)
+                    con.cwd(uuid)
+                    with open(file, 'rb') as f:
+                        res = con.storbinary('STOR ' + file_name, f)
+                    self.log.debug(res)
+                    do_loop = False
+            except ConnectionResetError:
+                max_try -= 1
+                do_loop = max_try > 0
         return uuid
 
     def __make_zip(self, file_name, file_path, sig):
