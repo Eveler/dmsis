@@ -98,6 +98,7 @@ class Integration:
         requests and sends SendResponse if status changed
         """
         # Send to DIRECTUM previously saved declars
+        sent = False
         try:
             for declar, files, reply_to, uuid in self.db.all_declars_as_xsd():
                 try:
@@ -106,6 +107,7 @@ class Integration:
                                        reply_to, directum_id=res)
                     logging.info('Добавлено/обновлено дело с ID = %s' % res)
                     self.db.delete_declar(uuid)
+                    sent = True
                 except IntegrationServicesException as e:
                     if "Услуга не найдена" in e.message:
                         logging.warning(
@@ -126,12 +128,13 @@ class Integration:
                     logging.warning(
                         'Failed to send saved data to DIRECTUM.',
                         exc_info=True)
-            try:
-                self.directum.run_script('СтартЗадачПоМУ')
-            except:
-                logging.warning(
-                    'Error while run directum`s script "СтартЗадачПоМУ"',
-                    exc_info=True)
+            if sent:
+                try:
+                    self.directum.run_script('СтартЗадачПоМУ')
+                except:
+                    logging.warning(
+                        'Error while run directum`s script "СтартЗадачПоМУ"',
+                        exc_info=True)
         except Exception:
             self.report_error()
             self.db.rollback()
@@ -202,23 +205,34 @@ class Integration:
                         pass
 
                     applied_docs = []
-                    found = False
 
                     # Search newest procedure with document bound
                     # for that declar
                     procs = self.directum.search(
-                        'ПРОУ',
-                        "Kod2=%s AND ProcState<>'Исключена вручную'" % request.declar_num,
+                        'ПРОУ', "Kod2='%s' AND ProcState<>'Исключена вручную'" %
+                                request.declar_num,
                         order_by='Дата4', ascending=False)
                     for proc in procs:
-                        if proc.get(
-                                'Ведущая аналитика') == str(request.directum_id):
+                        if proc.get('Ведущая аналитика') == \
+                                str(request.directum_id):
                             try:
                                 docs = self.directum.get_bind_docs(
                                     'ПРОУ', proc.get('ИДЗапГлавРазд'))
                                 for doc in docs:
+                                    # if doc.get('ISBEDocKind') != 'Г000037':
+                                    if doc.get('TKED') not in \
+                                            ('КИК', 'ИК1', 'ИК2', 'ПСИ'):
+                                        continue
                                     doc_id = doc.get('ID')
                                     ad = Ad()
+                                    ad.date = doc.get('ISBEDocCreateDate')
+                                    ad.file_name = doc.get(
+                                        'ID') + '.' + doc.get(
+                                        'Extension').lower()
+                                    ad.number = doc.get(
+                                        'Дополнение') if doc.get(
+                                        'Дополнение') else doc.get('NumberEDoc')
+                                    ad.title = doc.get('ISBEDocName')
                                     # Get only last version
                                     versions = self.directum.get_doc_versions(
                                         doc_id)
@@ -228,30 +242,19 @@ class Integration:
                                     os.write(file, data)
                                     os.close(file)
                                     ad.file = file_n
-                                    ad.date = doc.get('ISBEDocCreateDate')
-                                    ad.file_name = doc.get(
-                                        'ID') + '.' + doc.get(
-                                        'Extension').lower()
-                                    ad.number = doc.get(
-                                        'Дополнение') if doc.get(
-                                        'Дополнение') else doc.get('NumberEDoc')
-                                    ad.title = doc.get('ISBEDocName')
                                     applied_docs.append(ad)
-                                if docs:
-                                    found = True
-                                    break
                             except:
                                 logging.warning('', exc_info=True)
 
                     # Get bound docs from declar if there is no procedures
                     # with docs bound
-                    if not found:
+                    if not applied_docs:
                         docs = self.directum.get_bind_docs(
                             'ДПУ', request.directum_id)
-                        ad = Ad()
                         for doc in docs:
                             if doc.get('TKED') in ('КИК', 'ИК1', 'ИК2', 'ПСИ'):
                                 # if ad.date > doc.get('ISBEDocCreateDate'):
+                                ad = Ad()
                                 doc_id = doc.get('ID')
                                 file, file_n = mkstemp()
                                 ad.file = file_n

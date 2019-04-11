@@ -607,7 +607,7 @@ class Adapter:
         max_try = 12
         closed = False
         encoding = 'utf-8'
-        encodings = ['cp1251', 'cp866']
+        encodings = ['utf-8', 'cp1251', 'cp866']
         while do_loop:
             do_loop = False
             try:
