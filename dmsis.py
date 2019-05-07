@@ -108,6 +108,17 @@ class Integration:
                     logging.info('Добавлено/обновлено дело с ID = %s' % res)
                     self.db.delete_declar(uuid)
                     sent = True
+                    try:
+                        self.smev.send_ack(uuid)
+                    except:
+                        logging.warning(
+                            'Failed to send AckRequest.', exc_info=True)
+                    # try:
+                    #     params = ['ID', res]
+                    #     self.directum.run_script('СтартЗадачПоМУ', params)
+                    # except:
+                    #     logging.warning('Error while run directum`s script '
+                    #                     '"СтартЗадачПоМУ"', exc_info=True)
                 except IntegrationServicesException as e:
                     if "Услуга не найдена" in e.message:
                         logging.warning(
@@ -156,6 +167,12 @@ class Integration:
                         except:
                             logging.warning(
                                 'Failed to send AckRequest.', exc_info=True)
+                        # try:
+                        #     params = ['ID', res]
+                        #     self.directum.run_script('СтартЗадачПоМУ', params)
+                        # except:
+                        #     logging.warning('Error while run directum`s script '
+                        #                     '"СтартЗадачПоМУ"', exc_info=True)
                     except IntegrationServicesException as e:
                         if "Услуга не найдена" in e.message:
                             logging.warning(
@@ -217,7 +234,9 @@ class Integration:
                                 str(request.directum_id):
                             try:
                                 docs = self.directum.get_bind_docs(
-                                    'ПРОУ', proc.get('ИДЗапГлавРазд'))
+                                    'ПРОУ', proc.get('Аналитика-оригинал')
+                                    if proc.get('Аналитика-оригинал')
+                                    else proc.get('ИДЗапГлавРазд'))
                                 for doc in docs:
                                     # if doc.get('ISBEDocKind') != 'Г000037':
                                     if doc.get('TKED') not in \

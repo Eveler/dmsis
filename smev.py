@@ -607,7 +607,7 @@ class Adapter:
         max_try = 12
         closed = False
         encoding = 'utf-8'
-        encodings = ['utf-8', 'cp1251', 'cp866']
+        # encodings = ['utf-8', 'cp1251', 'cp866']
         while do_loop:
             do_loop = False
             try:
@@ -636,10 +636,10 @@ class Adapter:
                 elif len(uuid) > 2:
                     uuid = '/'
                     do_loop = True
-                elif 'No such' in str_e:
-                    if encodings:
-                        encoding = encodings.pop()
-                        do_loop = True
+                # elif 'No such' in str_e:
+                #     if encodings:
+                #         encoding = encodings.pop()
+                #         do_loop = True
                 else:
                     if max_try:
                         max_try -= 1

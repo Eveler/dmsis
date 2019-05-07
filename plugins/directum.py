@@ -410,7 +410,10 @@ class IntegrationServices:
                            declar.register_date.strftime('%d.%m.%Y')))
         if len(res):
             # Добавляем отсутствующие документы
-            declar_id = res[0]['ИДЗапГлавРазд']
+            declar_id = res[0].get('Аналитика-оригинал') \
+                if res[0].get('Аналитика-оригинал') \
+                else res[0].get('ИДЗапГлавРазд') \
+                if res[0].get('ИДЗапГлавРазд') else res[0].get('ИД')
 
             # На всякий случай нормализуем наименование записи
             # params = [('Param', None), ('Param2', declar_id)]
@@ -680,7 +683,8 @@ class IntegrationServices:
         if not len(res):
             raise IntegrationServicesException("Услуга не найдена")
         text = xml_package.createTextNode(
-            res[0].get('ИДЗапГлавРазд')
+            res[0].get('Аналитика-оригинал')
+            if res[0].get('Аналитика-оригинал') else res[0].get('ИДЗапГлавРазд')
             if res[0].get('ИДЗапГлавРазд') else res[0].get('ИД'))
         requisite.appendChild(text)
         section.appendChild(requisite)
@@ -736,7 +740,9 @@ class IntegrationServices:
         res = self.search('ДПУ', "Дополнение3='%s' and Дата='%s'" %
                           (declar.declar_number,
                            declar.register_date.strftime('%d.%m.%Y')))
-        declar_id = res[0]['ИДЗапГлавРазд']
+        declar_id = res[0].get('Аналитика-оригинал') \
+            if res[0].get('Аналитика-оригинал') else res[0].get('ИДЗапГлавРазд') \
+            if res[0].get('ИДЗапГлавРазд') else res[0].get('ИД')
 
         params = [('Param', None), ('Param2', declar_id)]
         res = self.run_script('NameDPU', params)
