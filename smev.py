@@ -152,21 +152,24 @@ class Adapter:
                 for uuid, file in files.items():
                     file_name = file['FileName']
                     fn, ext = path.splitext(file_name)
-                    res = self.__load_file(uuid, file['UserName'],
+                    res1 = self.__load_file(uuid, file['UserName'],
                                            file['Password'],
                                            file['FileName'])
-                    if isinstance(res, (str, bytes)):
+                    if isinstance(res1, (str, bytes)):
                         new_ext = guess_extension(file_name).lower()
                         ext = ext.lower()
                         if ext != new_ext:
                             file_name = fn + new_ext
                     else:
-                        res, e = res
+                        res1, e = res1
                         file_name = fn + '.txt'
+                        with open(res1, 'w') as f:
+                            f.write('\n\r\n\r')
+                            f.write(str(res))
                     sig = file.get('SignaturePKCS7')
                     if sig:
-                        res = self.__make_zip(file_name, res, sig)
-                    declar.files.append({res: file_name})
+                        res1 = self.__make_zip(file_name, res1, sig)
+                    declar.files.append({res1: file_name})
 
             uuid = xml.find('.//{*}MessageID').text
             reply_to = xml.find('.//{*}ReplyTo')
@@ -218,6 +221,9 @@ class Adapter:
                             # new_ext = guess_extension(file['MimeType'])
                             # file_name = fn + new_ext if new_ext else '.txt'
                             file_name = fn + '.txt'
+                            with open(rs, 'w') as f:
+                                f.write('\n\r\n\r')
+                                f.write(str(res))
                         sig = file.get('SignaturePKCS7')
                         if sig:
                             rs = self.__make_zip(file_name, rs, sig)
