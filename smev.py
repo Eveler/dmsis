@@ -165,7 +165,35 @@ class Adapter:
                         file_name = fn + '.txt'
                         with open(res1, 'a') as f:
                             f.write('\n\r\n\r')
-                            f.write(str(res))
+                            try:
+                                f.write(etree.tostring(res))
+                                f.write('\n\r\n\r')
+                                f.write(etree.tostring(
+                                    res.Request.MessagePrimaryContent))
+                            except:
+                                from sys import exc_info
+                                from traceback import format_exception
+                                etype, value, tb = exc_info()
+                                trace = ''.join(
+                                    format_exception(etype, value, tb))
+                                msg = ("%s\n" + "*" * 70 + "\n%s\n" +
+                                       "*" * 70) % (value, trace)
+                                f.write(msg)
+                                f.write('\n\r\n\r')
+                                try:
+                                    f.write(etree.tostring(res.Request))
+                                    f.write('\n\r\n\r')
+                                    f.write(etree.tostring(
+                                        res.Request.MessagePrimaryContent))
+                                except:
+                                    etype, value, tb = exc_info()
+                                    trace = ''.join(
+                                        format_exception(etype, value, tb))
+                                    msg = ("%s\n" + "*" * 70 + "\n%s\n" +
+                                           "*" * 70) % (value, trace)
+                                    f.write(msg)
+                                    f.write('\n\r\n\r')
+                                    f.write(str(res))
                     sig = file.get('SignaturePKCS7')
                     if sig:
                         res1 = self.__make_zip(file_name, res1, sig)
