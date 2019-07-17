@@ -113,6 +113,12 @@ class Integration:
                     except:
                         logging.warning(
                             'Failed to send AckRequest.', exc_info=True)
+                    try:
+                        params = [('ID', res)]
+                        self.directum.run_script('СтартЗадачПоМУ', params)
+                    except:
+                        logging.warning('Error while run directum`s script '
+                                        '"СтартЗадачПоМУ"', exc_info=True)
                     # try:
                     #     params = ['ID', res]
                     #     self.directum.run_script('СтартЗадачПоМУ', params)
@@ -167,6 +173,12 @@ class Integration:
                         except:
                             logging.warning(
                                 'Failed to send AckRequest.', exc_info=True)
+                        try:
+                            params = [('ID', res)]
+                            self.directum.run_script('СтартЗадачПоМУ', params)
+                        except:
+                            logging.warning('Error while run directum`s script '
+                                            '"СтартЗадачПоМУ"', exc_info=True)
                         # try:
                         #     params = ['ID', res]
                         #     self.directum.run_script('СтартЗадачПоМУ', params)
