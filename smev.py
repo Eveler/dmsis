@@ -507,9 +507,9 @@ class Adapter:
         self.log.debug(res)
         return res
 
-    def send_respose(self, reply_to, declar_number, register_date,
-                     result='FINAL', text='', applied_documents=list(),
-                     ftp_user='anonymous', ftp_pass='anonymous'):
+    def send_response(self, reply_to, declar_number, register_date,
+                      result='FINAL', text='', applied_documents=list(),
+                      ftp_user='anonymous', ftp_pass='anonymous'):
         files = []
         for doc in applied_documents:
             if isinstance(doc, (bytes, str)):
@@ -850,7 +850,7 @@ if __name__ == '__main__':
         ad3 = Ad()
         ad3.file = 'C:\\Users\\836D~1\\AppData\\Local\\Temp\\1\\tmpurz0d7nl'
         ad3.file_name = 'zajcevispravlbiletohot758 1.zip'
-        a.send_respose(
+        a.send_response(
             'eyJzaWQiOjM0NzQ2LCJtaWQiOiJkNTk3Mzg1Ni1kMTBjLTExZTgtYjZkZS0wMDUwNTZhMjE1MTQiLCJlb2wiOjAsInNsYyI6ImF1Z29fc21ldl91c2x1Z2lfMS4wLjBfZGVjbGFyIiwibW5tIjoiMjUwMjAxIn0=',
             '00/2018/14441', datetime(2018, 11, 30),
             text='Услуга предоставлена', applied_documents=[ad, ad2, ad3])

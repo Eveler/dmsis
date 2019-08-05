@@ -132,10 +132,10 @@ class Integration:
                             (declar.service, declar.declar_number,
                              declar.register_date.strftime('%d.%m.%Y')))
                         self.smev.send_ack(uuid, 'false')
-                        self.smev.send_respose(
-                            reply_to, declar.declar_number,
-                            declar.register_date.strftime('%d.%m.%Y'), 'ERROR',
-                            "Услуга '%s' не найдена" % declar.service)
+                        self.smev.send_response(reply_to, declar.declar_number,
+                                                declar.register_date.strftime(
+                                                    '%d.%m.%Y'), 'ERROR',
+                                                "Услуга '%s' не найдена" % declar.service)
                         self.db.delete_declar(uuid)
                     else:
                         logging.warning(
@@ -192,10 +192,11 @@ class Integration:
                                 (declar.service, declar.declar_number,
                                  declar.register_date.strftime('%d.%m.%Y')))
                             self.smev.send_ack(uuid)
-                            self.smev.send_respose(
-                                reply_to, declar.declar_number,
-                                declar.register_date.strftime('%d.%m.%Y'), 'ERROR',
-                                "Услуга '%s' не найдена" % declar.service)
+                            self.smev.send_response(reply_to,
+                                                    declar.declar_number,
+                                                    declar.register_date.strftime(
+                                                        '%d.%m.%Y'), 'ERROR',
+                                                    "Услуга '%s' не найдена" % declar.service)
                         else:
                             logging.warning(
                                 'Failed to send saved data to DIRECTUM.',
@@ -316,12 +317,12 @@ class Integration:
                     #                 state[0].get('Наименование')
 
                     try:
-                        self.smev.send_respose(
-                            request.reply_to, request.declar_num,
-                            request.declar_date, text=text,
-                            applied_documents=applied_docs,
-                            ftp_user=self.ftp_user,
-                            ftp_pass=self.ftp_pass)
+                        self.smev.send_response(request.reply_to,
+                                                request.declar_num,
+                                                request.declar_date, text=text,
+                                                applied_documents=applied_docs,
+                                                ftp_user=self.ftp_user,
+                                                ftp_pass=self.ftp_pass)
                         logging.info(
                             'Результат услуги отправлен. Дело № %s от %s' %
                             (request.declar_num, request.declar_date))
