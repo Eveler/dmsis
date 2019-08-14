@@ -73,15 +73,11 @@ class Integration:
     @property
     def smev(self):
         if not self.__smev:
-            try:
-                self.__smev = Adapter(self.smev_wsdl, self.smev_ftp,
-                                      method=self.cert_method,
-                                      crt_name=self.crt_name,
-                                      container=self.container,
-                                      serial=self.crt_serial)
-            except Exception:
-                self.report_error()
-
+            self.__smev = Adapter(self.smev_wsdl, self.smev_ftp,
+                                  method=self.cert_method,
+                                  crt_name=self.crt_name,
+                                  container=self.container,
+                                  serial=self.crt_serial)
         return self.__smev
 
     @smev.setter
@@ -211,7 +207,7 @@ class Integration:
                     # logging.warning("Получен пустой ответ")
                     # self.smev.send_ack(uuid, 'false')
                     pass
-            except Exception as e:
+            except Exception:
                 self.report_error()
                 self.db.rollback()
         if received:
@@ -562,6 +558,7 @@ def main():
     from twisted.python import threadable
 
     threadable.init(1)
+    reactor.suggestThreadPoolSize(30)
 
     from optparse import OptionParser
 

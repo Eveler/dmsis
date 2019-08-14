@@ -366,14 +366,6 @@ class IntegrationServices:
             fn, ext = path.splitext(file_name)
             found = files.get(file_name)
             if not found:
-                found = files.get(file_name.lower())
-            if not found:
-                found = files.get(file_name.upper())
-            if not found:
-                found = files.get(fn + ext.lower())
-            if not found:
-                found = files.get(fn + ext.upper())
-            if not found:
                 found = files.get(fn + '.zip')
                 ext = '.zip'
             with open(found, 'rb') as f:

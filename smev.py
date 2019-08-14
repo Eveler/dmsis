@@ -22,6 +22,8 @@ from declar import Declar
 from lxml import etree, objectify
 from plugins.cryptopro import Crypto
 from translit import translate
+from twisted.internet import threads, reactor
+from twisted.internet.defer import returnValue, inlineCallbacks
 from zeep import Client
 from zeep.plugins import HistoryPlugin
 
@@ -46,6 +48,7 @@ class Adapter:
             self.proxy = Client(wsdl, plugins=[self.history])
         else:
             self.proxy = Client(wsdl)
+        self.__calls = 0
 
     def dump(self):
         res = "Prefixes:\n"
@@ -137,67 +140,21 @@ class Adapter:
                     xml.find('.//{urn://augo/smev/uslugi/1.0.0}declar')))
 
             if 'RefAttachmentHeaderList' in res:
-                files = {}
+                attach_files = {}
                 attach_head_list = objectify.fromstring(
                     self.__xml_part(res, b'RefAttachmentHeaderList'))
                 for head in attach_head_list.getchildren():
-                    files[head.uuid] = {'MimeType': head.MimeType}
-                    files[head.uuid]['SignaturePKCS7'] = head.SignaturePKCS7
+                    attach_files[head.uuid] = {'MimeType': head.MimeType}
+                    attach_files[head.uuid]['SignaturePKCS7'] = head.SignaturePKCS7
                 attach_list = objectify.fromstring(
                     self.__xml_part(res, b'FSAttachmentsList'))
                 for attach in attach_list.getchildren():
-                    files[attach.uuid]['UserName'] = str(attach.UserName)
-                    files[attach.uuid]['Password'] = str(attach.Password)
-                    files[attach.uuid]['FileName'] = str(attach.FileName)
-                for uuid, file in files.items():
-                    file_name = file['FileName']
-                    fn, ext = path.splitext(file_name)
-                    res1 = self.__load_file(uuid, file['UserName'],
-                                           file['Password'],
-                                           file['FileName'])
-                    if isinstance(res1, (str, bytes)):
-                        new_ext = guess_extension(file_name).lower()
-                        ext = ext.lower()
-                        if ext != new_ext:
-                            file_name = fn + new_ext
-                    else:
-                        res1, e = res1
-                        file_name = fn + '.txt'
-                        with open(res1, 'a') as f:
-                            f.write('\n\r\n\r')
-                            try:
-                                f.write(etree.tostring(res))
-                                f.write('\n\r\n\r')
-                                f.write(etree.tostring(
-                                    res.Request.MessagePrimaryContent))
-                            except:
-                                from sys import exc_info
-                                from traceback import format_exception
-                                etype, value, tb = exc_info()
-                                trace = ''.join(
-                                    format_exception(etype, value, tb))
-                                msg = ("%s\n" + "*" * 70 + "\n%s\n" +
-                                       "*" * 70) % (value, trace)
-                                f.write(msg)
-                                f.write('\n\r\n\r')
-                                try:
-                                    f.write(etree.tostring(res.Request))
-                                    f.write('\n\r\n\r')
-                                    f.write(etree.tostring(
-                                        res.Request.MessagePrimaryContent))
-                                except:
-                                    etype, value, tb = exc_info()
-                                    trace = ''.join(
-                                        format_exception(etype, value, tb))
-                                    msg = ("%s\n" + "*" * 70 + "\n%s\n" +
-                                           "*" * 70) % (value, trace)
-                                    f.write(msg)
-                                    f.write('\n\r\n\r')
-                                    f.write(str(res))
-                    sig = file.get('SignaturePKCS7')
-                    if sig:
-                        res1 = self.__make_zip(file_name, res1, sig)
-                    declar.files.append({res1: file_name})
+                    attach_files[attach.uuid]['UserName'] = str(attach.UserName)
+                    attach_files[attach.uuid]['Password'] = str(attach.Password)
+                    attach_files[attach.uuid]['FileName'] = str(attach.FileName)
+                self.__load_files(attach_files, res, files)
+                for key, item in files:
+                    declar.files.append({item: key})
 
             uuid = xml.find('.//{*}MessageID').text
             reply_to = xml.find('.//{*}ReplyTo')
@@ -229,62 +186,7 @@ class Adapter:
                         attach_files[attach.uuid]['UserName'] = str(attach.UserName)
                         attach_files[attach.uuid]['Password'] = str(attach.Password)
                         attach_files[attach.uuid]['FileName'] = str(attach.FileName)
-                    for uuid, file in attach_files.items():
-                        file_name = file['FileName']
-                        fn, ext = path.splitext(file_name)
-                        if fn[0] == '/':
-                            fn = fn[1:]
-                        rs = self.__load_file(uuid, file['FileName'],
-                                               file['UserName'],
-                                               file['Password'])
-                        if isinstance(rs, (str, bytes)):
-                            new_ext = guess_extension(file['MimeType'])
-                            ext = ext.lower()
-                            if new_ext and not ext:
-                                file_name = fn + new_ext.lower()
-                            else:
-                                file_name = fn + ext
-                        else:
-                            rs, e = rs
-                            # new_ext = guess_extension(file['MimeType'])
-                            # file_name = fn + new_ext if new_ext else '.txt'
-                            file_name = fn + '.txt'
-                            with open(rs, 'a') as f:
-                                f.write('\n\r\n\r')
-                                try:
-                                    f.write(etree.tostring(res))
-                                    f.write('\n\r\n\r')
-                                    f.write(etree.tostring(
-                                        res.Request.MessagePrimaryContent))
-                                except:
-                                    from sys import exc_info
-                                    from traceback import format_exception
-                                    etype, value, tb = exc_info()
-                                    trace = ''.join(
-                                        format_exception(etype, value, tb))
-                                    msg = ("%s\n" + "*" * 70 + "\n%s\n" +
-                                           "*" * 70) % (value, trace)
-                                    f.write(msg)
-                                    f.write('\n\r\n\r')
-                                    try:
-                                        f.write(etree.tostring(res.Request))
-                                        f.write('\n\r\n\r')
-                                        f.write(etree.tostring(
-                                            res.Request.MessagePrimaryContent))
-                                    except:
-                                        etype, value, tb = exc_info()
-                                        trace = ''.join(
-                                            format_exception(etype, value, tb))
-                                        msg = ("%s\n" + "*" * 70 + "\n%s\n" +
-                                               "*" * 70) % (value, trace)
-                                        f.write(msg)
-                                        f.write('\n\r\n\r')
-                                        f.write(str(res))
-                        sig = file.get('SignaturePKCS7')
-                        if sig:
-                            rs = self.__make_zip(file_name, rs, sig)
-                            file_name = file_name[:-4] + '.zip'
-                        files[file_name] = rs
+                    self.__load_files(attach_files, res, files)
                 if hasattr(res, 'AttachmentContentList') \
                         and res.AttachmentContentList:
                     attach_files = {}
@@ -660,6 +562,98 @@ class Adapter:
         zip.close()
         remove(file_path)
         return f_p
+
+    def __load_files(self, attach_files, res, files):
+        if reactor.running:
+            reactor.stop()
+        defereds = {}
+        for uuid, file in attach_files.items():
+            file_name = file['FileName']
+            rs = self.__load_file_ic(uuid, file_name, file['UserName'],
+                                     file['Password'])
+            defereds[file_name] = rs
+        reactor.run()
+        for uuid, file in attach_files.items():
+            file_name = file['FileName']
+            fn, ext = path.splitext(file_name)
+            if fn[0] == '/':
+                fn = fn[1:]
+            rs = defereds[file_name].result
+            if isinstance(rs, (str, bytes)):
+                new_ext = guess_extension(file['MimeType'])
+                ext = ext.lower()
+                if new_ext and not ext:
+                    file_name = fn + new_ext.lower()
+                else:
+                    file_name = fn + ext
+            else:
+                rs, e = rs
+                self.log.error(
+                    'Error loading file %s: %s\n%s\n\n%s\n\n' %
+                    (file_name, str(e),
+                     etree.tostring(res.Request.SenderProvidedRequestData.
+                                    MessagePrimaryContent._value_1),
+                     str(res)))
+                raise Exception(
+                    'Error loading file %s\n\n%s\n%s\n\n' %
+                    (file_name,
+                     etree.tostring(res.Request.SenderProvidedRequestData.
+                                    MessagePrimaryContent._value_1),
+                     str(res))) from e
+                file_name = fn + '.txt'
+                with open(rs, 'a') as f:
+                    f.write('\n\r\n\r')
+                    try:
+                        f.write(str(e, errors='ignore'))
+                        f.write('\n\r\n\r')
+                        f.write(str(res))
+                        f.write('\n\r\n\r')
+                        f.write(etree.tostring(
+                            res.Request.SenderProvidedRequestData.
+                                MessagePrimaryContent._value_1))
+                    except:
+                        from sys import exc_info
+                        from traceback import format_exception
+                        etype, value, tb = exc_info()
+                        trace = ''.join(
+                            format_exception(etype, value, tb))
+                        msg = ("%s\n" + "*" * 70 + "\n%s\n" +
+                               "*" * 70) % (value, trace)
+                        f.write(msg)
+                        f.write('\n\r\n\r')
+                        try:
+                            f.write(str(res.Request))
+                            f.write('\n\r\n\r')
+                            f.write(etree.tostring(
+                                res.Request.SenderProvidedRequestData.
+                                    MessagePrimaryContent._value_1))
+                        except:
+                            etype, value, tb = exc_info()
+                            trace = ''.join(
+                                format_exception(etype, value, tb))
+                            msg = ("%s\n" + "*" * 70 + "\n%s\n" +
+                                   "*" * 70) % (value, trace)
+                            f.write(msg)
+                            f.write('\n\r\n\r')
+                            f.write(str(res))
+            sig = file.get('SignaturePKCS7')
+            if sig:
+                rs = self.__make_zip(file_name, rs, sig)
+                file_name = file_name[:-4] + '.zip'
+            files[file_name] = rs
+
+    @inlineCallbacks
+    def __load_file_ic(self, uuid, file_name, user='anonymous',
+                      passwd='anonymous'):
+        self.__calls += 1
+        try:
+            r = yield threads.deferToThread(
+                self.__load_file, uuid, file_name, user, passwd)
+        finally:
+            self.__calls -= 1
+            if not self.__calls:
+                reactor.stop()
+        returnValue(r)
 
     def __load_file(self, uuid, file_name, user='anonymous',
                     passwd='anonymous'):
