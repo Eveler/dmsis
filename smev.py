@@ -587,8 +587,8 @@ class Adapter:
                                     MessagePrimaryContent._value_1),
                      str(res)))
                 raise Exception(
-                    'Error loading file %s\n\n%s\n%s\n\n' %
-                    (file_name,
+                    'Error loading file %s: %s\n%s\n\n%s\n\n' %
+                    (file_name, str(e),
                      etree.tostring(res.Request.SenderProvidedRequestData.
                                     MessagePrimaryContent._value_1),
                      str(res))) from e
