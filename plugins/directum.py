@@ -271,7 +271,7 @@ class IntegrationServices:
         requisite.setAttribute("Type", "String")
         name = entity.name if entity.name else entity.full_name
         text = xml_package.createTextNode(
-            name if len(name) < 50 else name[len(name) - 49:])
+            name if len(name) < 50 else name[:50])
         requisite.appendChild(text)
         section.appendChild(requisite)
 
@@ -553,11 +553,14 @@ class IntegrationServices:
                     query_str = "LongString='%s'" % ent.full_name
                 if ent.name:
                     query_str = (query_str + ' or ' if query_str else '') + \
-                                "Наименование='%s'" % ent.name
+                                "Наименование like '%%%s%%'" % \
+                                (ent.name if len(ent.name) < 50
+                                 else ent.name[:50])
                 if ent.inn:
-                    query_str = "ИНН like '%%%s'" % ent.inn + (
+                    query_str = "ИНН like '%%%s%%'" % ent.inn + (
                         ' or ' + query_str if query_str else '')
                 query_str = query_str.replace('"', '\\"')
+                logging.info(query_str)
                 res = self.search(
                     'ОРГ', "(" + query_str + ") and Состояние='Действующая'")
                 if res:

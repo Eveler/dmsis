@@ -103,7 +103,8 @@ namespace xmlsigner
 			signedXml.AddReference(reference);
 			signedXml.KeyInfo = keyInfo;
 			signedXml.SignedInfo.CanonicalizationMethod = SignedXml.XmlDsigExcC14NTransformUrl;
-			signedXml.SignedInfo.SignatureMethod = CPSignedXml.XmlDsigGost3410UrlObsolete;
+//			signedXml.SignedInfo.SignatureMethod = CPSignedXml.XmlDsigGost3410UrlObsolete;
+			signedXml.SignedInfo.SignatureMethod = CPSignedXml.XmlDsigGost3410_2012_256Url;
 			
 			signedXml.ComputeSignature();
 			if (!signedXml.CheckSignature()) throw new ApplicationException("Неверная подпись!!!");
