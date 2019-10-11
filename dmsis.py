@@ -12,6 +12,7 @@ from tempfile import mkstemp
 from win32._service import SERVICE_STOP_PENDING
 from win32serviceutil import ServiceFramework, HandleCommandLine
 
+from crypto import clean_pkcs7
 from db import Db
 from plugins.directum import IntegrationServices, IntegrationServicesException
 from smev import Adapter
@@ -37,6 +38,7 @@ class Integration:
             self.local_name = 'directum'
             self.cert_method = 'sharp'
             self.crt_serial = None
+            self.crt_name = 'Администрация Уссурийского городского округа'
             self.mail_server = None
             self.ftp_user, self.ftp_pass = 'anonymous', 'anonymous'
 
@@ -284,8 +286,6 @@ class Integration:
                                 # if ad.date > doc.get('ISBEDocCreateDate'):
                                 ad = Ad()
                                 doc_id = doc.get('ID')
-                                file, file_n = mkstemp()
-                                ad.file = file_n
                                 ad.date = doc.get('ISBEDocCreateDate')
                                 ad.file_name = doc.get(
                                     'ID') + '.' + doc.get(
@@ -299,8 +299,13 @@ class Integration:
                                     doc_id)
                                 data = self.directum.get_doc(
                                     doc_id, versions[0])
+                                file, file_n = mkstemp()
+                                ad.file = file_n
                                 os.write(file, data)
                                 os.close(file)
+                                certs = clean_pkcs7(
+                                    self.directum.run_script('GetEDocCertificates', [('DocID', doc_id)]), self.crt_name)
+                                ad.certs = certs
                                 applied_docs.append(ad)
 
                     text = 'Услуга предоставлена'
@@ -329,16 +334,17 @@ class Integration:
                                 '%s от %s № %s' %
                                 (doc.title, doc.date[:19],
                                  doc.number if doc.number else 'б/н'))
+                        # self.db.delete(request.uuid)
+                        request.done = True
+                        self.db.commit()
                     except:
+                        self.report_error()
+                    finally:
                         for ad in applied_docs:
                             try:
                                 os.remove(ad.file)
                             except:
                                 pass
-                        raise
-                    # self.db.delete(request.uuid)
-                    request.done = True
-                    self.db.commit()
         except Exception as e:
             self.report_error()
             self.db.rollback()

@@ -110,17 +110,22 @@ class Crypto:
         finally:
             os.remove(hashtmp_fn)
 
-    def get_file_sign(self, file_path, crt_name=None):
+    def get_file_sign(self, file_path, crt_name=None, crt_file=None):
         """ Generates PKCS #7 signature"""
         csptest_path = 'C:\\Program Files (x86)\\Crypto Pro\\CSP\\csptest.exe'
         if not os.path.exists(csptest_path):
             csptest_path = 'C:\\Program Files\\Crypto Pro\\CSP\\csptest.exe'
         signtmp_f, signtmp_fn = tempfile.mkstemp()
         os.close(signtmp_f)
-        args = [csptest_path, '-sfsign', '-sign',
-                '-my', crt_name if crt_name else self.__crt_name, '-detached',
-                '-in', os.path.abspath(file_path), '-out', signtmp_fn, '-add',
-                '-base64', '-addsigtime']
+        if crt_file:
+            args = [csptest_path, '-sfsign', '-sign', '-detached',
+                    '-in', os.path.abspath(file_path), '-out', signtmp_fn,
+                    '-add', '-base64', '-addsigtime', '-signature', crt_file]
+        else:
+            args = [csptest_path, '-sfsign', '-sign',
+                    '-my', crt_name if crt_name else self.__crt_name,
+                    '-detached', '-in', os.path.abspath(file_path), '-out',
+                    signtmp_fn, '-add', '-base64', '-addsigtime']
         try:
             out = subprocess.check_output(args, stderr=subprocess.STDOUT)
             self.log.debug(out.decode(encoding='cp866'))
@@ -128,7 +133,7 @@ class Crypto:
             with open(signtmp_fn, 'rb') as f:
                 hsh = f.read()
             return hsh.replace(b'\n', b'').replace(b'\r', b'')
-            # hsh_bytes = base64_encode(hsh)[0][:-1].decode().replace('\n', '')
+            # hsh_bytes = base64_encode(hsh)[0][::-1].decode().replace('\n', '')
             # return hsh_bytes
         except subprocess.CalledProcessError as e:
             self.log.error(e.output.decode(encoding='cp866'))

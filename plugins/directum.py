@@ -5,7 +5,6 @@ from xml.etree.ElementTree import fromstring
 from os import path, remove
 
 from zeep import Client
-from zeep.exceptions import Fault
 
 
 class IntegrationServicesException(Exception):
@@ -996,8 +995,8 @@ class IntegrationServices:
 
 
 if __name__ == '__main__':
-    from declar import Declar
-    from lxml import etree
+    # from declar import Declar
+    # from lxml import etree
 
     logging.basicConfig(
         level=logging.INFO,
@@ -1006,17 +1005,47 @@ if __name__ == '__main__':
     logging.getLogger('zeep.xsd').setLevel(logging.INFO)
     logging.getLogger('zeep.wsdl').setLevel(logging.INFO)
 
-    with open('tests/GetRequestResponseAttachFTP.xml', 'rb') as f:
-        res = f.read()
-    xml = etree.fromstring(res)
-    declar = Declar.parsexml(
-        etree.tostring(xml.find('.//{urn://augo/smev/uslugi/1.0.0}declar')))
+    # with open('tests/GetRequestResponseAttachFTP.xml', 'rb') as f:
+    #     res = f.read()
+    # xml = etree.fromstring(res)
+    # declar = Declar.parsexml(
+    #     etree.tostring(xml.find('.//{urn://augo/smev/uslugi/1.0.0}declar')))
 
-    wsdl = "http://snadb:8082/IntegrationService.svc?singleWsdl"
+    # wsdl = "http://snadb:8082/IntegrationService.svc?singleWsdl"
+    wsdl = "http://127.0.0.1:8082/IntegrationService.svc?singleWsdl"
     dis = IntegrationServices(wsdl)
-    dis.add_declar(declar)
-    # res = dis.get_entity('ДПУ', 922928)
-    # print(res)
+    res = dis.run_script('GetEDocCertificates', [('DocID', 5277587)])
+    if res:
+        import crypto
+        # res = res.replace('\r', '').replace('\n', '')
+        # doc = dis.get_doc(5277587, 0)
+        # import tempfile, os, subprocess
+        # p7stmp_f, p7stmp_fn = tempfile.mkstemp()
+        # os.close(p7stmp_f)
+        # with open(p7stmp_fn, 'w') as f:
+        #     f.write(res)
+        # doctmp_f, doctmp_fn = tempfile.mkstemp()
+        # os.write(doctmp_f, doc)
+        # os.close(doctmp_f)
+        # csptest_path = 'C:\\Program Files (x86)\\Crypto Pro\\CSP\\csptest.exe'
+        # if not os.path.exists(csptest_path):
+        #     csptest_path = 'C:\\Program Files\\Crypto Pro\\CSP\\csptest.exe'
+        # signtmp_f, signtmp_fn = tempfile.mkstemp()
+        # os.close(signtmp_f)
+        # args = [csptest_path, '-lowsign', '-sign', '-detached',
+        #         '-in', os.path.abspath(doctmp_fn), '-out', signtmp_fn,
+        #         '-add', '-base64', '-signature', p7stmp_fn,
+        #         '-my', 'Администрация Уссурийского городского округа']
+        # print(' '.join(args))
+        # try:
+        #     out = subprocess.check_output(args, stderr=subprocess.STDOUT)
+        #     print(out)
+        # except subprocess.CalledProcessError as e:
+        #     print(e.output.decode(encoding='cp866'))
+        # os.rename(signtmp_fn, path.join(path.dirname(signtmp_fn), 'doc.pdf.p7s'))
+        # os.rename(p7stmp_fn, path.join(path.dirname(p7stmp_fn), 'doc.pdf.sig'))
+        # os.rename(doctmp_fn, path.join(path.dirname(doctmp_fn), 'doc.pdf'))
+
     # procs = dis.search('ПРОУ', 'Kod2=%s' % 178609, order_by='Дата4',
     #                    ascending=False)
     # for proc in procs:

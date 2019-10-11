@@ -428,7 +428,10 @@ class Adapter:
                 #                           ftp_user, ftp_pass)
                 files.append({uuid: {'name': doc.file_name,
                                      'type': guess_type(doc.file)[0],
-                                     'full_name': doc.file}})
+                                     'full_name': doc.file,
+                                     'certs': doc.certs
+                                     if hasattr(doc, 'certs') and doc.certs
+                                     else None}})
 
         operation = 'SendResponse'
         element = self.proxy.get_element('ns1:MessagePrimaryContent')
@@ -501,10 +504,10 @@ class Adapter:
                     file['full_name'])
                 etree.SubElement(rah, '{%s}MimeType' % ns).text = \
                     file['type'] if file['type'] else guess_type(file['name'])[0]
-                # etree.SubElement(
-                #     rah,
-                #     '{%s}SignaturePKCS7' % ns).text = self.crypto.get_file_sign(
-                #     file['full_name'])
+                if file['certs']:
+                    etree.SubElement(
+                        rah,
+                        '{%s}SignaturePKCS7' % ns).text = file['certs']
 
         node_str = etree.tostring(node)
         res = etree.QName(res)

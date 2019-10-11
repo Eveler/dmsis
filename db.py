@@ -242,7 +242,7 @@ class Db:
         self.session.commit()
 
     def rollback(self):
-        self.session.rolback()
+        self.session.rollback()
 
     def save_declar(self, declar, uuid, reply_to, files):
         logging.debug(declar)
