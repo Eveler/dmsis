@@ -488,6 +488,7 @@ class IntegrationServices:
                 if person.patronymic:
                     query_str = "Дополнение3='%s' and " % person.patronymic +\
                                 query_str
+                query_str = query_str.replace('"', '\\"')
                 res = self.search('ПРС', query_str)
                 if not res:
                     query_str = \
@@ -497,6 +498,7 @@ class IntegrationServices:
                     if person.patronymic:
                         query_str = "Дополнение3='%s' and " \
                                     % person.patronymic + query_str
+                    query_str = query_str.replace('"', '\\"')
                     res = self.search('ПРС', query_str)
                 self.log.debug('res = %s' % res)
                 if res:
@@ -512,6 +514,7 @@ class IntegrationServices:
                     if person.patronymic:
                         query_str = "Дополнение3='%s' and " % person.patronymic + \
                                     query_str
+                    query_str = query_str.replace('"', '\\"')
                     res = self.search('ПРС', query_str)
                     if not res:
                         query_str = \
@@ -521,6 +524,7 @@ class IntegrationServices:
                         if person.patronymic:
                             query_str = "Дополнение3='%s' and " \
                                         % person.patronymic + query_str
+                        query_str = query_str.replace('"', '\\"')
                         res = self.search('ПРС', query_str)
                     person_id = res[0].get('ИД')
                     self.log.info('ИД персоны = %s' % person_id)
@@ -559,7 +563,6 @@ class IntegrationServices:
                     query_str = "ИНН like '%%%s%%'" % ent.inn + (
                         ' or ' + query_str if query_str else '')
                 query_str = query_str.replace('"', '\\"')
-                logging.info(query_str)
                 res = self.search(
                     'ОРГ', "(" + query_str + ") and Состояние='Действующая'")
                 if res:

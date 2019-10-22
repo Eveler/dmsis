@@ -41,7 +41,10 @@ def clean_pkcs7(p7data, subject='Администрация Уссурийско
     """
     Removes all certificates from the PKCS7 structure, if certificate subject not caontains `subject`.
     """
-    p7data = crypto.load_pkcs7_data(crypto.FILETYPE_ASN1, base64_decode(p7data.encode())[0])
+    if not p7data:
+        return p7data
+    p7data = crypto.load_pkcs7_data(crypto.FILETYPE_ASN1,
+                                    base64_decode(p7data.encode())[0] if isinstance(p7data, str) else p7data)
     certs = _ffi.NULL
     if p7data.type_is_signed():
         certs = p7data._pkcs7.d.sign.cert

@@ -303,9 +303,8 @@ class Integration:
                                 ad.file = file_n
                                 os.write(file, data)
                                 os.close(file)
-                                certs = clean_pkcs7(
-                                    self.directum.run_script('GetEDocCertificates', [('DocID', doc_id)]), self.crt_name)
-                                ad.certs = certs
+                                ad.certs = clean_pkcs7(self.directum.run_script(
+                                    'GetEDocCertificates', [('DocID', doc_id)]), self.crt_name)
                                 applied_docs.append(ad)
 
                     text = 'Услуга предоставлена'
