@@ -9,9 +9,11 @@ import logging
 import os
 from tempfile import mkstemp
 
+from dateutil.utils import today
 from win32._service import SERVICE_STOP_PENDING
 from win32serviceutil import ServiceFramework, HandleCommandLine
 
+import requests
 from crypto import clean_pkcs7
 from db import Db
 from plugins.directum import IntegrationServices, IntegrationServicesException
@@ -154,71 +156,73 @@ class Integration:
             self.report_error()
             self.db.rollback()
 
-        declar = 1
-        received = False
-        while declar:
-            try:
-                declar, uuid, reply_to, files = self.smev.get_request()
-                if declar:
-                    received = True
-                    try:
-                        res = self.directum.add_declar(declar, files=files)
-                        self.db.add_update(uuid, declar.declar_number, reply_to,
-                                           directum_id=res)
-                        logging.info('Добавлено/обновлено дело с ID = %s' % res)
+        # TODO: Must be a config value if we should check workdays
+        if requests.get('https://isdayoff.ru/' + today().strftime('%Y%m%d')).text == '0':  # is work day
+            declar = 1
+            received = False
+            while declar:
+                try:
+                    declar, uuid, reply_to, files = self.smev.get_request()
+                    if declar:
+                        received = True
                         try:
-                            self.smev.send_ack(uuid)
-                        except:
+                            res = self.directum.add_declar(declar, files=files)
+                            self.db.add_update(uuid, declar.declar_number, reply_to,
+                                               directum_id=res)
+                            logging.info('Добавлено/обновлено дело с ID = %s' % res)
+                            try:
+                                self.smev.send_ack(uuid)
+                            except:
+                                logging.warning(
+                                    'Failed to send AckRequest.', exc_info=True)
+                            try:
+                                params = [('ID', res)]
+                                self.directum.run_script('СтартЗадачПоМУ', params)
+                            except:
+                                logging.warning('Error while run directum`s script '
+                                                '"СтартЗадачПоМУ"', exc_info=True)
+                            # try:
+                            #     params = ['ID', res]
+                            #     self.directum.run_script('СтартЗадачПоМУ', params)
+                            # except:
+                            #     logging.warning('Error while run directum`s script '
+                            #                     '"СтартЗадачПоМУ"', exc_info=True)
+                        except IntegrationServicesException as e:
+                            if "Услуга не найдена" in e.message:
+                                logging.warning(
+                                    "Услуга '%s' не найдена. Дело № %s от %s" %
+                                    (declar.service, declar.declar_number,
+                                     declar.register_date.strftime('%d.%m.%Y')))
+                                self.smev.send_ack(uuid)
+                                self.smev.send_response(reply_to,
+                                                        declar.declar_number,
+                                                        declar.register_date.strftime(
+                                                            '%d.%m.%Y'), 'ERROR',
+                                                        "Услуга '%s' не найдена" % declar.service)
+                            else:
+                                logging.warning(
+                                    'Failed to send saved data to DIRECTUM.',
+                                    exc_info=True)
+                        except Exception:
                             logging.warning(
-                                'Failed to send AckRequest.', exc_info=True)
-                        try:
-                            params = [('ID', res)]
-                            self.directum.run_script('СтартЗадачПоМУ', params)
-                        except:
-                            logging.warning('Error while run directum`s script '
-                                            '"СтартЗадачПоМУ"', exc_info=True)
-                        # try:
-                        #     params = ['ID', res]
-                        #     self.directum.run_script('СтартЗадачПоМУ', params)
-                        # except:
-                        #     logging.warning('Error while run directum`s script '
-                        #                     '"СтартЗадачПоМУ"', exc_info=True)
-                    except IntegrationServicesException as e:
-                        if "Услуга не найдена" in e.message:
-                            logging.warning(
-                                "Услуга '%s' не найдена. Дело № %s от %s" %
-                                (declar.service, declar.declar_number,
-                                 declar.register_date.strftime('%d.%m.%Y')))
-                            self.smev.send_ack(uuid)
-                            self.smev.send_response(reply_to,
-                                                    declar.declar_number,
-                                                    declar.register_date.strftime(
-                                                        '%d.%m.%Y'), 'ERROR',
-                                                    "Услуга '%s' не найдена" % declar.service)
-                        else:
-                            logging.warning(
-                                'Failed to send saved data to DIRECTUM.',
+                                'Failed to send data to DIRECTUM. Saving locally.',
                                 exc_info=True)
-                    except Exception:
-                        logging.warning(
-                            'Failed to send data to DIRECTUM. Saving locally.',
-                            exc_info=True)
-                        self.db.save_declar(declar, uuid, reply_to, files)
-                        self.smev.send_ack(uuid)
-                else:
-                    # logging.warning("Получен пустой ответ")
-                    # self.smev.send_ack(uuid, 'false')
-                    pass
-            except Exception:
-                self.report_error()
-                self.db.rollback()
-        if received:
-            try:
-                self.directum.run_script('СтартЗадачПоМУ')
-            except:
-                logging.warning(
-                    'Error while run directum`s script "СтартЗадачПоМУ"',
-                    exc_info=True)
+                            self.db.save_declar(declar, uuid, reply_to, files)
+                            self.smev.send_ack(uuid)
+                    else:
+                        # logging.warning("Получен пустой ответ")
+                        # self.smev.send_ack(uuid, 'false')
+                        pass
+                except Exception:
+                    self.report_error()
+                    self.db.rollback()
+            if received:
+                try:
+                    self.directum.run_script('СтартЗадачПоМУ')
+                except:
+                    logging.warning(
+                        'Error while run directum`s script "СтартЗадачПоМУ"',
+                        exc_info=True)
 
         # Send final response
         try:
@@ -297,15 +301,20 @@ class Integration:
                                 # Get only last version
                                 versions = self.directum.get_doc_versions(
                                     doc_id)
-                                data = self.directum.get_doc(
-                                    doc_id, versions[0])
-                                file, file_n = mkstemp()
-                                ad.file = file_n
-                                os.write(file, data)
-                                os.close(file)
-                                ad.certs = clean_pkcs7(self.directum.run_script(
-                                    'GetEDocCertificates', [('DocID', doc_id)]), self.crt_name)
-                                applied_docs.append(ad)
+                                import zeep
+                                try:
+                                    data = self.directum.get_doc(
+                                        doc_id, versions[0])
+                                    file, file_n = mkstemp()
+                                    ad.file = file_n
+                                    os.write(file, data)
+                                    os.close(file)
+                                    ad.certs = clean_pkcs7(self.directum.run_script(
+                                        'GetEDocCertificates', [('DocID', doc_id)]), self.crt_name)
+                                    applied_docs.append(ad)
+                                except zeep.exceptions.Fault as e:
+                                    if 'не найдена в хранилище' in e.message:
+                                        logging.warning('Ошибка получения результата:', exc_info=True)
 
                     text = 'Услуга предоставлена'
                     # if declar[0].get('СтатусУслуги'):
