@@ -39,7 +39,7 @@ def get_certificates(p7data):
 
 def clean_pkcs7(p7data, subject='Администрация Уссурийского городского округа'):
     """
-    Removes all certificates from the PKCS7 structure, if certificate subject not caontains `subject`.
+    Removes all certificates from the PKCS7 structure, if certificate subject not contains `subject`.
     """
     if not p7data:
         return p7data

@@ -820,6 +820,17 @@ class IntegrationServices:
         res = self.proxy.service.GetEDocument(doc_id, version)
         return res
 
+    def get_doc_card(self, doc_id):
+        res = self.proxy.service.GetEDocumentCard(doc_id)
+        xml_doc = fromstring(res)
+        for elem in xml_doc.iter('Object'):
+            res = {req: elem.get(req)
+                   for req in ('Editor', 'Extension', 'Type', 'Name', 'ID',
+                               'VED', 'TKED')}
+            res.update(
+                {req.get('Name'): req.text for req in elem.iter('Requisite')})
+        return res
+
     def search(self, code, criteria, tp=REF, order_by='', ascending=True):
         """
         Call search

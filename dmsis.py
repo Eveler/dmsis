@@ -276,6 +276,8 @@ class Integration:
                                     os.write(file, data)
                                     os.close(file)
                                     ad.file = file_n
+                                    ad.certs = clean_pkcs7(self.directum.run_script(
+                                        'GetEDocCertificates', [('DocID', doc_id)]), self.crt_name)
                                     applied_docs.append(ad)
                             except:
                                 logging.warning('', exc_info=True)
@@ -353,7 +355,7 @@ class Integration:
                                 os.remove(ad.file)
                             except:
                                 pass
-        except Exception as e:
+        except:
             self.report_error()
             self.db.rollback()
 
