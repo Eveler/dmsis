@@ -210,7 +210,7 @@ class Adapter:
                         close(f)
                         sig = attach_files[attach.Id].get('SignaturePKCS7')
                         if sig:
-                            fn = self.__make_zip(file_name, fn, sig)
+                            fn = self.make_sig_zip(file_name, fn, sig)
                         files[file_name] = fn
             except:
                 for file_name, file_path in files.items():
@@ -553,7 +553,8 @@ class Adapter:
                 do_loop = max_try > 0
         return uuid
 
-    def __make_zip(self, file_name, file_path, sig):
+    @staticmethod
+    def make_sig_zip(file_name, file_path, sig):
         f, f_p = tempfile.mkstemp()
         close(f)
         zip = ZipFile(f_p, mode='w', compression=ZIP_DEFLATED)
@@ -633,7 +634,7 @@ class Adapter:
                             f.write(str(res))
             sig = file.get('SignaturePKCS7')
             if sig:
-                rs = self.__make_zip(file_name, rs, sig)
+                rs = self.make_sig_zip(file_name, rs, sig)
                 file_name = file_name[:-4] + '.zip'
             files[file_name] = rs
 

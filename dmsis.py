@@ -43,6 +43,8 @@ class Integration:
             self.crt_name = 'Администрация Уссурийского городского округа'
             self.mail_server = None
             self.ftp_user, self.ftp_pass = 'anonymous', 'anonymous'
+            self.zip_signed_doc = False
+            self.check_workdays = False
 
         try:
             self.__smev = Adapter(self.smev_wsdl, self.smev_ftp,
@@ -156,8 +158,9 @@ class Integration:
             self.report_error()
             self.db.rollback()
 
-        # TODO: Must be a config value if we should check workdays
-        if requests.get('https://isdayoff.ru/' + today().strftime('%Y%m%d')).text == '0':  # is work day
+        check_requests = requests.get('https://isdayoff.ru/' + today().strftime('%Y%m%d')).text == '0' \
+            if self.check_workdays else True
+        if check_requests:
             declar = 1
             received = False
             while declar:
@@ -227,8 +230,7 @@ class Integration:
         # Send final response
         try:
             for request in self.db.all_not_done():
-                declar = self.directum.search(
-                    'ДПУ', 'ИД=%s' % request.directum_id)
+                declar = self.directum.search('ДПУ', 'ИД=%s' % request.directum_id)
 
                 # For all requests check if declar`s end date is set
                 if declar and declar[0].get('Дата5'):
@@ -241,12 +243,10 @@ class Integration:
                     # Search newest procedure with document bound
                     # for that declar
                     procs = self.directum.search(
-                        'ПРОУ', "Kod2='%s' AND ProcState<>'Исключена вручную'" %
-                                request.declar_num,
+                        'ПРОУ', "Kod2='%s' AND ProcState<>'Исключена вручную'" % request.declar_num,
                         order_by='Дата4', ascending=False)
                     for proc in procs:
-                        if proc.get('Ведущая аналитика') == \
-                                str(request.directum_id):
+                        if proc.get('Ведущая аналитика') == str(request.directum_id):
                             try:
                                 docs = self.directum.get_bind_docs(
                                     'ПРОУ', proc.get('Аналитика-оригинал')
@@ -254,30 +254,29 @@ class Integration:
                                     else proc.get('ИДЗапГлавРазд'))
                                 for doc in docs:
                                     # if doc.get('ISBEDocKind') != 'Г000037':
-                                    if doc.get('TKED') not in \
-                                            ('КИК', 'ИК1', 'ИК2', 'ПСИ'):
+                                    if doc.get('TKED') not in ('КИК', 'ИК1', 'ИК2', 'ПСИ'):
                                         continue
                                     doc_id = doc.get('ID')
                                     ad = Ad()
                                     ad.date = doc.get('ISBEDocCreateDate')
-                                    ad.file_name = doc.get(
-                                        'ID') + '.' + doc.get(
-                                        'Extension').lower()
-                                    ad.number = doc.get(
-                                        'Дополнение') if doc.get(
-                                        'Дополнение') else doc.get('NumberEDoc')
+                                    ad.file_name = doc.get('ID') + '.' + doc.get('Extension').lower()
+                                    ad.number = doc.get('Дополнение') \
+                                        if doc.get('Дополнение') else doc.get('NumberEDoc')
                                     ad.title = doc.get('ISBEDocName')
                                     # Get only last version
-                                    versions = self.directum.get_doc_versions(
-                                        doc_id)
-                                    data = self.directum.get_doc(
-                                        doc_id, versions[0])
+                                    versions = self.directum.get_doc_versions(doc_id)
+                                    data = self.directum.get_doc(doc_id, versions[0])
                                     file, file_n = mkstemp()
                                     os.write(file, data)
                                     os.close(file)
-                                    ad.file = file_n
-                                    ad.certs = clean_pkcs7(self.directum.run_script(
-                                        'GetEDocCertificates', [('DocID', doc_id)]), self.crt_name)
+                                    if self.zip_signed_doc:
+                                        certs = clean_pkcs7(self.directum.run_script(
+                                            'GetEDocCertificates', [('DocID', doc_id)]), self.crt_name)
+                                        ad.file = self.smev.make_sig_zip(ad.file_name, file_n, certs)
+                                    else:
+                                        ad.file = file_n
+                                        ad.certs = clean_pkcs7(self.directum.run_script(
+                                            'GetEDocCertificates', [('DocID', doc_id)]), self.crt_name)
                                     applied_docs.append(ad)
                             except:
                                 logging.warning('', exc_info=True)
@@ -285,34 +284,33 @@ class Integration:
                     # Get bound docs from declar if there is no procedures
                     # with docs bound
                     if not applied_docs:
-                        docs = self.directum.get_bind_docs(
-                            'ДПУ', request.directum_id)
+                        docs = self.directum.get_bind_docs('ДПУ', request.directum_id)
                         for doc in docs:
                             if doc.get('TKED') in ('КИК', 'ИК1', 'ИК2', 'ПСИ'):
                                 # if ad.date > doc.get('ISBEDocCreateDate'):
                                 ad = Ad()
                                 doc_id = doc.get('ID')
                                 ad.date = doc.get('ISBEDocCreateDate')
-                                ad.file_name = doc.get(
-                                    'ID') + '.' + doc.get(
-                                    'Extension').lower()
+                                ad.file_name = doc.get('ID') + '.' + doc.get('Extension').lower()
                                 add = doc.get('Дополнение')
-                                ad.number = add if add else doc.get(
-                                    'NumberEDoc')
+                                ad.number = add if add else doc.get('NumberEDoc')
                                 ad.title = doc.get('ISBEDocName')
                                 # Get only last version
-                                versions = self.directum.get_doc_versions(
-                                    doc_id)
+                                versions = self.directum.get_doc_versions(doc_id)
                                 import zeep
                                 try:
-                                    data = self.directum.get_doc(
-                                        doc_id, versions[0])
+                                    data = self.directum.get_doc(doc_id, versions[0])
                                     file, file_n = mkstemp()
-                                    ad.file = file_n
                                     os.write(file, data)
                                     os.close(file)
-                                    ad.certs = clean_pkcs7(self.directum.run_script(
-                                        'GetEDocCertificates', [('DocID', doc_id)]), self.crt_name)
+                                    if self.zip_signed_doc:
+                                        certs = clean_pkcs7(self.directum.run_script(
+                                            'GetEDocCertificates', [('DocID', doc_id)]), self.crt_name)
+                                        ad.file = self.smev.make_sig_zip(ad.file_name, file_n, certs)
+                                    else:
+                                        ad.file = file_n
+                                        ad.certs = clean_pkcs7(self.directum.run_script(
+                                            'GetEDocCertificates', [('DocID', doc_id)]), self.crt_name)
                                     applied_docs.append(ad)
                                 except zeep.exceptions.Fault as e:
                                     if 'не найдена в хранилище' in e.message:
@@ -476,6 +474,10 @@ class Integration:
                 self.ftp_pass = cfg.get('smev', 'ftp_pass')
             else:
                 self.ftp_pass = 'anonymous'
+            if 'zip_signed_doc' not in cfg.options('smev'):
+                do_write = True
+                cfg.set('smev', 'zip_signed_doc', "False")
+            self.zip_signed_doc = cfg.getboolean('smev', 'zip_signed_doc')
 
             if not cfg.has_section("directum"):
                 do_write = True
@@ -494,6 +496,10 @@ class Integration:
                 do_write = True
                 cfg.set('integration', 'repeat_every', '10')
             self.repeat_every = cfg.getint('integration', 'repeat_every')
+            if 'check_workdays' not in cfg.options('integration'):
+                do_write = True
+                cfg.set('integration', 'check_workdays', 'True')
+            self.check_workdays = cfg.getboolean('integration', 'check_workdays')
 
             if do_write:
                 for fn in lst:
