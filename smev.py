@@ -93,7 +93,8 @@ class Adapter:
     def get_request(self, uri='', local_name='', node_id=None,
                     gen_xml_only=False):
         operation = 'GetRequest'
-        timestamp = datetime.now()
+        import timezone
+        timestamp = timezone.utcnow()
         node = self.proxy.create_message(
             self.proxy.service, operation,
             {'NamespaceURI': uri, 'RootElementLocalName': local_name,

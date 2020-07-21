@@ -163,62 +163,61 @@ class Integration:
         if check_requests:
             declar = 1
             received = False
-            while declar:
-                try:
-                    declar, uuid, reply_to, files = self.smev.get_request()
-                    if declar:
-                        received = True
+            try:
+                declar, uuid, reply_to, files = self.smev.get_request()
+                if declar:
+                    received = True
+                    try:
+                        res = self.directum.add_declar(declar, files=files)
+                        self.db.add_update(uuid, declar.declar_number, reply_to,
+                                           directum_id=res)
+                        logging.info('Добавлено/обновлено дело с ID = %s' % res)
                         try:
-                            res = self.directum.add_declar(declar, files=files)
-                            self.db.add_update(uuid, declar.declar_number, reply_to,
-                                               directum_id=res)
-                            logging.info('Добавлено/обновлено дело с ID = %s' % res)
-                            try:
-                                self.smev.send_ack(uuid)
-                            except:
-                                logging.warning(
-                                    'Failed to send AckRequest.', exc_info=True)
-                            try:
-                                params = [('ID', res)]
-                                self.directum.run_script('СтартЗадачПоМУ', params)
-                            except:
-                                logging.warning('Error while run directum`s script '
-                                                '"СтартЗадачПоМУ"', exc_info=True)
-                            # try:
-                            #     params = ['ID', res]
-                            #     self.directum.run_script('СтартЗадачПоМУ', params)
-                            # except:
-                            #     logging.warning('Error while run directum`s script '
-                            #                     '"СтартЗадачПоМУ"', exc_info=True)
-                        except IntegrationServicesException as e:
-                            if "Услуга не найдена" in e.message:
-                                logging.warning(
-                                    "Услуга '%s' не найдена. Дело № %s от %s" %
-                                    (declar.service, declar.declar_number,
-                                     declar.register_date.strftime('%d.%m.%Y')))
-                                self.smev.send_ack(uuid)
-                                self.smev.send_response(reply_to,
-                                                        declar.declar_number,
-                                                        declar.register_date.strftime(
-                                                            '%d.%m.%Y'), 'ERROR',
-                                                        "Услуга '%s' не найдена" % declar.service)
-                            else:
-                                logging.warning(
-                                    'Failed to send saved data to DIRECTUM.',
-                                    exc_info=True)
-                        except Exception:
-                            logging.warning(
-                                'Failed to send data to DIRECTUM. Saving locally.',
-                                exc_info=True)
-                            self.db.save_declar(declar, uuid, reply_to, files)
                             self.smev.send_ack(uuid)
-                    else:
-                        # logging.warning("Получен пустой ответ")
-                        # self.smev.send_ack(uuid, 'false')
-                        pass
-                except Exception:
-                    self.report_error()
-                    self.db.rollback()
+                        except:
+                            logging.warning(
+                                'Failed to send AckRequest.', exc_info=True)
+                        try:
+                            params = [('ID', res)]
+                            self.directum.run_script('СтартЗадачПоМУ', params)
+                        except:
+                            logging.warning('Error while run directum`s script '
+                                            '"СтартЗадачПоМУ"', exc_info=True)
+                        # try:
+                        #     params = ['ID', res]
+                        #     self.directum.run_script('СтартЗадачПоМУ', params)
+                        # except:
+                        #     logging.warning('Error while run directum`s script '
+                        #                     '"СтартЗадачПоМУ"', exc_info=True)
+                    except IntegrationServicesException as e:
+                        if "Услуга не найдена" in e.message:
+                            logging.warning(
+                                "Услуга '%s' не найдена. Дело № %s от %s" %
+                                (declar.service, declar.declar_number,
+                                 declar.register_date.strftime('%d.%m.%Y')))
+                            self.smev.send_ack(uuid)
+                            self.smev.send_response(reply_to,
+                                                    declar.declar_number,
+                                                    declar.register_date.strftime(
+                                                        '%d.%m.%Y'), 'ERROR',
+                                                    "Услуга '%s' не найдена" % declar.service)
+                        else:
+                            logging.warning(
+                                'Failed to send saved data to DIRECTUM.',
+                                exc_info=True)
+                    except Exception:
+                        logging.warning(
+                            'Failed to send data to DIRECTUM. Saving locally.',
+                            exc_info=True)
+                        self.db.save_declar(declar, uuid, reply_to, files)
+                        self.smev.send_ack(uuid)
+                else:
+                    # logging.warning("Получен пустой ответ")
+                    # self.smev.send_ack(uuid, 'false')
+                    pass
+            except Exception:
+                self.report_error()
+                self.db.rollback()
             if received:
                 try:
                     self.directum.run_script('СтартЗадачПоМУ')
@@ -303,14 +302,13 @@ class Integration:
                                     file, file_n = mkstemp()
                                     os.write(file, data)
                                     os.close(file)
-                                    if self.zip_signed_doc:
-                                        certs = clean_pkcs7(self.directum.run_script(
-                                            'GetEDocCertificates', [('DocID', doc_id)]), self.crt_name)
+                                    certs = clean_pkcs7(self.directum.run_script(
+                                        'GetEDocCertificates', [('DocID', doc_id)]), self.crt_name)
+                                    if self.zip_signed_doc and certs:
                                         ad.file = self.smev.make_sig_zip(ad.file_name, file_n, certs)
                                     else:
                                         ad.file = file_n
-                                        ad.certs = clean_pkcs7(self.directum.run_script(
-                                            'GetEDocCertificates', [('DocID', doc_id)]), self.crt_name)
+                                        ad.certs = certs
                                     applied_docs.append(ad)
                                 except zeep.exceptions.Fault as e:
                                     if 'не найдена в хранилище' in e.message:
@@ -336,7 +334,7 @@ class Integration:
                             'Результат услуги отправлен. Дело № %s от %s' %
                             (request.declar_num, request.declar_date))
                         if applied_docs:
-                            logging.info('Прикрепрены документы:')
+                            logging.info('Прикреплены документы:')
                         for doc in applied_docs:
                             logging.info(
                                 '%s от %s № %s' %
@@ -419,6 +417,8 @@ class Integration:
             #     cfg.set('main', 'mail_server', '192.168.1.6')
             if 'mail_server' in cfg.options('main'):
                 self.mail_server = cfg.get('main', 'mail_server')
+            else:
+                self.mail_server = None
 
             if not cfg.has_section("smev"):
                 do_write = True

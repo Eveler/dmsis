@@ -914,27 +914,35 @@ class Db:
         self.session.execute('VACUUM FULL')
 
     def __del__(self):
-        self.vacuum()
+        try:
+            self.vacuum()
+        except:
+            pass
 
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
     db = Db()
-    with open('logo-ussuriisk.png', 'rb') as f:
-        data = f.read()
-    from declar import Declar, AppliedDocument
-
-    doc = AppliedDocument(title='dsgsfdgs', number='cvgfdg',
-                          date=date(2008, 1, 12), url='dfgdsfgs',
-                          file_name='logo-ussuriisk.png')
-    # doc.file = 'logo-ussuriisk.png'
-    declar = Declar(declar_number='dfgds', service='dfd',
-                    register_date=date(2008, 1, 12), end_date=date(2009, 1, 1),
-                    AppliedDocument=[doc])
-    files = {'logo-ussuriisk.png': 'logo-ussuriisk.png'}
-    db.save_declar(declar, 'sfsdf', 'sdfdsfdsf', files)
-
-    r = db.load_declar('sfsdf')
-    for doc in r.documents:
-        with open('logo-ussuriisk1.png', 'wb') as f:
-            f.write(doc.body)
+    # with open('logo-ussuriisk.png', 'rb') as f:
+    #     data = f.read()
+    # from declar import Declar, AppliedDocument
+    #
+    # doc = AppliedDocument(title='dsgsfdgs', number='cvgfdg',
+    #                       date=date(2008, 1, 12), url='dfgdsfgs',
+    #                       file_name='logo-ussuriisk.png')
+    # # doc.file = 'logo-ussuriisk.png'
+    # declar = Declar(declar_number='dfgds', service='dfd',
+    #                 register_date=date(2008, 1, 12), end_date=date(2009, 1, 1),
+    #                 AppliedDocument=[doc])
+    # files = {'logo-ussuriisk.png': 'logo-ussuriisk.png'}
+    # db.save_declar(declar, 'sfsdf', 'sdfdsfdsf', files)
+    #
+    # r = db.load_declar('sfsdf')
+    # for doc in r.documents:
+    #     with open('logo-ussuriisk1.png', 'wb') as f:
+    #         f.write(doc.body)
+    request = db.session.query(Requests).filter_by(declar_num='021/2020/427110').first()
+    print('***********************', request.done)
+    request.done = False
+    print('***********************', request.done)
+    db.commit()
