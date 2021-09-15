@@ -164,7 +164,8 @@ class Integration:
             declar = 1
             received = False
             try:
-                declar, uuid, reply_to, files = self.smev.get_request()
+                declar, uuid, reply_to, files = self.smev.get_request(
+                    uri='urn://augo/smev/uslugi/1.0.0', local_name='declar')
                 if declar:
                     received = True
                     try:
