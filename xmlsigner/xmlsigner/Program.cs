@@ -69,7 +69,9 @@ namespace xmlsigner
 			signedXml.SafeCanonicalizationMethods.Add("urn://smev-gov-ru/xmldsig/transform");
 			
 			var reference = new Reference("#SIGNED_BY_CALLER");
-			reference.DigestMethod = CPSignedXml.XmlDsigGost3411UrlObsolete; 
+//			reference.DigestMethod = CPSignedXml.XmlDsigGost3411UrlObsolete;
+//			reference.DigestMethod = CPSignedXml2012_256.XmlDsigGost3411Url;
+			reference.DigestMethod = "urn:ietf:params:xml:ns:cpxmlsec:algorithms:gostr34112012-256";
 			reference.AddTransform(new XmlDsigExcC14NTransform());
 			reference.AddTransform(new XmlDsigSmevTransform());
 			reference.AddTransform(new XmlDsigEnvelopedSignatureTransform());
@@ -80,7 +82,8 @@ namespace xmlsigner
 			signedXml.AddReference(reference);
 			signedXml.KeyInfo = keyInfo;
 			signedXml.SignedInfo.CanonicalizationMethod = SignedXml.XmlDsigExcC14NTransformUrl;
-			signedXml.SignedInfo.SignatureMethod = CPSignedXml.XmlDsigGost3410_2012_256Url;
+//			signedXml.SignedInfo.SignatureMethod = CPSignedXml.XmlDsigGost3410_2012_256Url;
+			signedXml.SignedInfo.SignatureMethod = "urn:ietf:params:xml:ns:cpxmlsec:algorithms:gostr34102012-gostr34112012-256";
 			
 			signedXml.ComputeSignature();
 			if (!signedXml.CheckSignature()) throw new ApplicationException("Неверная подпись!!!");

@@ -17,13 +17,13 @@ from uuid import uuid1
 # from datetime import date
 from zipfile import ZipFile, ZIP_DEFLATED
 
+from zeep.exceptions import XMLParseError
+
 import six
 from declar import Declar
 from lxml import etree, objectify
 from plugins.cryptopro import Crypto
 from translit import translate
-from twisted.internet import threads, reactor
-from twisted.internet.defer import returnValue, inlineCallbacks
 from zeep import Client
 from zeep.plugins import HistoryPlugin
 
@@ -45,7 +45,7 @@ class Adapter:
 
         if history:
             self.history = HistoryPlugin()
-            self.proxy = Client(wsdl, plugins=[self.history])
+            self.proxy = Client(wsdl, plugins=[self.history], strict=False)
         else:
             self.proxy = Client(wsdl)
         self.__calls = 0
@@ -93,8 +93,12 @@ class Adapter:
     def get_request(self, uri='', local_name='', node_id=None,
                     gen_xml_only=False):
         operation = 'GetRequest'
-        import timezone
-        timestamp = timezone.utcnow()
+        if sys.version_info.major == 3 and sys.version_info.minor <= 5:
+            import timezone
+            timestamp = timezone.utcnow()
+        else:
+            import pytz
+            timestamp = datetime.now(pytz.utc)
         node = self.proxy.create_message(
             self.proxy.service, operation,
             {'NamespaceURI': uri, 'RootElementLocalName': local_name,
@@ -798,12 +802,30 @@ class Adapter:
         return file_path
 
     def __send(self, operation, msg):
-        kw = {'_soapheaders': self.proxy.service._client._default_soapheaders}
+        host = self.proxy.service._binding_options['address']
+        host = host[host.index('//') + 2:]
+        host = host[:host.index('/')]
+        kw = {'_soapheaders': self.proxy.service._client._default_soapheaders,
+              'Content-Type': 'text/xml;charset=UTF-8', 'SOAPAction': 'urn:' + operation,
+              'Host': 's' + host}
         response = self.proxy.transport.post(
             self.proxy.service._binding_options['address'], msg, kw)
-        res = self.proxy.service._binding.process_reply(
-            self.proxy.service._client,
-            self.proxy.service._binding.get(operation), response)
+        try:
+            import pickle
+            with open('response.pkl', 'w') as f:
+                pickle.dump(response, f)
+        except:
+            with open('response.pkl', 'wb') as f:
+                f.write(response.content)
+        try:
+            res = self.proxy.service._binding.process_reply(
+                self.proxy.service._client,
+                self.proxy.service._binding.get(operation), response)
+        except XMLParseError as e:
+            with open('response.txt', 'wb') as f:
+                f.write(response.content)
+            logging.warning(response.content)
+            raise e
         if not res and b'--uuid:' in response.content:
             res = response.content[
                   response.content.index(b'Content-Type:'):]

@@ -10,7 +10,11 @@ import os
 from tempfile import mkstemp
 
 from dateutil.utils import today
-from win32._service import SERVICE_STOP_PENDING
+from sys import version_info
+if version_info.major == 3 and version_info.minor <= 5:
+    from win32._service import SERVICE_STOP_PENDING
+else:
+    from win32.win32service import SERVICE_STOP_PENDING
 from win32serviceutil import ServiceFramework, HandleCommandLine
 
 import requests
@@ -585,7 +589,7 @@ def main():
 
     from optparse import OptionParser
 
-    parser = OptionParser(version="%prog ver. 1.03",
+    parser = OptionParser(version="%prog ver. 1.04",
                           conflict_handler="resolve")
     parser.print_version()
     parser.add_option("-r", "--run", action="store_true", dest="run",

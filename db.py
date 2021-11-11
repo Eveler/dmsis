@@ -2,11 +2,16 @@
 import logging
 from datetime import date, datetime
 from os import path, remove
+from sys import version_info
 
 from sqlalchemy import Column, Integer, String, Boolean, Date, ForeignKey, func, \
     or_
 from sqlalchemy.engine import create_engine
-from sqlalchemy.ext.declarative.api import declarative_base
+
+if version_info.major == 3 and version_info.minor <= 5:
+    from sqlalchemy.ext.declarative.api import declarative_base
+else:
+    from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from sqlalchemy.orm.session import sessionmaker
 
@@ -911,7 +916,7 @@ class Db:
         self.session.execute('VACUUM FULL')
 
     def vacuum(self):
-        self.session.execute('VACUUM FULL')
+        self.session.execute('VACUUM')
 
     def __del__(self):
         try:

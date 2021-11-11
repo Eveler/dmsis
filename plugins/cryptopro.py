@@ -243,9 +243,10 @@ class Crypto:
         else:
             return self.signed_xml.Sign()
 
-    def sign_sharp(self, xml):
+    def sign_sharp(self, xml, xmlsigner_path=''):
         self.log.debug(xml)
-        xmlsigner_path = 'xmlsigner\\xmlsigner\\bin\\Release\\xmlsigner.exe'
+        if not xmlsigner_path:
+            xmlsigner_path = 'xmlsigner\\xmlsigner\\bin\\Release\\xmlsigner.exe'
         try:
             if isinstance(xml, str):
                 xml = xml.encode()
@@ -274,9 +275,9 @@ if __name__ == '__main__':
     # XmlDsigGost3411Url = "urn:ietf:params:xml:ns:cpxmlsec:algorithms:gostr3411"
     # signed_xml.DigestMethod = 'http://www.w3.org/2001/04/xmldsig-more#gostr3411'
     # res = signed_xml.Sign(oSigner)
-    signer = Crypto('008E BDC8 291F 0003 81E7 11E1 AF7A 5ED3 27', use_com=True)
+    signer = Crypto('7B50 1200 32AD C898 4FBE D1CF 63D1 9A20', use_com=False)
 
-    res = signer.sign_sharp(xml_str)
+    res = signer.sign_sharp(xml_str, '..\\xmlsigner\\xmlsigner\\bin\\Release\\xmlsigner.exe')
     print(res)
     quit()
 
