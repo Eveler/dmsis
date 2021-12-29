@@ -367,10 +367,10 @@ class IntegrationServices:
             if not found:
                 found = files.get(fn + '.zip')
                 ext = '.zip'
-            with open(found, 'rb') as f:
-                doc_data = (
-                    f.read(), ext[1:].lower() if ext else 'txt')
-            remove(found)
+                with open(found, 'rb') as f:
+                    doc_data = (
+                        f.read(), ext[1:].lower() if ext else 'txt')
+                remove(found)
         else:
             doc_data = (b'No file', 'txt')
         res = self.add_doc(doc, doc_data[1], doc_data[0])
