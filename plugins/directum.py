@@ -368,7 +368,10 @@ class IntegrationServices:
                 found = files.get(fn + '.zip')
                 ext = '.zip'
             if not found:
-                raise Exception("Cannot find file %s in %s" % (file_name, files))
+                found = files.get(fn + '..zip')
+                ext = '.zip'
+            if not found:
+                raise Exception("Cannot find file '%s' in %s" % (file_name, files))
             with open(found, 'rb') as f:
                 doc_data = (
                     f.read(), ext[1:].lower() if ext else 'txt')

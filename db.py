@@ -629,7 +629,10 @@ class Db:
             if not found:
                 found = files.get(fn + '.zip')
             if not found:
-                raise Exception("Cannot find file %s in %s" % (file_name, files))
+                found = files.get(fn + '..zip')
+                ext = '.zip'
+            if not found:
+                raise Exception("Cannot find file '%s' in %s" % (file_name, files))
             fn, ext1 = path.splitext(found)
             mime_type = guess_type(found + ext if not ext1 else '')[0]
             doc_data = None
