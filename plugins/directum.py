@@ -571,7 +571,9 @@ class IntegrationServices:
                 res = self.search(
                     'ОРГ', "(" + query_str + ") and Состояние='Действующая'")
                 if res:
-                    ent_id = res[0].get('ИД')
+                    ent_id = res[0].get('Аналитика-оригинал') \
+                        if res[0].get('Аналитика-оригинал') else res[0].get('ИДЗапГлавРазд') \
+                        if res[0].get('ИДЗапГлавРазд') else res[0].get('ИД')
                 else:
                     self.add_legal_entity(ent)
                     res = self.search(
@@ -737,8 +739,11 @@ class IntegrationServices:
         package = xml_package.toxml(encoding='utf-8').decode('utf-8')
         xml_package.unlink()
 
-        self.proxy.service.ReferencesUpdate(XMLPackage=package, ISCode='',
+        res = self.proxy.service.ReferencesUpdate(XMLPackage=package, ISCode='',
                                             FullSync=True)
+        if res[0]:
+            raise Exception(str(res))
+
         res = self.search('ДПУ', "Дополнение3='%s' and Дата='%s'" %
                           (declar.declar_number,
                            declar.register_date.strftime('%d.%m.%Y')))

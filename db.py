@@ -485,7 +485,7 @@ class Db:
                     Reference_point=legal_entity.address.Reference_point)
                 self.session.add(a)
             p = None
-            if legal_entity.person:
+            if legal_entity.person and legal_entity.person.surname:
                 person = legal_entity.person
                 pa = self.session.query(Addresses).filter_by(
                     Postal_Code=person.address.Postal_Code,
