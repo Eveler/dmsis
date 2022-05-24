@@ -277,6 +277,7 @@ class Integration:
                                         certs = clean_pkcs7(self.directum.run_script(
                                             'GetEDocCertificates', [('DocID', doc_id)]), self.crt_name)
                                         ad.file = self.smev.make_sig_zip(ad.file_name, file_n, certs)
+                                        ad.file_name = doc.get('ID') + '.zip'
                                     else:
                                         ad.file = file_n
                                         ad.certs = clean_pkcs7(self.directum.run_script(
