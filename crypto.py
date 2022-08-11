@@ -54,7 +54,7 @@ def clean_pkcs7(p7data, subject='Администрация Уссурийско
     for i in range(_lib.sk_X509_num(certs)):
         pycert = X509.__new__(X509)
         pycert._x509 = _lib.sk_X509_value(certs, i)
-        if subject in [v.value for v in pycert.to_cryptography().subject]:
+        if subject.upper() in [v.value.upper() for v in pycert.to_cryptography().subject]:
             sk = _lib.sk_X509_new_null()
             _lib.sk_X509_push(sk, pycert._x509)
             if p7data.type_is_signed():
