@@ -558,7 +558,7 @@ class IntegrationServices:
             for ent in declar.legal_entity:
                 query_str = ''
                 if ent.full_name:
-                    query_str = "LongString='%s'" % ent.full_name
+                    query_str = "LongString5='%s'" % ent.full_name
                 if ent.name:
                     query_str = (query_str + ' or ' if query_str else '') + \
                                 "Наименование like '%%%s%%'" % \
