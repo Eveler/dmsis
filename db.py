@@ -672,6 +672,9 @@ class Db:
                             file_name=adoc.file_name, mime_type=mime_type,
                             body=doc_data, file_path=file_path, declar_id=d.id,
                             declar=d)
+            if not doc.file_name:
+                doc.file_name = file_name
+                doc.file_path = file_path
             self.session.add(doc)
             docs.append(doc)
             remove(found)
