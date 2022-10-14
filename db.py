@@ -590,7 +590,8 @@ class Db:
                         pe = Emails(email=email, person=p)
                         self.session.add(pe)
             l = LegalEntity(
-                name=legal_entity.name, full_name=legal_entity.full_name,
+                name=legal_entity.name if legal_entity.name else legal_entity.full_name,
+                full_name=legal_entity.full_name,
                 inn=legal_entity.inn, kpp=legal_entity.kpp,
                 address=a, ogrn=legal_entity.ogrn,
                 taxRegDoc=legal_entity.taxRegDoc,
