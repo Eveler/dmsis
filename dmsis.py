@@ -15,7 +15,7 @@ if version_info.major == 3 and version_info.minor <= 5:
     from win32._service import SERVICE_STOP_PENDING
 else:
     from win32.win32service import SERVICE_STOP_PENDING
-from win32serviceutil import ServiceFramework, HandleCommandLine
+#from win32serviceutil import ServiceFramework, HandleCommandLine
 
 import requests
 from crypto import clean_pkcs7
@@ -558,9 +558,9 @@ class Integration:
         self.db.vacuum()
 
 
-class Service(ServiceFramework):
-    _svc_name_ = 'dmsis'
-    _svc_display_name_ = 'Directum SMEV integration system'
+# class Service(ServiceFramework):
+#     _svc_name_ = 'dmsis'
+#     _svc_display_name_ = 'Directum SMEV integration system'
 
     def SvcStop(self):
         self.ReportServiceStatus(SERVICE_STOP_PENDING)

@@ -276,11 +276,11 @@ class IntegrationServices:
 
         #  "Юрид. наименование"
         requisite = xml_package.createElement("Requisite")
-        requisite.setAttribute("Name", u"LongString")
+        requisite.setAttribute("Name", u"LongString5")
         requisite.setAttribute("Type", "String")
         name = entity.full_name if entity.full_name else entity.name
         text = xml_package.createTextNode(
-            name if len(name) < 1024 else name[:1023])
+            name if len(name) < 512 else name[:511])
         requisite.appendChild(text)
         section.appendChild(requisite)
 
