@@ -943,7 +943,7 @@ class IntegrationServices:
             cnt, cnt2 = 1, 0
             while cnt or cnt2:
                 q_idx = criteria.find("'", idx + 1)
-                q_idx2 = criteria.rfind("'", idx + 1, idx2 - 1)
+                q_idx2 = criteria.rfind("'", idx + 1, idx2)
                 oldidx = idx
                 idx = criteria.find('(', idx + 1, idx2 - 1)
                 if idx < 0:
@@ -978,7 +978,7 @@ class IntegrationServices:
         logics = {'and': 'And', 'or': 'Or'}
         for logic, txt in logics.items():
             logic = ' %s ' % logic
-            if logic in criteria.lower():
+            if logic in ' ' + criteria.lower() + ' ':
                 idx = criteria.lower().index(logic)
                 first = criteria[:idx]
                 second = criteria[idx + len(logic):]

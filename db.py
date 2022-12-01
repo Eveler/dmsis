@@ -6,7 +6,7 @@ from sys import version_info
 
 from sqlalchemy import Column, Integer, String, Boolean, Date, ForeignKey, func, \
     or_
-from sqlalchemy.engine import create_engine
+from sqlalchemy.engine import create_engine, Row
 
 if version_info.major == 3 and version_info.minor <= 5:
     from sqlalchemy.ext.declarative.api import declarative_base
@@ -642,7 +642,7 @@ class Db:
                 maxid = self.session.query(func.max(Documents.id)).first()
                 if not maxid or not maxid[0]:
                     maxid = 1
-                elif isinstance(maxid, (tuple, list)):
+                elif isinstance(maxid, (tuple, list, Row)):
                     maxid = maxid[0] + 1
                 else:
                     maxid += 1
