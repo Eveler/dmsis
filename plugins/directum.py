@@ -372,10 +372,14 @@ class IntegrationServices:
                 ext = '.zip'
             if not found:
                 raise Exception("Cannot find file '%s' in %s" % (file_name, files))
-            with open(found, 'rb') as f:
-                doc_data = (
-                    f.read(), ext[1:].lower() if ext else 'txt')
-            remove(found)
+            try:
+                with open(found, 'rb') as f:
+                    doc_data = (
+                        f.read(), ext[1:].lower() if ext else 'txt')
+                remove(found)
+            except FileNotFoundError:
+                logging.warning("Cannot find file '%s'" % file_name, exc_info=True)
+                doc_data = (b'No file', 'txt')
         else:
             doc_data = (b'No file', 'txt')
         res = self.add_doc(doc, doc_data[1], doc_data[0])

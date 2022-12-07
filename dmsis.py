@@ -147,6 +147,8 @@ class Integration:
                         logging.warning(
                             'Failed to send saved data to DIRECTUM.',
                             exc_info=True)
+                # except FileNotFoundError:
+                #     self.db.delete_declar(uuid)
                 except:
                     logging.warning(
                         'Failed to send saved data to DIRECTUM.',
