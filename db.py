@@ -893,12 +893,12 @@ class Db:
         return declars_info
 
     def delete_declar(self, uuid):
+        from os import remove
         for d in self.session.query(Declars).filter_by(uuid=uuid).all():
             if d.object_address:
                 self.session.delete(d.object_address)
             for doc in d.documents:
                 if doc.file_path:
-                    from os import remove
                     try:
                         remove(doc.file_path)
                     except:

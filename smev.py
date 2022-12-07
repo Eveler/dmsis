@@ -216,6 +216,7 @@ class Adapter:
                         sig = attach_files[attach.Id].get('SignaturePKCS7')
                         if sig:
                             fn = self.make_sig_zip(file_name, fn, sig)
+                            file_name = file_name.replace(ext, '.zip')
                         files[file_name] = fn
             except:
                 for file_name, file_path in files.items():

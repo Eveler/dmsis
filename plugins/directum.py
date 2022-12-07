@@ -978,10 +978,11 @@ class IntegrationServices:
         logics = {'and': 'And', 'or': 'Or'}
         for logic, txt in logics.items():
             logic = ' %s ' % logic
-            if logic in ' ' + criteria.lower() + ' ':
-                idx = criteria.lower().index(logic)
+            crt = ' ' + criteria.lower() + ' '
+            if logic in crt:
+                idx = crt.index(logic)
                 first = criteria[:idx]
-                second = criteria[idx + len(logic):]
+                second = criteria[idx + len(logic) - 1:]
                 first, second = first.strip(), second.strip()
                 elem = doc.createElement(txt)
                 if first:
