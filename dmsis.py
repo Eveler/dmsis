@@ -275,15 +275,14 @@ class Integration:
                                     file, file_n = mkstemp()
                                     os.write(file, data)
                                     os.close(file)
-                                    if self.zip_signed_doc:
-                                        certs = clean_pkcs7(self.directum.run_script(
-                                            'GetEDocCertificates', [('DocID', doc_id)]), self.crt_name)
+                                    certs = clean_pkcs7(self.directum.run_script(
+                                        'GetEDocCertificates', [('DocID', doc_id)]), self.crt_name)
+                                    if self.zip_signed_doc and certs:
                                         ad.file = self.smev.make_sig_zip(ad.file_name, file_n, certs)
                                         ad.file_name = doc.get('ID') + '.zip'
                                     else:
                                         ad.file = file_n
-                                        ad.certs = clean_pkcs7(self.directum.run_script(
-                                            'GetEDocCertificates', [('DocID', doc_id)]), self.crt_name)
+                                        ad.certs = certs
                                     applied_docs.append(ad)
                             except:
                                 logging.warning('', exc_info=True)
