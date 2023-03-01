@@ -24,7 +24,7 @@ class IntegrationServices:
         self.log = logging.getLogger('directum')
         self.proxy = Client(wsdl)
 
-    def run_script(self, script_name, params={}):
+    def run_script(self, script_name, params=()):
         """
         Executes Directum script `script_name` with parameters `params`
         :param str script_name: Name of the script
@@ -32,9 +32,14 @@ class IntegrationServices:
         :return: Script execution result
         """
         keys_values = self.proxy.get_type('ns2:ArrayOfKeyValueOfstringstring')()
-        for key, value in params:
-            param = {'Key': key, 'Value': value}
-            keys_values.KeyValueOfstringstring.append(param)
+        if isinstance(params, dict):
+            for key, value in params.items():
+                param = {'Key': key, 'Value': value}
+                keys_values.KeyValueOfstringstring.append(param)
+        else:
+            for key, value in params:
+                param = {'Key': key, 'Value': value}
+                keys_values.KeyValueOfstringstring.append(param)
         res = self.proxy.service.RunScript(script_name, keys_values)
         return res
 
@@ -1021,6 +1026,65 @@ class IntegrationServices:
                                   get_val(criteria, idx + len(key)))
                 doc.unlink()
                 return elem
+
+    def update_elk_status(self, data):
+        if not data and not isinstance(data, dict):
+            return
+        xml_pack = Document()
+        obj = xml_pack.createElement('Object')
+        obj.setAttribute('Type', 'Reference')
+        obj.setAttribute('Name', 'ELK_STATUS')
+        code_values = []
+        for key, value in data.items():
+            if value['name'] == 'Код':
+                code_values = value['values']
+            if value['name'] == 'Наименование':
+                name_values = value['values']
+        index = 0
+        while index < len(code_values):
+            rec = None
+            # Search if changed
+            res = self.search('ELK_STATUS', "Код='{:>10}'".format(code_values[index]))
+            for r in res:  # Update record
+                if r['Наименование'] != name_values[index][:50]:
+                    rec = xml_pack.createElement('Record')
+                    rec.setAttribute('Action', 'Change')
+                    rec.setAttribute('ИД', r['ИД'])
+            if not res:
+                rec = xml_pack.createElement('Record')
+                rec.setAttribute('Action', 'Change')
+            if rec:
+                req_code = xml_pack.createElement('Requisite')
+                req_code.setAttribute('Name', 'Код')
+                req_code.setAttribute('Type', 'String')
+                text = xml_pack.createTextNode(code_values[index])
+                req_code.appendChild(text)
+                req_name = xml_pack.createElement('Requisite')
+                req_name.setAttribute('Name', 'Наименование')
+                req_name.setAttribute('Type', 'String')
+                text = xml_pack.createTextNode(name_values[index][:50])
+                req_name.appendChild(text)
+                sec = xml_pack.createElement('Section')
+                sec.setAttribute('Index', '0')
+                sec.appendChild(req_code)
+                sec.appendChild(req_name)
+                req = xml_pack.createElement('Requisite')
+                req.setAttribute('Name', 'LongString')
+                req.setAttribute('Type', 'String')
+                text = xml_pack.createTextNode(name_values[index][:1024])
+                req.appendChild(text)
+                sec.appendChild(req)
+                rec.appendChild(sec)
+                obj.appendChild(rec)
+            index += 1
+        # dataexchangepackage = xml_pack.createElement("DataExchangePackage")
+        # dataexchangepackage.appendChild(obj)
+        # xml_pack.appendChild(dataexchangepackage)
+        xml_pack.appendChild(obj)
+        package = xml_pack.toxml(encoding='utf-8').decode('utf-8')
+        xml_pack.unlink()
+        res = self.proxy.service.ReferencesUpdate(XMLPackage=package, ISCode='', FullSync=True)
+        return res
 
 
 if __name__ == '__main__':
