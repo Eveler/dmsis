@@ -269,7 +269,7 @@ class Adapter:
         res = self.__send(operation, res)
         self.log.debug(res)
 
-    def __add_element(self, parent, ns, elem, data, file_names=list()):
+    def __add_element(self, parent, ns, elem, data, file_names=()):
         if not data:
             return
         se = etree.SubElement(parent, '{%s}%s' % (ns, elem))
@@ -416,7 +416,7 @@ class Adapter:
         return res
 
     def send_response(self, reply_to, declar_number, register_date,
-                      result='FINAL', text='', applied_documents=list(),
+                      result='FINAL', text='', applied_documents=(),
                       ftp_user='anonymous', ftp_pass='anonymous'):
         files = []
         for doc in applied_documents:
@@ -858,94 +858,313 @@ class Adapter:
                 tag_name) + 1
         return xml_as_str[b_idx:e_idx]
 
+    def _dict_to_xml(self, tag, d: dict, pre=None, nsmap=None):
+        elem = etree.Element("{%s}%s" % (pre, tag) if pre else tag, nsmap=nsmap)
+        for key, val in d.items():
+            if isinstance(val, dict):
+                child = self._dict_to_xml(key, val, pre, nsmap)
+            else:
+                child = etree.Element("{%s}%s" % (pre, key) if pre else key, nsmap=nsmap)
+                child.text = str(val)
+            elem.append(child)
+        return elem
+
+    def create_orders_request(self, orders: dict = (), uri='http://epgu.gosuslugi.ru/elk/status/1.0.2'):
+        operation = 'SendRequest'
+        element = self.proxy.get_element('ns1:MessagePrimaryContent')
+        eor = etree.Element('{%s}ElkOrderRequest' % uri, nsmap={'ns1': uri})
+        eor.set("env", "EPGU")  # Код маршрутизации
+        cor = etree.SubElement(eor, '{%s}CreateOrdersRequest' % uri, nsmap={'ns1': uri})
+        cor.append(self._dict_to_xml("orders", orders, pre=uri, nsmap={'ns1': uri}))
+        mpc = element(eor)
+        node = self.proxy.create_message(
+            self.proxy.service, operation,
+            {'MessageID': uuid1(), 'MessagePrimaryContent': mpc},
+            CallerInformationSystemSignature=etree.Element('Signature'))
+        self.log.debug(etree.tostring(node))
+        res = self.__sign_node(node, 'SenderProvidedRequestData')
+        res = self.__send(operation, res.encode('utf-8'))
+        self.log.debug(res)
+
+    def update_orders_request(self, orders: dict = (), uri='http://epgu.gosuslugi.ru/elk/status/1.0.2', test=False):
+        operation = 'SendRequest'
+        element = self.proxy.get_element('ns1:MessagePrimaryContent')
+        eor = etree.Element('{%s}ElkOrderRequest' % uri, nsmap={'ns1': uri})
+        eor.set("env", "EPGU")  # Код маршрутизации
+        cor = etree.SubElement(eor, '{%s}UpdateOrdersRequest' % uri, nsmap={'ns1': uri})
+        cor.append(self._dict_to_xml("orders", orders, pre=uri, nsmap={'ns1': uri}))
+        mpc = element(eor)
+        node = self.proxy.create_message(
+            self.proxy.service, operation,
+            {'TestMessage': '', 'MessageID': uuid1(), 'MessagePrimaryContent': mpc} if test else
+            {'MessageID': uuid1(), 'MessagePrimaryContent': mpc},
+            CallerInformationSystemSignature=etree.Element('Signature'))
+        self.log.debug(etree.tostring(node))
+        res = self.__sign_node(node, 'SenderProvidedRequestData')
+        res = self.__send(operation, res.encode('utf-8'))
+        self.log.debug(res)
+
+    def get_response(self, resp_name: str, uri: str, node_id=None):
+        operation = 'GetResponse'
+        if sys.version_info.major == 3 and sys.version_info.minor <= 5:
+            import timezone
+            timestamp = timezone.utcnow()
+        else:
+            import pytz
+            timestamp = datetime.now(pytz.utc)
+        node = self.proxy.create_message(
+            self.proxy.service, operation,
+            {'NamespaceURI': uri, 'RootElementLocalName': resp_name,
+             'Timestamp': timestamp, 'NodeID': node_id},
+            CallerInformationSystemSignature=etree.Element('Signature'))
+        node[0][0][0].set('Id', 'SIGNED_BY_CALLER')
+        node_str = etree.tostring(node)
+        self.log.debug(node_str)
+        res = self.__call_sign(
+            self.__xml_part(node_str, b'ns1:MessageTypeSelector'))
+        res = node_str.decode().replace('<Signature/>', res)
+        res = self.__send(operation, res)
+        self.log.debug(res)
+        return res
+
+    def __sign_node(self, node, signed_tag: str):
+        res = node.find('.//{*}%s' % signed_tag)
+        res.set('Id', 'SIGNED_BY_CALLER')
+        node_str = etree.tostring(node)
+        res = etree.QName(res)
+        node_str = node_str.replace(b'<ns0:%s' % signed_tag.encode(),
+                                    (b'<ns0:%s xmlns:ns0="' % signed_tag.encode()) + res.namespace.encode() + b'"')
+        self.log.debug(node_str)
+        res = self.__xml_part(node_str, b'ns0:%s' % signed_tag.encode())
+        res = self.__call_sign(res)
+        res = node_str.decode().replace('<Signature/>', res)
+        return res
+
+    def _send_request(self, req_name: str, uri: str, data, test=False):
+        operation = 'SendRequest'
+        element = self.proxy.get_element('ns1:MessagePrimaryContent')
+        if isinstance(data, dict):
+            rr = self._dict_to_xml(req_name, data, pre=uri, nsmap={'ns1': uri})
+            mpc = element(rr)
+        elif isinstance(data, (str, bytes)):
+            rr = etree.Element('{%s}%s' % (uri, req_name), nsmap={'ns1': uri})
+            rr.text = data
+            mpc = element(rr)
+        elif data:
+            mpc = element(data)
+        else:
+            mpc = element(etree.Element('{%s}%s' % (uri, req_name), nsmap={'ns1': uri}))
+        node = self.proxy.create_message(
+            self.proxy.service, operation,
+            {'TestMessage': '', 'MessageID': uuid1(), 'MessagePrimaryContent': mpc} if test else
+            {'MessageID': uuid1(), 'MessagePrimaryContent': mpc},
+            CallerInformationSystemSignature=etree.Element('Signature'))
+        res = self.__sign_node(node, 'SenderProvidedRequestData')
+        res = self.__send(operation, res)
+        self.log.debug(res)
+        return res
+
 
 if __name__ == '__main__':
     loglevel = logging.DEBUG
     logging.basicConfig(level=loglevel,
-	    format='%(asctime)s %(levelname)s:%(module)s:%(name)s:%(lineno)d: %(message)s')
+                        format='%(asctime)s %(levelname)s:%(module)s:%(name)s:%(lineno)d: %(message)s')
     # logging.root.handlers[0].setLevel(logging.DEBUG)
     # logging.getLogger('zeep.xsd').setLevel(logging.INFO)
     # logging.getLogger('zeep.wsdl').setLevel(logging.INFO)
     # logging.getLogger('urllib3').setLevel(logging.INFO)
-    from logging.handlers import TimedRotatingFileHandler
-    backupcount = 7
-    handler = TimedRotatingFileHandler(
-        os.path.abspath("dmsis.log"), when='D',
-        backupCount=backupcount, encoding='cp1251')
-    handler.setFormatter(logging.Formatter(
-        '%(asctime)s %(name)s:%(module)s(%(lineno)d): %(levelname)s: '
-        '%(message)s'))
-    logging.root.addHandler(handler)
-    logging.info("Set logging level to '%s'", loglevel)
-    logging.root.setLevel(loglevel)
+    # from logging.handlers import TimedRotatingFileHandler
+    # backupcount = 7
+    # handler = TimedRotatingFileHandler(
+    #     os.path.abspath("dmsis.log"), when='D',
+    #     backupCount=backupcount, encoding='cp1251')
+    # handler.setFormatter(logging.Formatter(
+    #     '%(asctime)s %(name)s:%(module)s(%(lineno)d): %(levelname)s: '
+    #     '%(message)s'))
+    # logging.root.addHandler(handler)
+    # logging.info("Set logging level to '%s'", loglevel)
+    # logging.root.setLevel(loglevel)
+    #
+    # if len(sys.argv) < 2:
+    #     handler = TimedRotatingFileHandler(
+    #         os.path.abspath("dmsic.log"), when='D', backupCount=0,
+    #         encoding='cp1251')
+    #     handler.setFormatter(logging.Formatter(
+    #         '%(asctime)s %(name)s:%(module)s(%(lineno)d): %(levelname)s: '
+    #         '%(message)s'))
+    #     logging.root.addHandler(handler)
+    #     handler.setLevel(logging.DEBUG)
 
-    if len(sys.argv) < 2:
-        handler = TimedRotatingFileHandler(
-            os.path.abspath("dmsic.log"), when='D', backupCount=0,
-            encoding='cp1251')
-        handler.setFormatter(logging.Formatter(
-            '%(asctime)s %(name)s:%(module)s(%(lineno)d): %(levelname)s: '
-            '%(message)s'))
-        logging.root.addHandler(handler)
-        handler.setLevel(logging.DEBUG)
-
-    a = Adapter(serial='028E BDC8 291F 0020 81E8 1169 B503 61CC B6',
-                container='ep_ov2018',
+    # a = Adapter(serial='2F5D 25DB 6C79 E302 1D08 4786 DEFC C15A 0EAC B515',
+    #             container='ep_ov-2022',
+    #             wsdl="http://smev3-n0.test.gosuslugi.ru:7500/smev/v1.2/ws?wsdl",
+    #             ftp_addr="ftp://smev3-n0.test.gosuslugi.ru/",
+    #             crt_name='АДМИНИСТРАЦИЯ УССУРИЙСКОГО ГОРОДСКОГО ОКРУГА')
+    a = Adapter(serial='2F5D 25DB 6C79 E302 1D08 4786 DEFC C15A 0EAC B515',
+                container='ep_ov-2022',
                 wsdl="http://172.20.3.12:7500/smev/v1.2/ws?wsdl",
                 ftp_addr="ftp://172.20.3.12/",
-                crt_name='Администрация Уссурийского городского округа')
+                crt_name='АДМИНИСТРАЦИЯ УССУРИЙСКОГО ГОРОДСКОГО ОКРУГА')
 
-    try:
-        # # a.send_ack('5bf287aa-c87c-11e8-9897-005056a21514')
-        # a.send_respose(
-        #     'eyJzaWQiOjM0NzQ2LCJtaWQiOiI1YmYyODdhYS1jODdjLTExZTgtOTg5Ny0wMDUwNTZhMjE1MTQiLCJlb2wiOjAsInNsYyI6ImF1Z29fc21ldl91c2x1Z2lfMS4wLjBfZGVjbGFyIiwibW5tIjoiMjUwMjAxIn0=',
-        #     '00/2018/14282', datetime(2018, 10, 5), text='Услуга предоставлена')
+    orders = {
+        'order': {
+            'user': {
+                # 'userPersonalDoc': {
+                #     'PersonalDocType': '1',  # ЕЛК. Тип документа удостоверяющего личность - Паспорт гражданина РФ (https://esnsi.gosuslugi.ru/classifiers/7211/view/10)
+                #     'series': '0502',
+                #     'number': '918150',
+                #     'lastName': 'Савенко',
+                #     'firstName': 'Михаил',
+                #     'middleName': 'Юрьевич',
+                #     'citizenship': '643'  # ЕЛК. Гражданство - РОССИЯ (https://esnsi.gosuslugi.ru/classifiers/7210/view/27)
+                # }
+                'userPersonalDoc': {
+                    'PersonalDocType': '1',
+                    # ЕЛК. Тип документа удостоверяющего личность - Паспорт гражданина РФ (https://esnsi.gosuslugi.ru/classifiers/7211/view/10)
+                    'series': '0507',
+                    'number': '380602',
+                    'lastName': 'Эйснер',
+                    'firstName': 'Ольга',
+                    'middleName': 'Владимировна',
+                    'citizenship': '643'
+                    # ЕЛК. Гражданство - РОССИЯ (https://esnsi.gosuslugi.ru/classifiers/7210/view/27)
+                }
 
-        class Ad:
-            title = 'письмо исх.'
-            number = ''
-            date = datetime.now().strftime('%Y-%m-%d')
-            valid_until = None
-            url = ''
-            url_valid_until = None
+                # 'userDocSnils': {
+                #     'snils': '060-908-001-34',
+                #     'lastName': 'Савенко',
+                #     'firstName': 'Михаил',
+                #     'middleName': 'Юрьевич',
+                #     'citizenship': '643'
+                # }
 
-        # # a.send_ack('8ea257e8-c7a0-11e8-a9b5-005056a21514')
-        # ad = Ad()
-        # ad.file = 'C:/Users/Администратор/AppData/Local/Temp/1/tmp_zo7d1dm'
-        # ad.file_name = 'Список запросов 23-09-2018.zip'
-        # a.send_respose(
-        #     'eyJzaWQiOjM0NzQ2LCJtaWQiOiI4ZWEyNTdlOC1jN2EwLTExZTgtYTliNS0wMDUwNTZhMjE1MTQiLCJlb2wiOjAsInNsYyI6ImF1Z29fc21ldl91c2x1Z2lfMS4wLjBfZGVjbGFyIiwibW5tIjoiMjUwMjAxIn0=',
-        #     '00/2018/14255', datetime(2018, 10, 4), text='Услуга предоставлена',
-        #     applied_documents=[ad])
-        #
-        # # a.send_ack('f005381a-cb89-11e8-98d3-005056a21514')
-        # ad = Ad()
-        # ad.file = 'C:/Users/Администратор/AppData/Local/Temp/1/tmpn1x_t5l2'
-        # ad.file_name = 'заявление ТЕПЛО.pdf'
-        # a.send_respose(
-        #     'eyJzaWQiOjM0NzQ2LCJtaWQiOiJmMDA1MzgxYS1jYjg5LTExZTgtOThkMy0wMDUwNTZhMjE1MTQiLCJlb2wiOjAsInNsYyI6ImF1Z29fc21ldl91c2x1Z2lfMS4wLjBfZGVjbGFyIiwibW5tIjoiMjUwMjAxIn0=',
-        #     '00/2018/14339', datetime(2018, 10, 9), text='Услуга предоставлена',
-        #     applied_documents=[ad])
-        #
-        # # a.send_ack('ad19ec3c-cb91-11e8-82eb-005056a21514')
-        # a.send_respose(
-        #     'eyJzaWQiOjM0NzQ2LCJtaWQiOiJhZDE5ZWMzYy1jYjkxLTExZTgtODJlYi0wMDUwNTZhMjE1MTQiLCJlb2wiOjAsInNsYyI6ImF1Z29fc21ldl91c2x1Z2lfMS4wLjBfZGVjbGFyIiwibW5tIjoiMjUwMjAxIn0=',
-        #     '00/2018/14342', datetime(2018, 10, 9), text='Услуга предоставлена')
+                # 'userDocSnilsBirthDate': {
+                #     'citizenship': '643',
+                #     'snils': '060-908-001-34',
+                #     'birthDate': '1980-09-21'
+                # }
 
+                # 'userDocInn': {
+                #     'INN': '253602023181',
+                #     'lastName': 'Савенко',
+                #     'firstName': 'Михаил',
+                #     'middleName': 'Юрьевич',
+                #     'citizenship': '643'
+                # }
+            },
+            'senderKpp': '251101001',
+            'senderInn': '2511004094',
+            # 'serviceTargetCode': '2540100010000664823',
+            'serviceTargetCode': '2540100010000664885',
+            'userSelectedRegion': '00000000',
+            'orderNumber': 'test_num01',
+            'requestDate': datetime.now().strftime('%Y-%m-%dT%H:%M:%S+10:00'),
+            'OfficeInfo': {
+                'ApplicationAcceptance': '4'  # ЕЛК. Канал приема - Подразделение ведомства (https://esnsi.gosuslugi.ru/classifiers/7213/view/8)
+            },
+            'statusHistoryList': {
+                'statusHistory': {
+                    'status': '6',  # ЕЛК. Статусы - Заявление принято (https://esnsi.gosuslugi.ru/classifiers/7212/view/86)
+                    'IsInformed': 'true',
+                    'statusDate': datetime.now().strftime('%Y-%m-%dT%H:%M:%S+10:00')
+                }
+            }
+        }
+    }
+    # a.create_orders_request(orders)
 
-        # a.send_ack('d5973856-d10c-11e8-b6de-005056a21514')
-        ad = Ad()
-        ad.file = 'C:\\Users\\836D~1\\AppData\\Local\\Temp\\1\\tmp3vq849b_'
-        ad.file_name = 'заявление ТЕПЛО.zip'
-        ad2 = Ad()
-        ad2.file = 'C:\\Users\\836D~1\\AppData\\Local\\Temp\\1\\tmpevq8juvz'
-        ad2.file_name = '3_Руководство пользователя ВС ГЭПС.zip'
-        ad3 = Ad()
-        ad3.file = 'C:\\Users\\836D~1\\AppData\\Local\\Temp\\1\\tmpurz0d7nl'
-        ad3.file_name = 'zajcevispravlbiletohot758 1.zip'
-        a.send_response(
-            'eyJzaWQiOjM0NzQ2LCJtaWQiOiJkNTk3Mzg1Ni1kMTBjLTExZTgtYjZkZS0wMDUwNTZhMjE1MTQiLCJlb2wiOjAsInNsYyI6ImF1Z29fc21ldl91c2x1Z2lfMS4wLjBfZGVjbGFyIiwibW5tIjoiMjUwMjAxIn0=',
-            '00/2018/14441', datetime(2018, 11, 30),
-            text='Услуга предоставлена', applied_documents=[ad, ad2, ad3])
-    except Exception as e:
-        logging.error(str(e), exc_info=True)
+    orders = {
+        'order': {
+            'orderNumber': 'test_num',
+            'senderKpp': '251101001',
+            'senderInn': '2511004094',
+            'statusHistoryList': {
+                'statusHistory': {
+                    'status': '223',
+                    'IsInformed': 'true',
+                    'statusDate': datetime.now().strftime('%Y-%m-%dT%H:%M:%S+10:00')
+                }
+            }
+        }
+    }
+    a.update_orders_request(orders)
+
+    import time
+    time.sleep(10)
+    res = a.get_response('ElkOrderResponse', 'http://epgu.gosuslugi.ru/elk/status/1.0.2', None)
+    while not res:
+        time.sleep(10)
+        res = a.get_response('ElkOrderResponse', 'http://epgu.gosuslugi.ru/elk/status/1.0.2', None)
+    if isinstance(res, bytes):
+        res = res.decode(errors='replace')
+    if res and 'MessagePrimaryContent' in res:
+        res = etree.fromstring(res)
+    if hasattr(res, 'Response') \
+            and hasattr(res.Response, 'SenderProvidedResponseData'):
+        if hasattr(res.Response.SenderProvidedResponseData, "MessageID"):
+            a.send_ack(res.Response.SenderProvidedResponseData.MessageID)
+        if hasattr(res.Response.SenderProvidedResponseData, 'MessagePrimaryContent') \
+                and res.Response.SenderProvidedResponseData.MessagePrimaryContent:
+            val: etree._Element = res.Response.SenderProvidedResponseData.MessagePrimaryContent._value_1
+            try:
+                print(val, type(val))
+                print([elem.findtext('.//{*}message') for elem in val.findall('.//{*}order')])
+                print(len(val[0]), val[0][1], [elem for elem in val[0][2]])
+            except Exception as e:
+                print("ERROR:", e)
+            res = etree.tostring(res.Response.SenderProvidedResponseData.MessagePrimaryContent._value_1)
+    print(res)
+
+    orders = {
+        'order': {
+            'user': {
+                'userDocPassport': {
+                    'passportRF': {
+                        'series': '0502',
+                        'number': '918150',
+                        'issueDate': '2002-07-03'
+                    },
+                    'lastName': 'Савенко',
+                    'firstName': 'Михаил',
+                    'middleName': 'Юрьевич'
+                }
+
+                # 'userDocSnils': {
+                #     'snils': '060-908-001-34',
+                #     'lastName': 'Савенко',
+                #     'firstName': 'Михаил',
+                #     'middleName': 'Юрьевич',
+                # }
+            },
+            # 'serviceTargetCode': '2540100010000664823',
+            'serviceTargetCode': '2540100010000664885',
+            'userSelectedRegion': '00000000',
+            'orderNumber': 'a',
+            'requestDate': datetime.now().strftime('%Y-%m-%dT%H:%M:%S'),
+            'statusHistoryList': {
+                'statusHistory': {
+                    'status': '6',
+                    # ЕЛК. Статусы - Заявление принято (https://esnsi.gosuslugi.ru/classifiers/7212/view/86)
+                    'statusDate': '2022-12-17T09:30:47Z'
+                }
+            }
+        }
+    }
+    # a.create_orders_request(orders, 'http://epgu.gosuslugi.ru/elk/order/3.3.0')
+    # time.sleep(10)
+    # res = a.get_response('ElkOrderRequest', 'http://epgu.gosuslugi.ru/elk/order/3.3.0', None)
+    # while not res:
+    #     time.sleep(10)
+    #     res = a.get_response('ElkOrderRequest', 'http://epgu.gosuslugi.ru/elk/order/3.3.0', None)
+    # if isinstance(res, bytes):
+    #     res = res.decode(errors='replace')
+    # if res and 'MessagePrimaryContent' in res:
+    #     res = etree.fromstring(res)
+    # if hasattr(res, 'Response') \
+    #         and hasattr(res.Response, 'SenderProvidedResponseData'):
+    #     if hasattr(res.Response.SenderProvidedResponseData, "MessageID"):
+    #         a.send_ack(res.Response.SenderProvidedResponseData.MessageID)
+    #     if hasattr(res.Response.SenderProvidedResponseData, 'MessagePrimaryContent') \
+    #             and res.Response.SenderProvidedResponseData.MessagePrimaryContent:
+    #         res = etree.tostring(res.Response.SenderProvidedResponseData.MessagePrimaryContent._value_1)
+    # print(res)
