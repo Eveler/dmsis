@@ -183,6 +183,12 @@ class Emails(Base):
     person_id = Column(ForeignKey('persons.id'))
 
 
+class Config(Base):
+    __tablename__ = 'config'
+
+    id = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
+    name = Column(String, unique=True, index=True)
+    value = Column(String)
 class Db:
     def __init__(self, dbstr='sqlite:///dmsis.db'):
         self.log = logging.getLogger('db')
@@ -190,6 +196,29 @@ class Db:
                                     echo=(logging.root.level == logging.DEBUG))
         Base.metadata.create_all(self.engine, checkfirst=True)
         self.session = sessionmaker(bind=self.engine)()
+
+    def get_config_value(self, name):
+        if not name:
+            raise Exception('Необходимо указать name')
+        return self.session.query(Config).filter(Config.name == name).first().value
+
+    def remove_config_value(self, name):
+        if not name:
+            raise Exception('Необходимо указать name')
+        v = self.session.query(Config).filter(Config.name == name).first()
+        self.session.delete(v)
+        self.session.commit()
+
+    def set_config_value(self, name, value):
+        if not name:
+            raise Exception('Необходимо указать name')
+        v = self.session.query(Config).filter(Config.name == name).first()
+        if v:
+            v.value = value
+        else:
+            v = Config(name=name, value=value)
+            self.session.add(v)
+        self.session.commit()
 
     def add_update(self, uuid, declar_num, reply_to, status=None,
                    declar_date=None, directum_id=None):
@@ -955,8 +984,11 @@ if __name__ == '__main__':
     # for doc in r.documents:
     #     with open('logo-ussuriisk1.png', 'wb') as f:
     #         f.write(doc.body)
-    request = db.session.query(Requests).filter_by(declar_num='021/2020/427110').first()
-    print('***********************', request.done)
-    request.done = False
-    print('***********************', request.done)
-    db.commit()
+
+    # request = db.session.query(Requests).filter_by(declar_num='021/2020/427110').first()
+    # print('***********************', request.done)
+    # request.done = False
+    # print('***********************', request.done)
+    # db.commit()
+    res = db.get_config_value('last_ELK_STATUS_update')
+    print(res)

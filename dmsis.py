@@ -1,4 +1,5 @@
 # -*- encoding: utf-8 -*-
+from datetime import date
 
 # Twisted reactor sends GetRequest by timer
 # Got requests stored in DB
@@ -11,6 +12,9 @@ from tempfile import mkstemp
 
 from dateutil.utils import today
 from sys import version_info
+
+from smev_cnsi import Cnsi
+
 if version_info.major == 3 and version_info.minor <= 5:
     from win32._service import SERVICE_STOP_PENDING
 else:
@@ -361,6 +365,29 @@ class Integration:
         except:
             self.report_error()
             self.db.rollback()
+
+        # Обновление ЕЛК. Статусы
+        try:
+            last_update = self.db.get_config_value('last_ELK_STATUS_update')
+            if not last_update or date.fromisoformat(last_update) < date.today():
+                cnsi = Cnsi(self.smev)
+                res = cnsi.smev.get_response('CnsiRequest',
+                                             'urn://x-artefacts-smev-gov-ru/esnsi/smev-integration/read/2.0.1', None)
+                while res:
+                    res = cnsi.smev.get_response('CnsiRequest',
+                                                 'urn://x-artefacts-smev-gov-ru/esnsi/smev-integration/read/2.0.1',
+                                                 None)
+                revisions = cnsi.get_revision_list('ELK_STATUS')
+                if revisions:
+                    revisions, max_revision = revisions
+                    res = cnsi.get_data('ELK_STATUS', max_revision)
+                    try:
+                        self.directum.update_elk_status(res)
+                    except:
+                        pass
+                    self.db.set_config_value('last_ELK_STATUS_update', date.today())
+        except:
+            logging.error('Error update ELK_STATUS', exc_info=True)
 
         self.db.vacuum()
 
