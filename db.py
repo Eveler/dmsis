@@ -189,6 +189,7 @@ class Config(Base):
     id = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
     name = Column(String, unique=True, index=True)
     value = Column(String)
+
 class Db:
     def __init__(self, dbstr='sqlite:///dmsis.db'):
         self.log = logging.getLogger('db')

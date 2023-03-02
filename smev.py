@@ -556,6 +556,8 @@ class Adapter:
                     do_loop = False
             except ConnectionResetError:
                 max_try -= 1
+                if max_try < 0:
+                    raise
                 do_loop = max_try > 0
         return uuid
 
@@ -869,7 +871,8 @@ class Adapter:
             elem.append(child)
         return elem
 
-    def create_orders_request(self, orders: dict = (), uri='http://epgu.gosuslugi.ru/elk/status/1.0.2'):
+    def create_orders_request(self, orders: dict = (), files: list = None,
+                              uri='http://epgu.gosuslugi.ru/elk/status/1.0.2'):
         operation = 'SendRequest'
         element = self.proxy.get_element('ns1:MessagePrimaryContent')
         eor = etree.Element('{%s}ElkOrderRequest' % uri, nsmap={'ns1': uri})
@@ -881,12 +884,22 @@ class Adapter:
             self.proxy.service, operation,
             {'MessageID': uuid1(), 'MessagePrimaryContent': mpc},
             CallerInformationSystemSignature=etree.Element('Signature'))
+        if files:
+            uploaded = self.__upload_files(node, files, 'SenderProvidedRequestData')
+            if uploaded:
+                sh = node.find('.//{*}statusHistory')
+                atts = etree.SubElement(sh, '{%s}attachments' % uri)
+                for file_data in uploaded:
+                    att = etree.SubElement(atts, '{%s}attachment' % uri)
+                    etree.SubElement(att, '{%s}FSuuid' % uri).text = file_data.get('uuid')
+                    etree.SubElement(att, '{%s}docTypeId' % uri).text = 'ELK_RESULT'
         self.log.debug(etree.tostring(node))
         res = self.__sign_node(node, 'SenderProvidedRequestData')
         res = self.__send(operation, res.encode('utf-8'))
         self.log.debug(res)
 
-    def update_orders_request(self, orders: dict = (), uri='http://epgu.gosuslugi.ru/elk/status/1.0.2', test=False):
+    def update_orders_request(self, orders: dict = (), files: list = None,
+                              uri='http://epgu.gosuslugi.ru/elk/status/1.0.2', test=False):
         operation = 'SendRequest'
         element = self.proxy.get_element('ns1:MessagePrimaryContent')
         eor = etree.Element('{%s}ElkOrderRequest' % uri, nsmap={'ns1': uri})
@@ -899,10 +912,39 @@ class Adapter:
             {'TestMessage': '', 'MessageID': uuid1(), 'MessagePrimaryContent': mpc} if test else
             {'MessageID': uuid1(), 'MessagePrimaryContent': mpc},
             CallerInformationSystemSignature=etree.Element('Signature'))
+        if files:
+            uploaded = self.__upload_files(node, files, 'SenderProvidedRequestData')
+            if uploaded:
+                sh = node.find('.//{*}statusHistory')
+                atts = etree.SubElement(sh, '{%s}attachments' % uri)
+                for file_data in uploaded:
+                    att = etree.SubElement(atts, '{%s}attachment' % uri)
+                    etree.SubElement(att, '{%s}FSuuid' % uri).text = file_data.get('uuid')
+                    etree.SubElement(att, '{%s}docTypeId' % uri).text = 'ELK_RESULT'
         self.log.debug(etree.tostring(node))
         res = self.__sign_node(node, 'SenderProvidedRequestData')
         res = self.__send(operation, res.encode('utf-8'))
         self.log.debug(res)
+        return res
+
+    def __upload_files(self, node, file_names, signed_tag='SenderProvidedRequestData'):
+        ns = etree.QName(node.find('.//{*}MessagePrimaryContent')).namespace
+        res = node.find('.//{*}%s' % signed_tag)
+        rahl = etree.SubElement(res, '{%s}RefAttachmentHeaderList' % ns)
+        uploaded = []
+        for file_name in file_names:
+            rah = etree.SubElement(rahl, '{%s}RefAttachmentHeader' % ns)
+            uuid = self.__upload_file(file_name, translate(basename(file_name)))
+            etree.SubElement(rah, '{%s}uuid' % ns).text = uuid
+            f_hash = self.crypto.get_file_hash(file_name)
+            etree.SubElement(rah, '{%s}Hash' % ns).text = f_hash
+            mime_type = guess_type(file_name)[0]
+            if not mime_type:
+                mime_type = 'application/octet-stream'
+            etree.SubElement(
+                rah, '{%s}MimeType' % ns).text = mime_type
+            uploaded.append({'uuid': uuid, 'Hash': f_hash, 'MimeType': mime_type})
+        return uploaded
 
     def get_response(self, resp_name: str, uri: str, node_id=None):
         operation = 'GetResponse'
@@ -1081,13 +1123,13 @@ if __name__ == '__main__':
             'statusHistoryList': {
                 'statusHistory': {
                     'status': '223',
-                    'IsInformed': 'true',
+                    # 'IsInformed': 'true',
                     'statusDate': datetime.now().strftime('%Y-%m-%dT%H:%M:%S+10:00')
                 }
             }
         }
     }
-    a.update_orders_request(orders)
+    a.update_orders_request(orders, ['D:\\dmsis\\smev.py'])
 
     import time
     time.sleep(10)
