@@ -1150,7 +1150,9 @@ if __name__ == '__main__':
             val: etree._Element = res.Response.SenderProvidedResponseData.MessagePrimaryContent._value_1
             try:
                 print(val, type(val))
-                print([elem.findtext('.//{*}message') for elem in val.findall('.//{*}order')])
+                print(val.findtext('.//{*}message'),
+                      ', '.join([elem.findtext('.//{*}message') for elem in val.findall('.//{*}order')]))
+                print('elkOrderNumber', val.findtext('.//{*}elkOrderNumber'))
                 print(len(val[0]), val[0][1], [elem for elem in val[0][2]])
             except Exception as e:
                 print("ERROR:", e)

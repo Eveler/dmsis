@@ -444,6 +444,7 @@ class IntegrationServices:
                         doc_ids.append(str(self.__upload_doc(
                             doc_getter, doc, files, declar_id, declar)))
             else:
+                from datetime import date
                 for file_name, file_path in files.items():
                     fn, ext = path.splitext(file_name)
                     with open(file_path, 'rb') as f:
@@ -456,7 +457,6 @@ class IntegrationServices:
 
                     doc = D()
                     doc.number = ''
-                    from datetime import date
                     doc.date = date.today()
                     doc.title = fn
                     res = self.add_doc(doc, doc_data[1], doc_data[0])
@@ -785,6 +785,7 @@ class IntegrationServices:
             for doc in declar.AppliedDocument:
                 self.__upload_doc(doc_getter, doc, files, declar_id, declar)
         else:
+            from datetime import date
             for file_name, file_path in files:
                 fn, ext = path.splitext(file_name)
                 with open(file_path, 'rb') as f:
@@ -797,7 +798,6 @@ class IntegrationServices:
 
                 doc = D()
                 doc.number = ''
-                from datetime import date
                 doc.date = date.today()
                 doc.title = fn
                 res = self.add_doc(doc, doc_data[1], doc_data[0])
@@ -850,7 +850,7 @@ class IntegrationServices:
                 {req.get('Name'): req.text for req in elem.iter('Requisite')})
         return res
 
-    def search(self, code, criteria, tp=REF, order_by='', ascending=True):
+    def search(self, code, criteria, tp=REF, order_by='', ascending=True, raw=False):
         """
         Call search
 
@@ -901,6 +901,8 @@ class IntegrationServices:
         res = self.proxy.service.Search(xml_doc)
         self.log.debug("Search result: %s" % res)
         xml_doc = fromstring(res)
+        if raw:
+            return xml_doc
         if tp:
             docs = []
             for elem in xml_doc.iter('Object'):
@@ -1011,7 +1013,7 @@ class IntegrationServices:
                 idx = criteria.lower().index(logic)
                 first = criteria[:idx]
                 first = first.strip()
-                elem = doc.createElement('IsNotNull')
+                elem = doc.createElement(txt)
                 elem.setAttribute('Requisite', first)
                 doc.unlink()
                 return elem
@@ -1086,13 +1088,69 @@ class IntegrationServices:
         res = self.proxy.service.ReferencesUpdate(XMLPackage=package, ISCode='', FullSync=True)
         return res
 
+    def get_new_declars_4_status(self):
+        """
+        Returns new declars for today for send initial status
+        :return: list(dict)
+        """
+        from datetime import date
+        xml = self.search(
+            'ДПУ',
+            'СпособДост<>5652824 and СпособДост<>6953048 and СпособДост<>5652821 and Дата3=%s and Дата5 is null'
+            ' and LongString56 is null' % date.today(), raw=True)
+        # xml = self.proxy.service.GetEntity('ДПУ', 8804706)
+        res = []
+        for rec in xml.findall('.//Object/Record'):
+            id = rec.findtext('.//Section[@Index="0"]/Requisite[@Name="ИД"]')
+            card = fromstring(self.proxy.service.GetEntity('ДПУ', id))
+            card_map = {req.get('Name'): req.text for req in
+                        card.findall('.//Object/Record/Section[@Index="0"]/Requisite')}
+            # Get persons
+            if 'ЗаявителиФЛ' not in card_map:
+                card_map['ЗаявителиФЛ'] = []
+            for fl in card.findall('.//Section[@Index="7"]/Record'):
+                for req in fl.findall('.//Requisite[@Name="CitizenT7"]'):
+                    person = fromstring(self.proxy.service.GetEntity('ПРС', req.text))
+                    inn = person.findtext('.//Requisite[@Name="ИНН"]')
+                    series = person.findtext('.//Requisite[@Name="Section5"]')
+                    num = person.findtext('.//Requisite[@Name="Строка3"]')
+                    snils = person.findtext('.//Requisite[@Name="Реквизит"]')
+                    if inn or (series and num) or snils:
+                        card_map['ЗаявителиФЛ'].append({req.get('Name'): req.text for req in
+                                                        person.findall('.//Object/Record/Section[@Index="0"]/Requisite')
+                                                        if req.get('Name') != "Текст"})
+            # Skip persons couldn't be unique identified
+            if not card_map['ЗаявителиФЛ']:
+                continue
+            # Get service data
+            # srvs = self.search("ВМУ", 'ИД=%s' % card_map.get('ServiceCode'))
+            ent = fromstring(self.proxy.service.GetEntity('ВМУ', card_map.get('ServiceCode')))
+            card_map['Услуга'] = {req.get('Name'): req.text for req in
+                                  ent.findall('.//Object/Record/Section[@Index="0"]/Requisite')}
+            # Get declar status
+            ent = fromstring(self.proxy.service.GetEntity('СОУ', card_map.get('СтатусУслуги')))
+            card_map['Статус'] = {req.get('Name'): req.text for req in
+                                  ent.findall('.//Object/Record/Section[@Index="0"]/Requisite')}
+            if card_map['Статус'].get('AUGO_ELK_STATUS_REF'):
+                ent = fromstring(self.proxy.service.GetEntity(
+                    'ELK_STATUS', card_map['Статус'].get('AUGO_ELK_STATUS_REF')))
+                card_map['ELK_STATUS'] = {req.get('Name'): req.text for req in
+                                      ent.findall('.//Object/Record/Section[@Index="0"]/Requisite')}
+            # # Get organisations
+            # if 'ЗаявителиЮЛ' not in card_map:
+            #     card_map['ЗаявителиЮЛ'] = []
+            # for ul in card.findall('.//Section[@Index="6"]/Record'):
+            #     for req in ul.findall('.//Requisite[@Name="OrgT6"]'):
+            #         org = fromstring(self.proxy.service.GetEntity('ОРГ', req.text))
+            #         card_map['ЗаявителиЮЛ'].append({req.get('Name'): req.text for req in
+            #                       org.findall('.//Object/Record/Section[@Index="0"]/Requisite')})
+            res.append(card_map)
+        return res
+
 
 if __name__ == '__main__':
-    # from declar import Declar
-    # from lxml import etree
-
     logging.basicConfig(
-        level=logging.INFO,
+        level=logging.DEBUG,
         format='%(asctime)s %(name)s:%(module)s(%(lineno)d): %(levelname)s: '
                '%(message)s')
     logging.getLogger('zeep.xsd').setLevel(logging.INFO)
@@ -1107,46 +1165,68 @@ if __name__ == '__main__':
     # wsdl = "http://snadb:8082/IntegrationService.svc?singleWsdl"
     wsdl = "http://127.0.0.1:8082/IntegrationService.svc?singleWsdl"
     dis = IntegrationServices(wsdl)
-    res = dis.run_script('GetEDocCertificates', [('DocID', 5277587)])
-    if res:
-        import crypto
-        # res = res.replace('\r', '').replace('\n', '')
-        # doc = dis.get_doc(5277587, 0)
-        # import tempfile, os, subprocess
-        # p7stmp_f, p7stmp_fn = tempfile.mkstemp()
-        # os.close(p7stmp_f)
-        # with open(p7stmp_fn, 'w') as f:
-        #     f.write(res)
-        # doctmp_f, doctmp_fn = tempfile.mkstemp()
-        # os.write(doctmp_f, doc)
-        # os.close(doctmp_f)
-        # csptest_path = 'C:\\Program Files (x86)\\Crypto Pro\\CSP\\csptest.exe'
-        # if not os.path.exists(csptest_path):
-        #     csptest_path = 'C:\\Program Files\\Crypto Pro\\CSP\\csptest.exe'
-        # signtmp_f, signtmp_fn = tempfile.mkstemp()
-        # os.close(signtmp_f)
-        # args = [csptest_path, '-lowsign', '-sign', '-detached',
-        #         '-in', os.path.abspath(doctmp_fn), '-out', signtmp_fn,
-        #         '-add', '-base64', '-signature', p7stmp_fn,
-        #         '-my', 'Администрация Уссурийского городского округа']
-        # print(' '.join(args))
-        # try:
-        #     out = subprocess.check_output(args, stderr=subprocess.STDOUT)
-        #     print(out)
-        # except subprocess.CalledProcessError as e:
-        #     print(e.output.decode(encoding='cp866'))
-        # os.rename(signtmp_fn, path.join(path.dirname(signtmp_fn), 'doc.pdf.p7s'))
-        # os.rename(p7stmp_fn, path.join(path.dirname(p7stmp_fn), 'doc.pdf.sig'))
-        # os.rename(doctmp_fn, path.join(path.dirname(doctmp_fn), 'doc.pdf'))
-
-    # procs = dis.search('ПРОУ', 'Kod2=%s' % 178609, order_by='Дата4',
-    #                    ascending=False)
-    # for proc in procs:
-    #     if proc.get('Ведущая аналитика') == '3863571':
-    #         res = dis.get_bind_docs('ПРОУ', proc.get('ИДЗапГлавРазд'))
-    #         if res:
-    #             # doc_id = res[0].get('ID')
-    #             # res = dis.get_doc_versions(doc_id)
-    #             # res = dis.get_doc(doc_id, res[0])
-    #             print(proc.get('ИДЗапГлавРазд'), res)
-    #             # print(res)
+    res = dis.get_new_declars_4_status()
+    from datetime import datetime
+    orders = []
+    for d in res:
+        for human in d['ЗаявителиФЛ']:
+            order = {
+                'order': {
+                    'user': {},
+                    'senderKpp': '251101001',
+                    'senderInn': '2511004094',
+                    'serviceTargetCode': d['Услуга']['КСтрока'],
+                    'userSelectedRegion': '00000000',
+                    'orderNumber': d['Дополнение3'],
+                    'requestDate': d['Дата6'],
+                    'OfficeInfo': {
+                        'ApplicationAcceptance': '4'
+                        # ЕЛК. Канал приема - Подразделение ведомства (https://esnsi.gosuslugi.ru/classifiers/7213/view/8)
+                    },
+                    'statusHistoryList': {
+                        'statusHistory': {
+                            'status': '6',
+                            # ЕЛК. Статусы - Заявление принято (https://esnsi.gosuslugi.ru/classifiers/7212/view/86)
+                            # 'IsInformed': 'true',
+                            'statusDate': datetime.now().strftime('%Y-%m-%dT%H:%M:%S+10:00')
+                        }
+                    }
+                }
+            }
+            if human.get('Строка3'):
+                order['order']['user'] = {
+                    'userPersonalDoc': {
+                            'PersonalDocType': '1',
+                            # ЕЛК. Тип документа удостоверяющего личность - Паспорт гражданина РФ (https://esnsi.gosuslugi.ru/classifiers/7211/view/10)
+                            'series': human.get('Section5'),
+                            'number': human.get('Строка3'),
+                            'lastName': human.get('Дополнение'),
+                            'firstName': human.get('Дополнение2'),
+                            'middleName': human.get('Дополнение3'),
+                            'citizenship': '643'
+                            # ЕЛК. Гражданство - РОССИЯ (https://esnsi.gosuslugi.ru/classifiers/7210/view/27)
+                        }
+                }
+            elif human.get('ИНН'):
+                order['order']['user'] = {
+                    'userDocInn': {
+                        'INN': human.get('ИНН'),
+                        'lastName': human.get('Дополнение'),
+                        'firstName': human.get('Дополнение2'),
+                        'middleName': human.get('Дополнение3'),
+                        'citizenship': '643'
+                    }
+                }
+            elif human.get('Реквизит'):
+                order['order']['user'] = {
+                    'userDocSnils': {
+                        'snils': human.get('Реквизит'),
+                        'lastName': human.get('Дополнение'),
+                        'firstName': human.get('Дополнение2'),
+                        'middleName': human.get('Дополнение3'),
+                        'citizenship': '643'
+                    }
+                }
+            orders.append(order)
+    print(orders)
+    print(len(res))
