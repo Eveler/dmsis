@@ -244,102 +244,18 @@ class Integration:
 
                 # For all requests check if declar`s end date is set
                 if declar and declar[0].get('Дата5'):
-                    # Stub class for document info
-                    class Ad(object):
-                        pass
-
-                    applied_docs = []
-
-                    # Search newest procedure with document bound
-                    # for that declar
-                    procs = self.directum.search(
-                        'ПРОУ', "Kod2='%s' AND ProcState<>'Исключена вручную'" % request.declar_num,
-                        order_by='Дата4', ascending=False)
-                    for proc in procs:
-                        if proc.get('Ведущая аналитика') == str(request.directum_id):
-                            try:
-                                docs = self.directum.get_bind_docs(
-                                    'ПРОУ', proc.get('Аналитика-оригинал')
-                                    if proc.get('Аналитика-оригинал')
-                                    else proc.get('ИДЗапГлавРазд'))
-                                for doc in docs:
-                                    # if doc.get('ISBEDocKind') != 'Г000037':
-                                    if doc.get('TKED') not in ('КИК', 'ИК1', 'ИК2', 'ПСИ'):
-                                        continue
-                                    doc_id = doc.get('ID')
-                                    ad = Ad()
-                                    ad.date = doc.get('ISBEDocCreateDate')
-                                    ad.file_name = doc.get('ID') + '.' + doc.get('Extension').lower()
-                                    ad.number = doc.get('Дополнение') \
-                                        if doc.get('Дополнение') else doc.get('NumberEDoc')
-                                    ad.title = doc.get('ISBEDocName')
-                                    # Get only last version
-                                    versions = self.directum.get_doc_versions(doc_id)
-                                    data = self.directum.get_doc(doc_id, versions[0])
-                                    file, file_n = mkstemp()
-                                    os.write(file, data)
-                                    os.close(file)
-                                    certs = clean_pkcs7(self.directum.run_script(
-                                        'GetEDocCertificates', [('DocID', doc_id)]), self.crt_name)
-                                    if self.zip_signed_doc and certs:
-                                        ad.file = self.smev.make_sig_zip(ad.file_name, file_n, certs)
-                                        ad.file_name = doc.get('ID') + '.zip'
-                                    else:
-                                        ad.file = file_n
-                                        ad.certs = certs
-                                    applied_docs.append(ad)
-                            except:
-                                logging.warning('', exc_info=True)
-
-                    # Get bound docs from declar if there is no procedures
-                    # with docs bound
-                    if not applied_docs:
-                        docs = self.directum.get_bind_docs('ДПУ', request.directum_id)
-                        for doc in docs:
-                            if doc.get('TKED') in ('КИК', 'ИК1', 'ИК2', 'ПСИ'):
-                                # if ad.date > doc.get('ISBEDocCreateDate'):
-                                ad = Ad()
-                                doc_id = doc.get('ID')
-                                ad.date = doc.get('ISBEDocCreateDate')
-                                ad.file_name = doc.get('ID') + '.' + doc.get('Extension').lower()
-                                add = doc.get('Дополнение')
-                                ad.number = add if add else doc.get('NumberEDoc')
-                                ad.title = doc.get('ISBEDocName')
-                                # Get only last version
-                                versions = self.directum.get_doc_versions(doc_id)
-                                import zeep
-                                try:
-                                    data = self.directum.get_doc(doc_id, versions[0])
-                                    file, file_n = mkstemp()
-                                    os.write(file, data)
-                                    os.close(file)
-                                    certs = clean_pkcs7(self.directum.run_script(
-                                        'GetEDocCertificates', [('DocID', doc_id)]), self.crt_name)
-                                    if self.zip_signed_doc and certs:
-                                        ad.file = self.smev.make_sig_zip(ad.file_name, file_n, certs)
-                                    else:
-                                        ad.file = file_n
-                                        ad.certs = certs
-                                    applied_docs.append(ad)
-                                except zeep.exceptions.Fault as e:
-                                    if 'не найдена в хранилище' in e.message:
-                                        logging.warning('Ошибка получения результата:', exc_info=True)
+                    applied_docs = self.directum.get_result_docs(request.directum_id, request.declar_num, self.crt_name,
+                                                                 self.zip_signed_doc)
 
                     text = 'Услуга предоставлена'
                     # if declar[0].get('СтатусУслуги'):
-                    #     state = self.directum.search(
-                    #         'СОУ',
-                    #         'ИД=%s' % declar[0].get('СтатусУслуги'))
+                    #     state = self.directum.search('СОУ', 'ИД=%s' % declar[0].get('СтатусУслуги'))
                     #     if state[0].get('Наименование'):
-                    #         text += '. Статус: %s' % \
-                    #                 state[0].get('Наименование')
+                    #         text += '. Статус: %s' % state[0].get('Наименование')
 
                     try:
-                        self.smev.send_response(request.reply_to,
-                                                request.declar_num,
-                                                request.declar_date, text=text,
-                                                applied_documents=applied_docs,
-                                                ftp_user=self.ftp_user,
+                        self.smev.send_response(request.reply_to, request.declar_num, request.declar_date, text=text,
+                                                applied_documents=applied_docs, ftp_user=self.ftp_user,
                                                 ftp_pass=self.ftp_pass)
                         logging.info(
                             'Результат услуги отправлен. Дело № %s от %s' %
@@ -351,7 +267,6 @@ class Integration:
                                 '%s от %s № %s' %
                                 (doc.title, doc.date[:19],
                                  doc.number if doc.number else 'б/н'))
-                        # self.db.delete(request.uuid)
                         request.done = True
                         self.db.commit()
                     except:
@@ -366,7 +281,7 @@ class Integration:
             self.report_error()
             self.db.rollback()
 
-        # Обновление ЕЛК. Статусы
+        # Обновление ЕЛК.Статусы
         try:
             last_update = self.db.get_config_value('last_ELK_STATUS_update')
             if not last_update or date.fromisoformat(last_update) < date.today():
@@ -383,6 +298,7 @@ class Integration:
                     res = cnsi.get_data('ELK_STATUS', max_revision)
                     try:
                         self.directum.update_elk_status(res)
+                        logging.info("Обновлён справочник ЕЛК.Статусы")
                     except:
                         pass
                     self.db.set_config_value('last_ELK_STATUS_update', date.today())
@@ -618,7 +534,7 @@ def main():
 
     from optparse import OptionParser
 
-    parser = OptionParser(version="%prog ver. 1.04",
+    parser = OptionParser(version="%prog ver. 1.05",
                           conflict_handler="resolve")
     parser.print_version()
     parser.add_option("-r", "--run", action="store_true", dest="run",

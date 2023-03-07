@@ -1098,7 +1098,6 @@ class IntegrationServices:
             'ДПУ',
             'СпособДост<>5652824 and СпособДост<>6953048 and СпособДост<>5652821 and Дата3=%s and Дата5 is null'
             ' and LongString56 is null' % date.today(), raw=True)
-        # xml = self.proxy.service.GetEntity('ДПУ', 8804706)
         res = []
         for rec in xml.findall('.//Object/Record'):
             id = rec.findtext('.//Section[@Index="0"]/Requisite[@Name="ИД"]')
@@ -1123,7 +1122,6 @@ class IntegrationServices:
             if not card_map['ЗаявителиФЛ']:
                 continue
             # Get service data
-            # srvs = self.search("ВМУ", 'ИД=%s' % card_map.get('ServiceCode'))
             ent = fromstring(self.proxy.service.GetEntity('ВМУ', card_map.get('ServiceCode')))
             card_map['Услуга'] = {req.get('Name'): req.text for req in
                                   ent.findall('.//Object/Record/Section[@Index="0"]/Requisite')}
@@ -1146,6 +1144,98 @@ class IntegrationServices:
             #                       org.findall('.//Object/Record/Section[@Index="0"]/Requisite')})
             res.append(card_map)
         return res
+
+    def get_result_docs(self, directum_id, declar_num, crt_name='Администрация Уссурийского городского округа',
+                        zip_signed_doc=False):
+        """
+        Loads files from DIRECTUM bounded as result
+        :param directum_id: DIRECTUM record id
+        :param declar_num: Declar number
+        :param crt_name: Certificate name
+        :param zip_signed_doc: Compress signed document together with .sig
+        :return: List of class DocumentInfo
+        """
+        # Stub class for document info
+        class DocumentInfo(object):
+            date = None
+            file_name = None
+            number = None
+            title = None
+            file = None
+            certs = None
+        from tempfile import mkstemp
+        import os
+        from crypto import clean_pkcs7
+        applied_docs = []
+
+        # Search for newest procedures with document bound for that declar
+        procs = self.search('ПРОУ', "Kod2='%s' AND ProcState<>'Исключена вручную'" % declar_num,
+                            order_by='Дата4', ascending=False)
+        for proc in procs:
+            if proc.get('Ведущая аналитика') == str(directum_id):
+                try:
+                    docs = self.get_bind_docs('ПРОУ',
+                                              proc.get('Аналитика-оригинал') if proc.get('Аналитика-оригинал')
+                                              else proc.get('ИДЗапГлавРазд'))
+                    for doc in docs:
+                        if doc.get('TKED') not in ('КИК', 'ИК1', 'ИК2', 'ПСИ'):
+                            continue
+                        doc_id = doc.get('ID')
+                        ad = DocumentInfo()
+                        ad.date = doc.get('ISBEDocCreateDate')
+                        ad.file_name = doc.get('ID') + '.' + doc.get('Extension').lower()
+                        ad.number = doc.get('Дополнение') if doc.get('Дополнение') else doc.get('NumberEDoc')
+                        ad.title = doc.get('ISBEDocName')
+                        # Get only last version
+                        versions = self.get_doc_versions(doc_id)
+                        data = self.get_doc(doc_id, versions[0])
+                        file, file_n = mkstemp()
+                        os.write(file, data)
+                        os.close(file)
+                        certs = clean_pkcs7(self.run_script('GetEDocCertificates', [('DocID', doc_id)]), crt_name)
+                        if zip_signed_doc and certs:
+                            from smev import Adapter
+                            ad.file = Adapter.make_sig_zip(ad.file_name, file_n, certs)
+                            ad.file_name = doc.get('ID') + '.zip'
+                        else:
+                            ad.file = file_n
+                            ad.certs = certs
+                        applied_docs.append(ad)
+                except:
+                    logging.warning('', exc_info=True)
+
+        # Get bound docs from declar if there is no procedures with docs bound
+        if not applied_docs:
+            docs = self.get_bind_docs('ДПУ', directum_id)
+            for doc in docs:
+                if doc.get('TKED') in ('КИК', 'ИК1', 'ИК2', 'ПСИ'):
+                    ad = DocumentInfo()
+                    doc_id = doc.get('ID')
+                    ad.date = doc.get('ISBEDocCreateDate')
+                    ad.file_name = doc.get('ID') + '.' + doc.get('Extension').lower()
+                    add = doc.get('Дополнение')
+                    ad.number = add if add else doc.get('NumberEDoc')
+                    ad.title = doc.get('ISBEDocName')
+                    # Get only last version
+                    versions = self.get_doc_versions(doc_id)
+                    import zeep
+                    try:
+                        data = self.get_doc(doc_id, versions[0])
+                        file, file_n = mkstemp()
+                        os.write(file, data)
+                        os.close(file)
+                        certs = clean_pkcs7(self.run_script('GetEDocCertificates', [('DocID', doc_id)]), crt_name)
+                        if zip_signed_doc and certs:
+                            from smev import Adapter
+                            ad.file = Adapter.make_sig_zip(ad.file_name, file_n, certs)
+                        else:
+                            ad.file = file_n
+                            ad.certs = certs
+                        applied_docs.append(ad)
+                    except zeep.exceptions.Fault as e:
+                        if 'не найдена в хранилище' in e.message:
+                            logging.warning('Ошибка получения результата:', exc_info=True)
+        return applied_docs
 
 
 if __name__ == '__main__':
