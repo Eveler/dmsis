@@ -1050,56 +1050,64 @@ if __name__ == '__main__':
 
     orders = {
         'order': {
-            'user': {
-                # 'userPersonalDoc': {
-                #     'PersonalDocType': '1',  # ЕЛК. Тип документа удостоверяющего личность - Паспорт гражданина РФ (https://esnsi.gosuslugi.ru/classifiers/7211/view/10)
-                #     'series': '0502',
-                #     'number': '918150',
-                #     'lastName': 'Савенко',
-                #     'firstName': 'Михаил',
-                #     'middleName': 'Юрьевич',
-                #     'citizenship': '643'  # ЕЛК. Гражданство - РОССИЯ (https://esnsi.gosuslugi.ru/classifiers/7210/view/27)
-                # }
-                'userPersonalDoc': {
-                    'PersonalDocType': '1',
-                    # ЕЛК. Тип документа удостоверяющего личность - Паспорт гражданина РФ (https://esnsi.gosuslugi.ru/classifiers/7211/view/10)
-                    'series': '0507',
-                    'number': '380602',
-                    'lastName': 'Эйснер',
-                    'firstName': 'Ольга',
-                    'middleName': 'Владимировна',
-                    'citizenship': '643'
-                    # ЕЛК. Гражданство - РОССИЯ (https://esnsi.gosuslugi.ru/classifiers/7210/view/27)
+            # 'user': {
+            #     # 'userPersonalDoc': {
+            #     #     'PersonalDocType': '1',  # ЕЛК. Тип документа удостоверяющего личность - Паспорт гражданина РФ (https://esnsi.gosuslugi.ru/classifiers/7211/view/10)
+            #     #     'series': '0502',
+            #     #     'number': '918150',
+            #     #     'lastName': 'Савенко',
+            #     #     'firstName': 'Михаил',
+            #     #     'middleName': 'Юрьевич',
+            #     #     'citizenship': '643'  # ЕЛК. Гражданство - РОССИЯ (https://esnsi.gosuslugi.ru/classifiers/7210/view/27)
+            #     # }
+            #     'userPersonalDoc': {
+            #         'PersonalDocType': '1',
+            #         # ЕЛК. Тип документа удостоверяющего личность - Паспорт гражданина РФ (https://esnsi.gosuslugi.ru/classifiers/7211/view/10)
+            #         'series': '0507',
+            #         'number': '380602',
+            #         'lastName': 'Эйснер',
+            #         'firstName': 'Ольга',
+            #         'middleName': 'Владимировна',
+            #         'citizenship': '643'
+            #         # ЕЛК. Гражданство - РОССИЯ (https://esnsi.gosuslugi.ru/classifiers/7210/view/27)
+            #     }
+            #
+            #     # 'userDocSnils': {
+            #     #     'snils': '060-908-001-34',
+            #     #     'lastName': 'Савенко',
+            #     #     'firstName': 'Михаил',
+            #     #     'middleName': 'Юрьевич',
+            #     #     'citizenship': '643'
+            #     # }
+            #
+            #     # 'userDocSnilsBirthDate': {
+            #     #     'citizenship': '643',
+            #     #     'snils': '060-908-001-34',
+            #     #     'birthDate': '1980-09-21'
+            #     # }
+            #
+            #     # 'userDocInn': {
+            #     #     'INN': '253602023181',
+            #     #     'lastName': 'Савенко',
+            #     #     'firstName': 'Михаил',
+            #     #     'middleName': 'Юрьевич',
+            #     #     'citizenship': '643'
+            #     # }
+            # },
+            'organization': {
+                'ogrn_inn_UL': {
+                    'inn_kpp': {
+                        'inn': '2511004094'
+                    }#,
+                    #'UlTitle': 'Администрация Уссурийского городского округа'
                 }
-
-                # 'userDocSnils': {
-                #     'snils': '060-908-001-34',
-                #     'lastName': 'Савенко',
-                #     'firstName': 'Михаил',
-                #     'middleName': 'Юрьевич',
-                #     'citizenship': '643'
-                # }
-
-                # 'userDocSnilsBirthDate': {
-                #     'citizenship': '643',
-                #     'snils': '060-908-001-34',
-                #     'birthDate': '1980-09-21'
-                # }
-
-                # 'userDocInn': {
-                #     'INN': '253602023181',
-                #     'lastName': 'Савенко',
-                #     'firstName': 'Михаил',
-                #     'middleName': 'Юрьевич',
-                #     'citizenship': '643'
-                # }
             },
             'senderKpp': '251101001',
             'senderInn': '2511004094',
             # 'serviceTargetCode': '2540100010000664823',
             'serviceTargetCode': '2540100010000664885',
             'userSelectedRegion': '00000000',
-            'orderNumber': 'test_num01',
+            'orderNumber': 'test_num02',
             'requestDate': datetime.now().strftime('%Y-%m-%dT%H:%M:%S+10:00'),
             'OfficeInfo': {
                 'ApplicationAcceptance': '4'  # ЕЛК. Канал приема - Подразделение ведомства (https://esnsi.gosuslugi.ru/classifiers/7213/view/8)
@@ -1113,7 +1121,7 @@ if __name__ == '__main__':
             }
         }
     }
-    # a.create_orders_request(orders)
+    a.create_orders_request(orders)
 
     orders = {
         'order': {
@@ -1129,7 +1137,7 @@ if __name__ == '__main__':
             }
         }
     }
-    a.update_orders_request(orders, ['D:\\dmsis\\smev.py'])
+    # a.update_orders_request(orders, ['D:\\dmsis\\smev.py'])
 
     import time
     time.sleep(10)
