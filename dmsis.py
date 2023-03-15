@@ -269,6 +269,9 @@ class Integration:
                                  doc.number if doc.number else 'б/н'))
                         request.done = True
                         self.db.commit()
+
+                        # Send final status to ELK
+
                     except:
                         self.report_error()
                     finally:

@@ -222,8 +222,8 @@ if __name__ == '__main__':
     logging.basicConfig(level=loglevel,
                         format='%(asctime)s %(levelname)s:%(module)s:%(name)s:%(lineno)d: %(message)s')
 
-    a = Adapter(serial='2F5D 25DB 6C79 E302 1D08 4786 DEFC C15A 0EAC B515',
-                container='ep_ov-2022',
+    a = Adapter(serial='00AB 63BB BD9B 3728 C624 1DC9 C482 6264 F4',
+                container='ep_ov-2023',
                 wsdl="http://172.20.3.12:7500/smev/v1.2/ws?wsdl",
                 ftp_addr="ftp://172.20.3.12/",
                 crt_name='АДМИНИСТРАЦИЯ УССУРИЙСКОГО ГОРОДСКОГО ОКРУГА')
