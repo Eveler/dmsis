@@ -8,7 +8,6 @@ from datetime import date
 # SendResponse if status changed
 import logging
 import os
-from tempfile import mkstemp
 
 from dateutil.utils import today
 from sys import version_info
@@ -22,7 +21,6 @@ else:
 #from win32serviceutil import ServiceFramework, HandleCommandLine
 
 import requests
-from crypto import clean_pkcs7
 from db import Db
 from plugins.directum import IntegrationServices, IntegrationServicesException
 from smev import Adapter
@@ -254,7 +252,7 @@ class Integration:
                     #         text += '. Статус: %s' % state[0].get('Наименование')
 
                     try:
-                        self.smev.send_response(request.reply_to, request.declar_num, request.declar_date, text=text,
+                        uuids = self.smev.send_response(request.reply_to, request.declar_num, request.declar_date, text=text,
                                                 applied_documents=applied_docs, ftp_user=self.ftp_user,
                                                 ftp_pass=self.ftp_pass)
                         logging.info(
@@ -271,6 +269,8 @@ class Integration:
                         self.db.commit()
 
                         # Send final status to ELK
+                        for status in self.directum.get_declar_status_data(request.directum_id, uuids):
+                            print(status)
 
                     except:
                         self.report_error()
@@ -300,13 +300,86 @@ class Integration:
                     revisions, max_revision = revisions
                     res = cnsi.get_data('ELK_STATUS', max_revision)
                     try:
-                        self.directum.update_elk_status(res)
+                        res = self.directum.update_elk_status(res)
+                        logging.debug(res)
                         logging.info("Обновлён справочник ЕЛК.Статусы")
                     except:
                         pass
                     self.db.set_config_value('last_ELK_STATUS_update', date.today())
         except:
             logging.error('Error update ELK_STATUS', exc_info=True)
+
+        # try:
+        #     declar_id = 8921555
+        #     st_list = self.directum.get_declar_status_data(declar_id, permanent_status='3')
+        #     print(st_list)
+        #     for status in st_list:
+        #         if 'user' in status['order'] or 'organization' in status['order']:
+        #             self.smev.create_orders_request(status)
+        #         else:
+        #             self.smev.update_orders_request(status)
+        #         import time
+        #         time.sleep(10)
+        #         res = self.smev.get_response('ElkOrderResponse', 'http://epgu.gosuslugi.ru/elk/status/1.0.2', None)
+        #         while not res:
+        #             time.sleep(10)
+        #             res = self.smev.get_response('ElkOrderResponse', 'http://epgu.gosuslugi.ru/elk/status/1.0.2', None)
+        #         print(res)
+        #         if isinstance(res, bytes):
+        #             res = res.decode(errors='replace')
+        #         from lxml import etree
+        #         if res and 'MessagePrimaryContent' in res:
+        #             res = etree.fromstring(res)
+        #         if hasattr(res, 'Response') and hasattr(res.Response, 'SenderProvidedResponseData'):
+        #             if hasattr(res.Response.SenderProvidedResponseData, "MessageID"):
+        #                 self.smev.send_ack(res.Response.SenderProvidedResponseData.MessageID)
+        #             if hasattr(res.Response.SenderProvidedResponseData, 'MessagePrimaryContent') \
+        #                     and res.Response.SenderProvidedResponseData.MessagePrimaryContent:
+        #                 val: etree._Element = res.Response.SenderProvidedResponseData.MessagePrimaryContent._value_1
+        #                 print(etree.tostring(val))
+        #                 ok = val.findtext('.//{*}message')
+        #                 print(ok)
+        #                 if ok.lower() != 'ok':
+        #                     ok += ": " + ', '.join(
+        #                         [elem.findtext('.//{*}message') for elem in val.findall('.//{*}order')])
+        #                     logging.warning(ok)
+        #                     print(ok)
+        #                     self.smev.update_orders_request(status)
+        #                     time.sleep(10)
+        #                     res = self.smev.get_response('ElkOrderResponse',
+        #                                                  'http://epgu.gosuslugi.ru/elk/status/1.0.2', None)
+        #                     while not res:
+        #                         time.sleep(10)
+        #                         res = self.smev.get_response('ElkOrderResponse',
+        #                                                      'http://epgu.gosuslugi.ru/elk/status/1.0.2', None)
+        #                     print(res)
+        #                     if isinstance(res, bytes):
+        #                         res = res.decode(errors='replace')
+        #                     from lxml import etree
+        #                     if res and 'MessagePrimaryContent' in res:
+        #                         res = etree.fromstring(res)
+        #                     if hasattr(res, 'Response') and hasattr(res.Response, 'SenderProvidedResponseData'):
+        #                         if hasattr(res.Response.SenderProvidedResponseData, "MessageID"):
+        #                             self.smev.send_ack(res.Response.SenderProvidedResponseData.MessageID)
+        #                         if hasattr(res.Response.SenderProvidedResponseData, 'MessagePrimaryContent') \
+        #                                 and res.Response.SenderProvidedResponseData.MessagePrimaryContent:
+        #                             val: etree._Element = res.Response.SenderProvidedResponseData.MessagePrimaryContent._value_1
+        #                             print(etree.tostring(val))
+        #                             ok = val.findtext('.//{*}message')
+        #                             if ok.lower() != 'ok':
+        #                                 ok += ': ' + ', '.join(
+        #                                     [elem.findtext('.//{*}message') for elem in val.findall('.//{*}order')])
+        #                                 raise Exception(ok)
+        #                 elk_num = val.findtext('.//{*}elkOrderNumber')
+        #                 print('elkOrderNumber', elk_num)
+        #                 if elk_num:
+        #                     res = self.directum.update_reference(
+        #                         "ДПУ", declar_id, [{'Name': 'LongString56', 'Type': 'String', 'Value': elk_num},
+        #                                            {'Name': 'НашаОрг', 'Type': 'String', 'Value': '38838'}]) # Администрация Уссурийского городского округа (АУГО)
+        #                     logging.debug(res)
+        #                     print(res)
+        # except:
+        #     logging.error('Error update STATUS', exc_info=True)
 
         self.db.vacuum()
 
@@ -500,9 +573,6 @@ class Integration:
                 msg = ("%s" + "\n" + "*" * 70 + "\n%s\n" + "*" * 70) % (
                     value, trace)
                 logging.error(msg)
-
-    def __del__(self):
-        self.db.vacuum()
 
 
 # class Service(ServiceFramework):

@@ -498,11 +498,13 @@ class Adapter:
         res = node.find('.//{*}SenderProvidedResponseData')
         res.set('Id', 'SIGNED_BY_CALLER')
 
+        uuids = []
         if files:
             ns = etree.QName(node.find('.//{*}MessagePrimaryContent')).namespace
             rahl = etree.SubElement(res, '{%s}RefAttachmentHeaderList' % ns)
             for item in files:
                 uuid, file = item.popitem()
+                uuids.append(uuid)
                 rah = etree.SubElement(rahl, '{%s}RefAttachmentHeader' % ns)
                 etree.SubElement(rah, '{%s}uuid' % ns).text = uuid
                 etree.SubElement(
@@ -528,7 +530,7 @@ class Adapter:
         res = node_str.decode().replace('<Signature/>', res)
         res = self.__send(operation, res.encode('utf-8'))
         self.log.debug(res)
-        return res
+        return res, uuids
 
     def __call_sign(self, xml):
         method_name = 'sign_' + self.method

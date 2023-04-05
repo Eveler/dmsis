@@ -1088,69 +1088,98 @@ class IntegrationServices:
         res = self.proxy.service.ReferencesUpdate(XMLPackage=package, ISCode='', FullSync=True)
         return res
 
+    def update_reference(self, ref_name, rec_id, data):
+        if not data and not isinstance(data, list):
+            raise Exception("Need list of dict")
+        if not isinstance(data[0], dict):
+            raise Exception("Need list of dict")
+        xml_pack = Document()
+        obj = xml_pack.createElement('Object')
+        obj.setAttribute('Type', 'Reference')
+        obj.setAttribute('Name', ref_name)
+        rec = xml_pack.createElement('Record')
+        # rec.setAttribute('Action', 'Change')
+        rec.setAttribute('ID', str(rec_id))
+        sec = xml_pack.createElement('Section')
+        sec.setAttribute('Index', '0')
+        rec.appendChild(sec)
+        obj.appendChild(rec)
+        for req in data:
+            req_code = xml_pack.createElement('Requisite')
+            req_code.setAttribute('Name', req['Name'])
+            req_code.setAttribute('Type', req['Type'])
+            text = xml_pack.createTextNode(str(req['Value']))
+            req_code.appendChild(text)
+            sec.appendChild(req_code)
+        # dataexchangepackage = xml_pack.createElement("DataExchangePackage")
+        # dataexchangepackage.appendChild(obj)
+        # xml_pack.appendChild(dataexchangepackage)
+        xml_pack.appendChild(obj)
+        package = xml_pack.toxml(encoding='utf-8').decode('utf-8')
+        xml_pack.unlink()
+        res = self.proxy.service.ReferencesUpdate(XMLPackage=package, ISCode='', FullSync=True)
+        return res
+
     def get_new_declars_4_status(self):
         """
         Returns new declars for today for send initial status
         :return: list(dict)
         """
-        from datetime import date
+        from datetime import date, timedelta
         xml = self.search(
             'ДПУ',
-            'СпособДост<>5652824 and СпособДост<>6953048 and СпособДост<>5652821 and Дата3=%s and Дата5 is null'
-            ' and LongString56 is null' % date.today(), raw=True)
+            'СпособДост<>5652824 and СпособДост<>6953048 and СпособДост<>5652821 and Дата3>=%s and Дата3<%s and Дата5 is null'
+            ' and LongString56 is null' % (date.today(), date.today() + timedelta(days=1)), raw=True)
         res = []
         for rec in xml.findall('.//Object/Record'):
             id = rec.findtext('.//Section[@Index="0"]/Requisite[@Name="ИД"]')
             card = fromstring(self.proxy.service.GetEntity('ДПУ', id))
             card_map = {req.get('Name'): req.text for req in
                         card.findall('.//Object/Record/Section[@Index="0"]/Requisite')}
-            # # Get persons
-            # if 'ЗаявителиФЛ' not in card_map:
-            #     card_map['ЗаявителиФЛ'] = []
-            # for fl in card.findall('.//Section[@Index="7"]/Record'):
-            #     for req in fl.findall('.//Requisite[@Name="CitizenT7"]'):
-            #         person = fromstring(self.proxy.service.GetEntity('ПРС', req.text))
-            #         inn = person.findtext('.//Requisite[@Name="ИНН"]')
-            #         series = person.findtext('.//Requisite[@Name="Section5"]')
-            #         num = person.findtext('.//Requisite[@Name="Строка3"]')
-            #         snils = person.findtext('.//Requisite[@Name="Реквизит"]')
-            #         if inn or (series and num) or snils:
-            #             card_map['ЗаявителиФЛ'].append({req.get('Name'): req.text for req in
-            #                                             person.findall('.//Object/Record/Section[@Index="0"]/Requisite')
-            #                                             if req.get('Name') != "Текст"})
-            # # Get organisations
-            # if 'ЗаявителиЮЛ' not in card_map:
-            #     card_map['ЗаявителиЮЛ'] = []
-            # for ul in card.findall('.//Section[@Index="6"]/Record'):
-            #     for req in ul.findall('.//Requisite[@Name="OrgT6"]'):
-            #         org = fromstring(self.proxy.service.GetEntity('ОРГ', req.text))
-            #         inn = org.findtext('.//Requisite[@Name="ИНН"]')
-            #         ogrn = org.findtext('.//Requisite[@Name="ОГРН"]')
-            #         if inn or ogrn:
-            #             card_map['ЗаявителиЮЛ'].append({req.get('Name'): req.text for req in
-            #                                             org.findall('.//Object/Record/Section[@Index="0"]/Requisite')})
-            # # Skip persons orgs couldn't be unique identified
-            # if not (card_map['ЗаявителиФЛ'] or card_map['ЗаявителиЮЛ']):
-            #     continue
-            # # Get service data
-            # ent = fromstring(self.proxy.service.GetEntity('ВМУ', card_map.get('ServiceCode')))
-            # card_map['Услуга'] = {req.get('Name'): req.text for req in
-            #                       ent.findall('.//Object/Record/Section[@Index="0"]/Requisite')}
-            # # Get declar status
-            # ent = fromstring(self.proxy.service.GetEntity('СОУ', card_map.get('СтатусУслуги')))
-            # card_map['Статус'] = {req.get('Name'): req.text for req in
-            #                       ent.findall('.//Object/Record/Section[@Index="0"]/Requisite')}
-            # if card_map['Статус'].get('AUGO_ELK_STATUS_REF'):
-            #     ent = fromstring(self.proxy.service.GetEntity(
-            #         'ELK_STATUS', card_map['Статус'].get('AUGO_ELK_STATUS_REF')))
-            #     card_map['ELK_STATUS'] = {req.get('Name'): req.text for req in
-            #                           ent.findall('.//Object/Record/Section[@Index="0"]/Requisite')}
             res.append(card_map)
         return res
 
     def get_declar_status_data(self, declar_id, fsuids: list = (), permanent_status='6'):
+        """
+        Returns declar status in format required by http://epgu.gosuslugi.ru/elk/status/1.0.2
+        :param declar_id: Declar ID in DIRECTUM
+        :param fsuids: List of uids of files uploaded to ftp
+        :param permanent_status: Default = 6 - ЕЛК. Статусы - Заявление принято (https://esnsi.gosuslugi.ru/classifiers/7212/view/86)
+        :return: list
+        """
         res = []
         card = fromstring(self.proxy.service.GetEntity('ДПУ', declar_id))
+        # Get declar status
+        if not permanent_status:
+            ent = fromstring(self.proxy.service.GetEntity(
+                'СОУ', card.findtext('.//Requisite[@Name="СтатусУслуги"]')))
+            status_ref = ent.findtext('.//Requisite[@Name="AUGO_ELK_STATUS_REF"]')
+            if status_ref:
+                ent = fromstring(self.proxy.service.GetEntity('ELK_STATUS', status_ref))
+                status = ent.findtext('.//Requisite[@Name="Код"]').strip()
+            else:
+                raise IntegrationServicesException("AUGO_ELK_STATUS_REF is empty for AUGO status %s" %
+                                                   ent.findtext('.//Requisite[@Name="Наименование"]'))
+        else:
+            status = permanent_status
+
+        attachments = []
+        for fsuuid in fsuids:
+            attachments.append({'attachment': {'FSuuid': fsuuid, 'docTypeId': 'ELK_RESULT'}})
+
+        elk_num = card.findtext('.//Requisite[@Name="LongString56"]')
+        from datetime import datetime
+        if elk_num:
+            order = {'orderNumber': card.findtext('.//Requisite[@Name="Дополнение3"]'),'senderKpp': '251101001',
+                     'senderInn': '2511004094',
+                     'statusHistoryList':
+                         {'statusHistory': {'status': status,
+                                            'statusDate': datetime.now().strftime('%Y-%m-%dT%H:%M:%S+10:00')}}}
+            if attachments:
+                order['attachments'] = attachments
+            res.append({'order': order})
+            return res
+
         # Get persons
         users = []
         for fl in card.findall('.//Section[@Index="7"]/Record'):
@@ -1180,50 +1209,36 @@ class IntegrationServices:
                         orgs.append({'ogrn_inn_UL': {'ogrn': ogrn.strip()}})
                 elif ogrn:
                     orgs.append({'ogrn_inn_UL': {'ogrn': ogrn.strip()}})
+
         if users or orgs:
             # Get service data
             ent = fromstring(self.proxy.service.GetEntity('ВМУ', card.findtext('.//Requisite[@Name="ServiceCode"]')))
             service = ent.findtext('.//Requisite[@Name="КСтрока"]')
-            # Get declar status
-            if not permanent_status:
-                ent = fromstring(self.proxy.service.GetEntity('СОУ', card.findtext('.//Requisite[@Name="СтатусУслуги"]')))
-                status_ref = ent.findtext('.//Requisite[@Name="AUGO_ELK_STATUS_REF"]')
-                if status_ref:
-                    ent = fromstring(self.proxy.service.GetEntity('ELK_STATUS', status_ref))
-                    status = ent.findtext('.//Requisite[@Name="Код"]').strip()
-                else:
-                    raise IntegrationServicesException("AUGO_ELK_STATUS_REF is empty for AUGO status %s" %
-                                                       ent.findtext('.//Requisite[@Name="Наименование"]'))
-            else:
-                status = permanent_status
-            attachments = []
-            for fsuuid in fsuids:
-                attachments.append({'attachment': {'FSuuid': fsuuid, 'docTypeId': 'ELK_RESULT'}})
             for user in users:
                 order = {'user': user, 'senderKpp': '251101001', 'senderInn': '2511004094',
-                              'serviceTargetCode': service, 'userSelectedRegion': '00000000',
-                              'orderNumber': card.findtext('.//Requisite[@Name="Дополнение3"]'),
-                              'requestDate': card.findtext('.//Requisite[@Name="Дата6"]'),
-                              'OfficeInfo': {'ApplicationAcceptance': '4'
-                                             # ЕЛК. Канал приема - Подразделение ведомства (https://esnsi.gosuslugi.ru/classifiers/7213/view/8)
-                                             },
-                              'statusHistoryList': {'statusHistory': {
-                                  'status': status,
-                                  'statusDate': datetime.now().strftime('%Y-%m-%dT%H:%M:%S+10:00')}}}
+                         'serviceTargetCode': service, 'userSelectedRegion': '00000000',
+                         'orderNumber': card.findtext('.//Requisite[@Name="Дополнение3"]'),
+                         'requestDate': card.findtext('.//Requisite[@Name="Дата6"]'),
+                         'OfficeInfo': {'ApplicationAcceptance': '4'
+                                        # ЕЛК. Канал приема - Подразделение ведомства (https://esnsi.gosuslugi.ru/classifiers/7213/view/8)
+                                        },
+                         'statusHistoryList': {'statusHistory': {
+                             'status': status,
+                             'statusDate': datetime.now().strftime('%Y-%m-%dT%H:%M:%S+10:00')}}}
                 if attachments:
                     order['attachments'] = attachments
                 res.append({'order': order})
             for org in orgs:
                 order = {'organization': org, 'senderKpp': '251101001', 'senderInn': '2511004094',
-                              'serviceTargetCode': service, 'userSelectedRegion': '00000000',
-                              'orderNumber': card.findtext('.//Requisite[@Name="Дополнение3"]'),
-                              'requestDate': card.findtext('.//Requisite[@Name="Дата6"]'),
-                              'OfficeInfo': {'ApplicationAcceptance': '4'
-                                             # ЕЛК. Канал приема - Подразделение ведомства (https://esnsi.gosuslugi.ru/classifiers/7213/view/8)
-                                             },
-                              'statusHistoryList': {'statusHistory': {
-                                  'status': status,
-                                  'statusDate': datetime.now().strftime('%Y-%m-%dT%H:%M:%S+10:00')}}}
+                         'serviceTargetCode': service, 'userSelectedRegion': '00000000',
+                         'orderNumber': card.findtext('.//Requisite[@Name="Дополнение3"]'),
+                         'requestDate': card.findtext('.//Requisite[@Name="Дата6"]'),
+                         'OfficeInfo': {'ApplicationAcceptance': '4'
+                                        # ЕЛК. Канал приема - Подразделение ведомства (https://esnsi.gosuslugi.ru/classifiers/7213/view/8)
+                                        },
+                         'statusHistoryList': {'statusHistory': {
+                             'status': status,
+                             'statusDate': datetime.now().strftime('%Y-%m-%dT%H:%M:%S+10:00')}}}
                 if attachments:
                     order['attachments'] = attachments
                 res.append({'order': order})
@@ -1339,74 +1354,38 @@ if __name__ == '__main__':
     # wsdl = "http://snadb:8082/IntegrationService.svc?singleWsdl"
     wsdl = "http://127.0.0.1:8082/IntegrationService.svc?singleWsdl"
     dis = IntegrationServices(wsdl)
-    res = dis.get_new_declars_4_status()
-    from datetime import datetime
-    orders = []
-    for d in res:
-        orders.extend(dis.get_declar_status_data(d["ИД"], ['gggrgr', 'fgghfdhfgh'], None))
-    #     for human in d['ЗаявителиФЛ']:
-    #         user = None
-    #         if human.get('Строка3'):
-    #             user = {'userPersonalDoc': {'PersonalDocType': '1',
-    #                                         # ЕЛК. Тип документа удостоверяющего личность - Паспорт гражданина РФ (https://esnsi.gosuslugi.ru/classifiers/7211/view/10)
-    #                                         'series': human.get('Section5'), 'number': human.get('Строка3'),
-    #                                         'lastName': human.get('Дополнение'), 'firstName': human.get('Дополнение2'),
-    #                                         'middleName': human.get('Дополнение3'), 'citizenship': '643'
-    #                                         # ЕЛК. Гражданство - РОССИЯ (https://esnsi.gosuslugi.ru/classifiers/7210/view/27)
-    #                                         }}
-    #         elif human.get('ИНН'):
-    #             user = {'userDocInn': {'INN': human.get('ИНН'), 'lastName': human.get('Дополнение'),
-    #                                    'firstName': human.get('Дополнение2'), 'middleName': human.get('Дополнение3'),
-    #                                    'citizenship': '643'}}
-    #         elif human.get('Реквизит'):
-    #             user = {'userDocSnils': {'snils': human.get('Реквизит'), 'lastName': human.get('Дополнение'),
-    #                                      'firstName': human.get('Дополнение2'), 'middleName': human.get('Дополнение3'),
-    #                                      'citizenship': '643'}}
-    #         if user:
-    #             orders.append({
-    #                 'order': {'user': user, 'senderKpp': '251101001', 'senderInn': '2511004094',
-    #                           'serviceTargetCode': d['Услуга']['КСтрока'], 'userSelectedRegion': '00000000',
-    #                           'orderNumber': d['Дополнение3'], 'requestDate': d['Дата6'],
-    #                           'OfficeInfo': {'ApplicationAcceptance': '4'
-    #                                          # ЕЛК. Канал приема - Подразделение ведомства (https://esnsi.gosuslugi.ru/classifiers/7213/view/8)
-    #                                          },
-    #                           'statusHistoryList': {'statusHistory': {
-    #                               'status': '6',
-    #                               'statusDate': datetime.now().strftime('%Y-%m-%dT%H:%M:%S+10:00'),
-    #                               'attachments': {
-    #                                   'attachment': {'FSuuid': '111111111111111111111','docTypeId': 'ELK_RESULT'}}}}}})
-    #     for org in d['ЗаявителиЮЛ']:
-    #         organization = None
-    #         if org.get('ИНН'):
-    #             organization = {'ogrn_inn_UL': {'inn_kpp': {'inn': org.get('ИНН').strip()}}}
-    #             if org.get('ОГРН'):
-    #                 orders.append({'order': {'organization': organization, 'senderKpp': '251101001',
-    #                                          'senderInn': '2511004094', 'serviceTargetCode': d['Услуга']['КСтрока'],
-    #                                          'userSelectedRegion': '00000000', 'orderNumber': d['Дополнение3'],
-    #                                          'requestDate': d['Дата6'], 'OfficeInfo':
-    #                                              {'ApplicationAcceptance': '4'
-    #                                               # ЕЛК. Канал приема - Подразделение ведомства (https://esnsi.gosuslugi.ru/classifiers/7213/view/8)
-    #                                               },
-    #                                          'statusHistoryList': {'statusHistory': {
-    #                                              'status': '6',
-    #                                              # ЕЛК. Статусы - Заявление принято (https://esnsi.gosuslugi.ru/classifiers/7212/view/86)
-    #                                              'statusDate': datetime.now().strftime('%Y-%m-%dT%H:%M:%S+10:00'),
-    #                                              'attachments': {'attachment': {'FSuuid': '1111111111111111111111',
-    #                                                                             'docTypeId': 'ELK_RESULT'}}}}}})
-    #                 organization = {'ogrn_inn_IP': {'ogrn': org.get('ОГРН').strip(),'inn': org.get('ИНН').strip()}}
-    #         elif org.get('ОГРН'):
-    #             organization = {'ogrn_inn_UL': {'ogrn': org.get('ОГРН').strip()}}
-    #         orders.append({'order': {'organization': organization, 'senderKpp': '251101001', 'senderInn': '2511004094',
-    #                                  'serviceTargetCode': d['Услуга']['КСтрока'], 'userSelectedRegion': '00000000',
-    #                                  'orderNumber': d['Дополнение3'], 'requestDate': d['Дата6'],
-    #                                  'OfficeInfo': {'ApplicationAcceptance': '4'
-    #                                                 # ЕЛК. Канал приема - Подразделение ведомства (https://esnsi.gosuslugi.ru/classifiers/7213/view/8)
-    #                                                 },
-    #                                  'statusHistoryList': {'statusHistory': {
-    #                                      'status': '6',
-    #                                      # ЕЛК. Статусы - Заявление принято (https://esnsi.gosuslugi.ru/classifiers/7212/view/86)
-    #                                      'statusDate': datetime.now().strftime('%Y-%m-%dT%H:%M:%S+10:00'),
-    #                                      'attachments': {'attachment': {'FSuuid': '1111111111111111111',
-    #                                                                     'docTypeId': 'ELK_RESULT'}}}}}})
-    print(orders)
-    print(len(res), len(orders))
+    # res = dis.get_new_declars_4_status()
+    # orders = []
+    # for d in res:
+    #     orders.extend(dis.get_declar_status_data(d["ИД"], ['gggrgr', 'fgghfdhfgh'], None))
+    #
+    # print(orders)
+    # print(len(res), len(orders))
+
+    from datetime import date
+    # xml = dis.search(
+    #     'ДПУ',
+    #     'СпособДост<>5652824 and СпособДост<>6953048 and СпособДост<>5652821 and Дата5=%s'
+    #     ' and LongString56 is null' % date.today(), raw=True)
+    # for rec in xml.findall('.//Object/Record'):
+    #     id = rec.findtext('.//Section[@Index="0"]/Requisite[@Name="ИД"]')
+    #     res = dis.get_declar_status_data(id)
+    #     if res:
+    #         print(res)
+    #         break
+    from datetime import timedelta
+    xml = dis.search(
+        'ДПУ',
+        "СпособДост<>5652824 and СпособДост<>6953048 and СпособДост<>5652821 and Дата5>=%s and Дата5<%s" %
+        (date.today(), date.today() + timedelta(days=1)), raw=True)
+    res = []
+    for rec in xml.findall('.//Object/Record'):
+        elk_num = rec.findtext('.//Section[@Index="0"]/Requisite[@Name="LongString56"]')
+        if '(3)' in elk_num:
+            print(elk_num)
+            continue
+        id = rec.findtext('.//Section[@Index="0"]/Requisite[@Name="ИД"]')
+        res.append(id)
+    res.sort()
+    print(res)
+    print(len(res))
