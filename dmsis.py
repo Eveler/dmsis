@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-from datetime import date
+from datetime import date, timedelta
 
 # Twisted reactor sends GetRequest by timer
 # Got requests stored in DB
@@ -309,8 +309,46 @@ class Integration:
         except:
             logging.error('Error update ELK_STATUS', exc_info=True)
 
+        # Send initial status to ELK
+        xml = self.directum.search(
+            'ДПУ',
+            'СпособДост<>5652824 and СпособДост<>6953048 and СпособДост<>5652821 and Дата3>=%s and Дата3<%s'
+            ' and Дата5 is null and LongString56 is null' % (date.today(), date.today() + timedelta(days=1)), raw=True)
+        for rec in xml.findall('.//Object/Record'):
+            declar_id = rec.findtext('.//Section[@Index="0"]/Requisite[@Name="ИД"]')
+            # st_list = self.directum.get_declar_status_data(declar_id)
+            # for status in st_list:
+            #     if 'user' in status['order'] or 'organization' in status['order']:
+            #         self.smev.create_orders_request(status)
+            #     else:
+            #         self.smev.update_orders_request(status)
+            #     elk_num = self.smev.get_orders_response()
+            #     if elk_num:
+            #         res = self.directum.update_reference(
+            #             "ДПУ", declar_id, [{'Name': 'LongString56', 'Type': 'String', 'Value': elk_num}])
+            #         if res:
+            #             logging.warning(res)
+            #         else:
+            #             logging.info("Отправлен начальный статус для дела Id=%s, num=%s %s" %
+            #                          (declar_id, rec.findtext('.//Section[@Index="0"]/Requisite[@Name="Дополнение3"]'),
+            #                           "для %s %s %s" % (status['order']['user']['lastName'],
+            #                                             status['order']['user']['firstName'],
+            #                                             status['order']['user']['middleName'])
+            #                           if 'user' in status['order'] else ""))
+
+        # Send final status to ELK
+        xml = self.directum.search(
+            'ДПУ',
+            "СпособДост<>5652824 and СпособДост<>6953048 and СпособДост<>5652821 and Дата5>=%s and Дата5<%s" %
+            (date.today(), date.today() + timedelta(days=1)), raw=True)
+        for rec in xml.findall('.//Object/Record'):
+            elk_num = rec.findtext('.//Section[@Index="0"]/Requisite[@Name="LongString56"]')
+            if '(3)' in elk_num:
+                continue
+            declar_id = rec.findtext('.//Section[@Index="0"]/Requisite[@Name="ИД"]')
+
+
         # try:
-        #     declar_id = 8921555
         #     st_list = self.directum.get_declar_status_data(declar_id, permanent_status='3')
         #     print(st_list)
         #     for status in st_list:

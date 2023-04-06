@@ -873,6 +873,31 @@ class Adapter:
             elem.append(child)
         return elem
 
+    def get_orders_response(self, resp_name='ElkOrderResponse', uri='http://epgu.gosuslugi.ru/elk/status/1.0.2'):
+        import time
+        time.sleep(10)
+        res = self.get_response(resp_name, uri, None)
+        while not res:
+            time.sleep(10)
+            res = self.get_response(resp_name, uri, None)
+        logging.debug(res)
+        if isinstance(res, bytes):
+            res = res.decode(errors='replace')
+        if res and 'MessagePrimaryContent' in res:
+            res = etree.fromstring(res)
+        if hasattr(res, 'Response') and hasattr(res.Response, 'SenderProvidedResponseData'):
+            if hasattr(res.Response.SenderProvidedResponseData, "MessageID"):
+                self.send_ack(res.Response.SenderProvidedResponseData.MessageID)
+            if hasattr(res.Response.SenderProvidedResponseData, 'MessagePrimaryContent') \
+                    and res.Response.SenderProvidedResponseData.MessagePrimaryContent:
+                val = res.Response.SenderProvidedResponseData.MessagePrimaryContent._value_1
+                ok = val.findtext('.//{*}message')
+                if ok.lower() != 'ok':
+                    ok += ": " + ', '.join([elem.findtext('.//{*}message') for elem in val.findall('.//{*}order')])
+                    logging.warning(ok)
+                return val.findtext('.//{*}elkOrderNumber')
+        return None
+
     def create_orders_request(self, orders: dict = (), files: list = None,
                               uri='http://epgu.gosuslugi.ru/elk/status/1.0.2'):
         operation = 'SendRequest'

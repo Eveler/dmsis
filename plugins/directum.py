@@ -1184,6 +1184,8 @@ class IntegrationServices:
         users = []
         for fl in card.findall('.//Section[@Index="7"]/Record'):
             for req in fl.findall('.//Requisite[@Name="CitizenT7"]'):
+                if not req.text:
+                    continue
                 person = fromstring(self.proxy.service.GetEntity('ПРС', req.text))
                 inn = person.findtext('.//Requisite[@Name="ИНН"]')
                 series = person.findtext('.//Requisite[@Name="Section5"]')
@@ -1200,6 +1202,8 @@ class IntegrationServices:
         orgs = []
         for ul in card.findall('.//Section[@Index="6"]/Record'):
             for req in ul.findall('.//Requisite[@Name="OrgT6"]'):
+                if not req.text:
+                    continue
                 org = fromstring(self.proxy.service.GetEntity('ОРГ', req.text))
                 inn = org.findtext('.//Requisite[@Name="ИНН"]')
                 ogrn = org.findtext('.//Requisite[@Name="ОГРН"]')
@@ -1354,38 +1358,31 @@ if __name__ == '__main__':
     # wsdl = "http://snadb:8082/IntegrationService.svc?singleWsdl"
     wsdl = "http://127.0.0.1:8082/IntegrationService.svc?singleWsdl"
     dis = IntegrationServices(wsdl)
-    # res = dis.get_new_declars_4_status()
-    # orders = []
-    # for d in res:
-    #     orders.extend(dis.get_declar_status_data(d["ИД"], ['gggrgr', 'fgghfdhfgh'], None))
-    #
-    # print(orders)
-    # print(len(res), len(orders))
 
-    from datetime import date
+    res = dis.get_new_declars_4_status()
+    orders = []
+    for d in res:
+        orders.extend(dis.get_declar_status_data(d["ИД"], ['gggrgr', 'fgghfdhfgh'], None))
+    print(orders)
+    print(len(res), len(orders))
+
+    # from datetime import date
+    # from datetime import timedelta
     # xml = dis.search(
     #     'ДПУ',
-    #     'СпособДост<>5652824 and СпособДост<>6953048 and СпособДост<>5652821 and Дата5=%s'
-    #     ' and LongString56 is null' % date.today(), raw=True)
+    #     "СпособДост<>5652824 and СпособДост<>6953048 and СпособДост<>5652821 and Дата5>=%s and Дата5<%s" %
+    #     (date.today(), date.today() + timedelta(days=1)), raw=True)
+    # orders = []
     # for rec in xml.findall('.//Object/Record'):
+    #     elk_num = rec.findtext('.//Section[@Index="0"]/Requisite[@Name="LongString56"]')
+    #     if '(3)' in elk_num:
+    #         print(elk_num)
+    #         import time
+    #         time.sleep(2)
+    #         continue
     #     id = rec.findtext('.//Section[@Index="0"]/Requisite[@Name="ИД"]')
-    #     res = dis.get_declar_status_data(id)
+    #     res = dis.get_declar_status_data(id, permanent_status='3')
     #     if res:
-    #         print(res)
-    #         break
-    from datetime import timedelta
-    xml = dis.search(
-        'ДПУ',
-        "СпособДост<>5652824 and СпособДост<>6953048 and СпособДост<>5652821 and Дата5>=%s and Дата5<%s" %
-        (date.today(), date.today() + timedelta(days=1)), raw=True)
-    res = []
-    for rec in xml.findall('.//Object/Record'):
-        elk_num = rec.findtext('.//Section[@Index="0"]/Requisite[@Name="LongString56"]')
-        if '(3)' in elk_num:
-            print(elk_num)
-            continue
-        id = rec.findtext('.//Section[@Index="0"]/Requisite[@Name="ИД"]')
-        res.append(id)
-    res.sort()
-    print(res)
-    print(len(res))
+    #         orders.extend(res)
+    # print(orders)
+    # print(len(orders))
