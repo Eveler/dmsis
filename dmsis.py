@@ -310,114 +310,67 @@ class Integration:
             logging.error('Error update ELK_STATUS', exc_info=True)
 
         # Send initial status to ELK
-        xml = self.directum.search(
-            'ДПУ',
-            'СпособДост<>5652824 and СпособДост<>6953048 and СпособДост<>5652821 and Дата3>=%s and Дата3<%s'
-            ' and Дата5 is null and LongString56 is null' % (date.today(), date.today() + timedelta(days=1)), raw=True)
-        for rec in xml.findall('.//Object/Record'):
-            declar_id = rec.findtext('.//Section[@Index="0"]/Requisite[@Name="ИД"]')
-            # st_list = self.directum.get_declar_status_data(declar_id)
-            # for status in st_list:
-            #     if 'user' in status['order'] or 'organization' in status['order']:
-            #         self.smev.create_orders_request(status)
-            #     else:
-            #         self.smev.update_orders_request(status)
-            #     elk_num = self.smev.get_orders_response()
-            #     if elk_num:
-            #         res = self.directum.update_reference(
-            #             "ДПУ", declar_id, [{'Name': 'LongString56', 'Type': 'String', 'Value': elk_num}])
-            #         if res:
-            #             logging.warning(res)
-            #         else:
-            #             logging.info("Отправлен начальный статус для дела Id=%s, num=%s %s" %
-            #                          (declar_id, rec.findtext('.//Section[@Index="0"]/Requisite[@Name="Дополнение3"]'),
-            #                           "для %s %s %s" % (status['order']['user']['lastName'],
-            #                                             status['order']['user']['firstName'],
-            #                                             status['order']['user']['middleName'])
-            #                           if 'user' in status['order'] else ""))
+        try:
+            xml = self.directum.search(
+                'ДПУ',
+                'СпособДост<>5652824 and СпособДост<>6953048 and СпособДост<>5652821 and Дата3>=%s and Дата3<%s'
+                ' and Дата5 is null and LongString56 is null' % ('07.04.2023', date.today() + timedelta(days=1)), raw=True)
+            for rec in xml.findall('.//Object/Record'):
+                declar_id = rec.findtext('.//Section[@Index="0"]/Requisite[@Name="ИД"]')
+                # st_list = self.directum.get_declar_status_data(declar_id)
+                # for status in st_list:
+                #     if 'user' in status['order'] or 'organization' in status['order']:
+                #         self.smev.create_orders_request(status)
+                #     else:
+                #         self.smev.update_orders_request(status)
+                #     elk_num = self.smev.get_orders_response()
+                #     if elk_num:
+                #         res = self.directum.update_reference(
+                #             "ДПУ", declar_id, [{'Name': 'LongString56', 'Type': 'String', 'Value': elk_num}])
+                #         if res:
+                #             logging.warning(res)
+                #         else:
+                #             logging.info("Отправлен начальный статус для дела Id=%s, num=%s %s" %
+                #                          (declar_id, rec.findtext('.//Section[@Index="0"]/Requisite[@Name="Дополнение3"]'),
+                #                           "для %s %s %s" % (status['order']['user']['lastName'],
+                #                                             status['order']['user']['firstName'],
+                #                                             status['order']['user']['middleName'])
+                #                           if 'user' in status['order'] else ""))
+        except:
+            logging.error('Error send initial status to ELK', exc_info=True)
 
         # Send final status to ELK
-        xml = self.directum.search(
-            'ДПУ',
-            "СпособДост<>5652824 and СпособДост<>6953048 and СпособДост<>5652821 and Дата5>=%s and Дата5<%s" %
-            (date.today(), date.today() + timedelta(days=1)), raw=True)
-        for rec in xml.findall('.//Object/Record'):
-            elk_num = rec.findtext('.//Section[@Index="0"]/Requisite[@Name="LongString56"]')
-            if '(3)' in elk_num:
-                continue
-            declar_id = rec.findtext('.//Section[@Index="0"]/Requisite[@Name="ИД"]')
-
-
-        # try:
-        #     st_list = self.directum.get_declar_status_data(declar_id, permanent_status='3')
-        #     print(st_list)
-        #     for status in st_list:
-        #         if 'user' in status['order'] or 'organization' in status['order']:
-        #             self.smev.create_orders_request(status)
-        #         else:
-        #             self.smev.update_orders_request(status)
-        #         import time
-        #         time.sleep(10)
-        #         res = self.smev.get_response('ElkOrderResponse', 'http://epgu.gosuslugi.ru/elk/status/1.0.2', None)
-        #         while not res:
-        #             time.sleep(10)
-        #             res = self.smev.get_response('ElkOrderResponse', 'http://epgu.gosuslugi.ru/elk/status/1.0.2', None)
-        #         print(res)
-        #         if isinstance(res, bytes):
-        #             res = res.decode(errors='replace')
-        #         from lxml import etree
-        #         if res and 'MessagePrimaryContent' in res:
-        #             res = etree.fromstring(res)
-        #         if hasattr(res, 'Response') and hasattr(res.Response, 'SenderProvidedResponseData'):
-        #             if hasattr(res.Response.SenderProvidedResponseData, "MessageID"):
-        #                 self.smev.send_ack(res.Response.SenderProvidedResponseData.MessageID)
-        #             if hasattr(res.Response.SenderProvidedResponseData, 'MessagePrimaryContent') \
-        #                     and res.Response.SenderProvidedResponseData.MessagePrimaryContent:
-        #                 val: etree._Element = res.Response.SenderProvidedResponseData.MessagePrimaryContent._value_1
-        #                 print(etree.tostring(val))
-        #                 ok = val.findtext('.//{*}message')
-        #                 print(ok)
-        #                 if ok.lower() != 'ok':
-        #                     ok += ": " + ', '.join(
-        #                         [elem.findtext('.//{*}message') for elem in val.findall('.//{*}order')])
-        #                     logging.warning(ok)
-        #                     print(ok)
-        #                     self.smev.update_orders_request(status)
-        #                     time.sleep(10)
-        #                     res = self.smev.get_response('ElkOrderResponse',
-        #                                                  'http://epgu.gosuslugi.ru/elk/status/1.0.2', None)
-        #                     while not res:
-        #                         time.sleep(10)
-        #                         res = self.smev.get_response('ElkOrderResponse',
-        #                                                      'http://epgu.gosuslugi.ru/elk/status/1.0.2', None)
-        #                     print(res)
-        #                     if isinstance(res, bytes):
-        #                         res = res.decode(errors='replace')
-        #                     from lxml import etree
-        #                     if res and 'MessagePrimaryContent' in res:
-        #                         res = etree.fromstring(res)
-        #                     if hasattr(res, 'Response') and hasattr(res.Response, 'SenderProvidedResponseData'):
-        #                         if hasattr(res.Response.SenderProvidedResponseData, "MessageID"):
-        #                             self.smev.send_ack(res.Response.SenderProvidedResponseData.MessageID)
-        #                         if hasattr(res.Response.SenderProvidedResponseData, 'MessagePrimaryContent') \
-        #                                 and res.Response.SenderProvidedResponseData.MessagePrimaryContent:
-        #                             val: etree._Element = res.Response.SenderProvidedResponseData.MessagePrimaryContent._value_1
-        #                             print(etree.tostring(val))
-        #                             ok = val.findtext('.//{*}message')
-        #                             if ok.lower() != 'ok':
-        #                                 ok += ': ' + ', '.join(
-        #                                     [elem.findtext('.//{*}message') for elem in val.findall('.//{*}order')])
-        #                                 raise Exception(ok)
-        #                 elk_num = val.findtext('.//{*}elkOrderNumber')
-        #                 print('elkOrderNumber', elk_num)
-        #                 if elk_num:
-        #                     res = self.directum.update_reference(
-        #                         "ДПУ", declar_id, [{'Name': 'LongString56', 'Type': 'String', 'Value': elk_num},
-        #                                            {'Name': 'НашаОрг', 'Type': 'String', 'Value': '38838'}]) # Администрация Уссурийского городского округа (АУГО)
-        #                     logging.debug(res)
-        #                     print(res)
-        # except:
-        #     logging.error('Error update STATUS', exc_info=True)
+        try:
+            xml = self.directum.search(
+                'ДПУ',
+                "СпособДост<>5652824 and СпособДост<>6953048 and СпособДост<>5652821 and Дата5>=%s and Дата5<%s" %
+                ('07.04.2023', date.today() + timedelta(days=1)), raw=True)
+            for rec in xml.findall('.//Object/Record'):
+                elk_num = rec.findtext('.//Section[@Index="0"]/Requisite[@Name="LongString56"]')
+                if '(3)' in elk_num:
+                    continue
+                declar_id = rec.findtext('.//Section[@Index="0"]/Requisite[@Name="ИД"]')
+                # st_list = self.directum.get_declar_status_data(declar_id, permanent_status='3')
+                # for status in st_list:
+                #     if 'user' in status['order'] or 'organization' in status['order']:
+                #         self.smev.create_orders_request(status)
+                #     else:
+                #         self.smev.update_orders_request(status)
+                # elk_num = self.smev.get_orders_response()
+                # if elk_num:
+                #     res = self.directum.update_reference(
+                #         "ДПУ", declar_id, [{'Name': 'LongString56', 'Type': 'String', 'Value': "%s (3)" % elk_num}])
+                #     if res:
+                #         logging.warning(res)
+                #     else:
+                #         logging.info("Отправлен конечный статус для дела Id=%s, num=%s %s" %
+                #                      (declar_id, rec.findtext('.//Section[@Index="0"]/Requisite[@Name="Дополнение3"]'),
+                #                       "для %s %s %s" % (status['order']['user']['lastName'],
+                #                                         status['order']['user']['firstName'],
+                #                                         status['order']['user']['middleName'])
+                #                       if 'user' in status['order'] else ""))
+        except:
+            logging.error('Error send final status to ELK', exc_info=True)
 
         self.db.vacuum()
 
