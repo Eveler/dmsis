@@ -269,8 +269,25 @@ class Integration:
                         self.db.commit()
 
                         # Send final status to ELK
-                        for status in self.directum.get_declar_status_data(request.directum_id, uuids):
-                            print(status)
+                        # st_list = self.directum.get_declar_status_data(request.directum_id, uuids, '3')
+                        # for status in st_list:
+                        #     if 'user' in status['order'] or 'organization' in status['order']:
+                        #         self.smev.create_orders_request(status)
+                        #     else:
+                        #         self.smev.update_orders_request(status)
+                        #     elk_num = self.smev.get_orders_response()
+                        #     if elk_num:
+                        #         res = self.directum.update_reference(
+                        #             "ДПУ", request.directum_id, [{'Name': 'LongString56', 'Type': 'String', 'Value': "%s (3)" % elk_num}])
+                        #         if res:
+                        #             logging.warning(res)
+                        #         else:
+                        #             logging.info("Отправлен конечный статус для дела Id=%s, num=%s %s" %
+                        #                          (request.directum_id, request.declar_num,
+                        #                           "для %s %s %s" % (status['order']['user']['lastName'],
+                        #                                             status['order']['user']['firstName'],
+                        #                                             status['order']['user']['middleName'])
+                        #                           if 'user' in status['order'] else ""))
 
                     except:
                         self.report_error()
@@ -310,67 +327,77 @@ class Integration:
             logging.error('Error update ELK_STATUS', exc_info=True)
 
         # Send initial status to ELK
-        try:
-            xml = self.directum.search(
-                'ДПУ',
-                'СпособДост<>5652824 and СпособДост<>6953048 and СпособДост<>5652821 and Дата3>=%s and Дата3<%s'
-                ' and Дата5 is null and LongString56 is null' % ('07.04.2023', date.today() + timedelta(days=1)), raw=True)
-            for rec in xml.findall('.//Object/Record'):
-                declar_id = rec.findtext('.//Section[@Index="0"]/Requisite[@Name="ИД"]')
-                # st_list = self.directum.get_declar_status_data(declar_id)
-                # for status in st_list:
-                #     if 'user' in status['order'] or 'organization' in status['order']:
-                #         self.smev.create_orders_request(status)
-                #     else:
-                #         self.smev.update_orders_request(status)
-                #     elk_num = self.smev.get_orders_response()
-                #     if elk_num:
-                #         res = self.directum.update_reference(
-                #             "ДПУ", declar_id, [{'Name': 'LongString56', 'Type': 'String', 'Value': elk_num}])
-                #         if res:
-                #             logging.warning(res)
-                #         else:
-                #             logging.info("Отправлен начальный статус для дела Id=%s, num=%s %s" %
-                #                          (declar_id, rec.findtext('.//Section[@Index="0"]/Requisite[@Name="Дополнение3"]'),
-                #                           "для %s %s %s" % (status['order']['user']['lastName'],
-                #                                             status['order']['user']['firstName'],
-                #                                             status['order']['user']['middleName'])
-                #                           if 'user' in status['order'] else ""))
-        except:
-            logging.error('Error send initial status to ELK', exc_info=True)
+        # try:
+        #     xml = self.directum.search(
+        #         'ДПУ',
+        #         'СпособДост<>5652824 and СпособДост<>6953048 and СпособДост<>5652821 and Дата3>=%s and Дата3<%s'
+        #         ' and Дата5 is null and LongString56 is null' %
+        #         (date.today() - timedelta(days=2), date.today() + timedelta(days=1)), raw=True)
+        #     for rec in xml.findall('.//Object/Record'):
+        #         declar_id = rec.findtext('.//Section[@Index="0"]/Requisite[@Name="ИД"]')
+        #         st_list = self.directum.get_declar_status_data(declar_id)
+        #         for status in st_list:
+        #             if 'user' in status['order'] or 'organization' in status['order']:
+        #                 self.smev.create_orders_request(status)
+        #             else:
+        #                 self.smev.update_orders_request(status)
+        #             elk_num = self.smev.get_orders_response()
+        #             if elk_num and elk_num != '0':
+        #                 res = self.directum.update_reference(
+        #                     "ДПУ", declar_id, [{'Name': 'LongString56', 'Type': 'String', 'Value': elk_num}])
+        #                 if res[0]:
+        #                     logging.warning(res)
+        #                 else:
+        #                     logging.info(
+        #                         "Отправлен начальный статус для дела Id=%s, num=%s %s" %
+        #                         (declar_id, rec.findtext('.//Section[@Index="0"]/Requisite[@Name="Дополнение3"]'),
+        #                          "для %s %s %s" % (status['order']['user']['userPersonalDoc']['lastName'],
+        #                                            status['order']['user']['userPersonalDoc']['firstName'],
+        #                                            status['order']['user']['userPersonalDoc']['middleName'])
+        #                          if 'user' in status['order'] else ""))
+        # except:
+        #     logging.error('Error send initial status to ELK', exc_info=True)
 
         # Send final status to ELK
-        try:
-            xml = self.directum.search(
-                'ДПУ',
-                "СпособДост<>5652824 and СпособДост<>6953048 and СпособДост<>5652821 and Дата5>=%s and Дата5<%s" %
-                ('07.04.2023', date.today() + timedelta(days=1)), raw=True)
-            for rec in xml.findall('.//Object/Record'):
-                elk_num = rec.findtext('.//Section[@Index="0"]/Requisite[@Name="LongString56"]')
-                if '(3)' in elk_num:
-                    continue
-                declar_id = rec.findtext('.//Section[@Index="0"]/Requisite[@Name="ИД"]')
-                # st_list = self.directum.get_declar_status_data(declar_id, permanent_status='3')
-                # for status in st_list:
-                #     if 'user' in status['order'] or 'organization' in status['order']:
-                #         self.smev.create_orders_request(status)
-                #     else:
-                #         self.smev.update_orders_request(status)
-                # elk_num = self.smev.get_orders_response()
-                # if elk_num:
-                #     res = self.directum.update_reference(
-                #         "ДПУ", declar_id, [{'Name': 'LongString56', 'Type': 'String', 'Value': "%s (3)" % elk_num}])
-                #     if res:
-                #         logging.warning(res)
-                #     else:
-                #         logging.info("Отправлен конечный статус для дела Id=%s, num=%s %s" %
-                #                      (declar_id, rec.findtext('.//Section[@Index="0"]/Requisite[@Name="Дополнение3"]'),
-                #                       "для %s %s %s" % (status['order']['user']['lastName'],
-                #                                         status['order']['user']['firstName'],
-                #                                         status['order']['user']['middleName'])
-                #                       if 'user' in status['order'] else ""))
-        except:
-            logging.error('Error send final status to ELK', exc_info=True)
+        # try:
+        #     xml = self.directum.search(
+        #         'ДПУ',
+        #         "СпособДост<>5652824 and СпособДост<>6953048 and СпособДост<>5652821 and Дата5>=%s and Дата5<%s" %
+        #         ('07.04.2023', date.today() + timedelta(days=1)), raw=True)
+        #     for rec in xml.findall('.//Object/Record'):
+        #         elk_num = rec.findtext('.//Section[@Index="0"]/Requisite[@Name="LongString56"]')
+        #         if '(3)' in elk_num:
+        #             continue
+        #         declar_id = rec.findtext('.//Section[@Index="0"]/Requisite[@Name="ИД"]')
+        #         applied_docs = self.directum.get_result_docs(
+        #             declar_id, rec.findtext('.//Section[@Index="0"]/Requisite[@Name="Дополнение3"]'), self.crt_name,
+        #             self.zip_signed_doc)
+        #         files = self.smev.upload_docs(applied_docs, self.ftp_user, self.ftp_pass)
+        #         uuids = []
+        #         for item in files:
+        #             uuid, file = item.popitem()
+        #             uuids.append(uuid)
+        #         st_list = self.directum.get_declar_status_data(declar_id, uuids, permanent_status='3')
+        #         for status in st_list:
+        #             if 'user' in status['order'] or 'organization' in status['order']:
+        #                 self.smev.create_orders_request(status)
+        #             else:
+        #                 self.smev.update_orders_request(status)
+        #         elk_num = self.smev.get_orders_response()
+        #         if elk_num:
+        #             res = self.directum.update_reference(
+        #                 "ДПУ", declar_id, [{'Name': 'LongString56', 'Type': 'String', 'Value': "%s (3)" % elk_num}])
+        #             if res:
+        #                 logging.warning(res)
+        #             else:
+        #                 logging.info("Отправлен конечный статус для дела Id=%s, num=%s %s" %
+        #                              (declar_id, rec.findtext('.//Section[@Index="0"]/Requisite[@Name="Дополнение3"]'),
+        #                               "для %s %s %s" % (status['order']['user']['userPersonalDoc']['lastName'],
+        #                                                 status['order']['user']['userPersonalDoc']['firstName'],
+        #                                                 status['order']['user']['userPersonalDoc']['middleName'])
+        #                               if 'user' in status['order'] else ""))
+        # except:
+        #     logging.error('Error send final status to ELK', exc_info=True)
 
         self.db.vacuum()
 
@@ -598,7 +625,7 @@ def main():
 
     from optparse import OptionParser
 
-    parser = OptionParser(version="%prog ver. 1.05",
+    parser = OptionParser(version="%prog ver. 1.15",
                           conflict_handler="resolve")
     parser.print_version()
     parser.add_option("-r", "--run", action="store_true", dest="run",

@@ -1277,9 +1277,9 @@ class IntegrationServices:
         for proc in procs:
             if proc.get('Ведущая аналитика') == str(directum_id):
                 try:
-                    docs = self.get_bind_docs('ПРОУ',
-                                              proc.get('Аналитика-оригинал') if proc.get('Аналитика-оригинал')
-                                              else proc.get('ИДЗапГлавРазд'))
+                    docs = self.get_bind_docs(
+                        'ПРОУ',
+                        proc.get('Аналитика-оригинал') if proc.get('Аналитика-оригинал') else proc.get('ИДЗапГлавРазд'))
                     for doc in docs:
                         if doc.get('TKED') not in ('КИК', 'ИК1', 'ИК2', 'ПСИ', 'РД_АУГО', 'ДГД', 'РУАУГО'):
                             continue
@@ -1359,15 +1359,17 @@ if __name__ == '__main__':
     wsdl = "http://127.0.0.1:8082/IntegrationService.svc?singleWsdl"
     dis = IntegrationServices(wsdl)
 
-    res = dis.get_new_declars_4_status()
+    from datetime import date, timedelta
+    xml = dis.search(
+                'ДПУ',
+                'СпособДост<>5652824 and СпособДост<>6953048 and СпособДост<>5652821 and Дата3>=%s and Дата3<%s'
+                ' and Дата5 is null and LongString56 is null' % ('07.04.2023', date.today() + timedelta(days=1)), raw=True)
     orders = []
-    for d in res:
-        orders.extend(dis.get_declar_status_data(d["ИД"], ['gggrgr', 'fgghfdhfgh'], None))
-    print(orders)
-    print(len(res), len(orders))
+    for rec in xml.findall('.//Object/Record'):
+        declar_id = rec.findtext('.//Section[@Index="0"]/Requisite[@Name="ИД"]')
+        orders.extend(dis.get_declar_status_data(declar_id, ['gggrgr', 'fgghfdhfgh']))
+    print(orders, len(orders), sep="\n")
 
-    # from datetime import date
-    # from datetime import timedelta
     # xml = dis.search(
     #     'ДПУ',
     #     "СпособДост<>5652824 and СпособДост<>6953048 and СпособДост<>5652821 and Дата5>=%s and Дата5<%s" %

@@ -415,29 +415,25 @@ class Adapter:
         self.log.debug(res)
         return res
 
-    def send_response(self, reply_to, declar_number, register_date,
-                      result='FINAL', text='', applied_documents=(),
-                      ftp_user='anonymous', ftp_pass='anonymous'):
+    def upload_docs(self, applied_documents, ftp_user='anonymous', ftp_pass='anonymous'):
         files = []
         for doc in applied_documents:
             if isinstance(doc, (bytes, str)):
                 file_name = os.path.split(doc)[1]
-                # file_name = translate(file_name)
                 uuid = self.__upload_file(doc, file_name, ftp_user, ftp_pass)
-                files.append({uuid: {'name': file_name,
-                                     'type': guess_type(doc)[0],
-                                     'full_name': doc}})
+                files.append({uuid: {'name': file_name, 'type': guess_type(doc)[0], 'full_name': doc}})
             if doc.file:
-                uuid = self.__upload_file(doc.file, doc.file_name, ftp_user,
-                                          ftp_pass)
-                # uuid = self.__upload_file(doc.file, translate(doc.file_name),
-                #                           ftp_user, ftp_pass)
+                uuid = self.__upload_file(doc.file, doc.file_name, ftp_user, ftp_pass)
                 files.append({uuid: {'name': doc.file_name,
                                      'type': guess_type(doc.file)[0],
                                      'full_name': doc.file,
                                      'certs': doc.certs
-                                     if hasattr(doc, 'certs') and doc.certs
-                                     else None}})
+                                     if hasattr(doc, 'certs') and doc.certs else None}})
+        return files
+
+    def send_response(self, reply_to, declar_number, register_date, result='FINAL', text='', applied_documents=(),
+                      ftp_user='anonymous', ftp_pass='anonymous'):
+        files = self.upload_docs(applied_documents, ftp_user, ftp_pass)
 
         operation = 'SendResponse'
         element = self.proxy.get_element('ns1:MessagePrimaryContent')
@@ -894,8 +890,10 @@ class Adapter:
                 ok = val.findtext('.//{*}message')
                 if ok.lower() != 'ok':
                     ok += ": " + ', '.join([elem.findtext('.//{*}message') for elem in val.findall('.//{*}order')])
-                    logging.warning(ok)
+                    logging.warning(ok + "\n" + str(res) + "\n" + etree.tostring(val).decode(errors='replace'))
                 return val.findtext('.//{*}elkOrderNumber')
+            else:
+                logging.warning(res)
         return None
 
     def create_orders_request(self, orders: dict = (), files: list = None,
