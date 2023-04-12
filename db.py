@@ -709,8 +709,6 @@ class Db:
             self.session.add(doc)
             docs.append(doc)
             remove(found)
-        # TODO: Correctly parse declar.Param
-        #  (<ns3:Param id="object_type" label="Вид объекта услуги" type="String">Значение</ns3:Param>)
         for param in declar.Param:
             if not isinstance(param, (str, bytes, bytearray)):
                 p = Params(type=param.attr('type'), param_id=param.attr('id'),

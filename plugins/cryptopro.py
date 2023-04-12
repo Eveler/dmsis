@@ -89,19 +89,24 @@ class Crypto:
         csptest_path = 'C:\\Program Files (x86)\\Crypto Pro\\CSP\\csptest.exe'
         if not os.path.exists(csptest_path):
             csptest_path = 'C:\\Program Files\\Crypto Pro\\CSP\\csptest.exe'
+        cpverify_path = 'C:\\Program Files (x86)\\Crypto Pro\\CSP\\cpverify.exe'
+        if not os.path.exists(csptest_path):
+            cpverify_path = 'C:\\Program Files\\Crypto Pro\\CSP\\cpverify.exe'
         hashtmp_f, hashtmp_fn = tempfile.mkstemp()
         os.close(hashtmp_f)
-        args = [csptest_path, '-keyset', '-hash', 'GOST', '-container',
-                self.__container, '-keytype', 'exchange',
-                '-in', os.path.abspath(file_path), '-hashout', hashtmp_fn]
+        args = [cpverify_path, '-mk', '-alg', 'GR3411_2012_256', os.path.abspath(file_path), '-inverted_halfbytes', '0']
+        # args = [csptest_path, '-keyset', '-hash', 'GOST', '-container',
+        #         self.__container, '-keytype', 'exchange',
+        #         '-in', os.path.abspath(file_path), '-hashout', hashtmp_fn]
         try:
             out = subprocess.check_output(args, stderr=subprocess.STDOUT)
             self.log.debug(out.decode(encoding='cp866'))
 
-            with open(hashtmp_fn, 'rb') as f:
-                hsh = f.read()
-            hsh_bytes = base64_encode(hsh)[0][:-1].decode().replace('\n', '')
-            # hsh_bytes = base64_encode(hsh)[0].decode().replace('\n', '')
+            # with open(hashtmp_fn, 'rb') as f:
+            #     hsh = f.read()
+            # hsh_bytes = base64_encode(hsh)[0][:-1].decode().replace('\n', '')
+            out = bytes.fromhex(out.decode())
+            hsh_bytes = base64_encode(out)[0][:-1].decode().replace('\n', '')
             return hsh_bytes
         except:
             if 'out' in locals():

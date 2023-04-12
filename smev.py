@@ -494,13 +494,12 @@ class Adapter:
         res = node.find('.//{*}SenderProvidedResponseData')
         res.set('Id', 'SIGNED_BY_CALLER')
 
-        uuids = []
         if files:
             ns = etree.QName(node.find('.//{*}MessagePrimaryContent')).namespace
             rahl = etree.SubElement(res, '{%s}RefAttachmentHeaderList' % ns)
             for item in files:
                 uuid, file = item.popitem()
-                uuids.append(uuid)
+                item[uuid] = file
                 rah = etree.SubElement(rahl, '{%s}RefAttachmentHeader' % ns)
                 etree.SubElement(rah, '{%s}uuid' % ns).text = uuid
                 etree.SubElement(
@@ -526,7 +525,7 @@ class Adapter:
         res = node_str.decode().replace('<Signature/>', res)
         res = self.__send(operation, res.encode('utf-8'))
         self.log.debug(res)
-        return res, uuids
+        return res, files
 
     def __call_sign(self, xml):
         method_name = 'sign_' + self.method
@@ -534,8 +533,7 @@ class Adapter:
         method = getattr(self.crypto, method_name)
         return method(xml)
 
-    def __upload_file(self, file, file_name, ftp_user='anonymous',
-                      ftp_pass='anonymous'):
+    def __upload_file(self, file, file_name, ftp_user='anonymous', ftp_pass='anonymous'):
         self.log.debug(file_name)
         addr = urlparse(self.ftp_addr).netloc
         max_try = 12
@@ -952,18 +950,28 @@ class Adapter:
         self.log.debug(res)
         return res
 
-    def __upload_files(self, node, file_names, signed_tag='SenderProvidedRequestData'):
+    def __upload_files(self, node, file_names, signed_tag='SenderProvidedRequestData', ftp_user='anonymous',
+                       ftp_pass='anonymous'):
         ns = etree.QName(node.find('.//{*}MessagePrimaryContent')).namespace
         res = node.find('.//{*}%s' % signed_tag)
         rahl = etree.SubElement(res, '{%s}RefAttachmentHeaderList' % ns)
         uploaded = []
-        for file_name in file_names:
+        for item in file_names:
             rah = etree.SubElement(rahl, '{%s}RefAttachmentHeader' % ns)
-            uuid = self.__upload_file(file_name, translate(basename(file_name)))
+            if isinstance(item, dict):
+                uuid = item.get('uuid')
+                f = item.get('path')
+                file_name = item.get('name')
+            else:
+                uuid = item.uuid
+                f = item.file
+                file_name = item.file_name
+            if not uuid:
+                uuid = self.__upload_file(f, translate(basename(file_name)), ftp_user, ftp_pass)
             etree.SubElement(rah, '{%s}uuid' % ns).text = uuid
-            f_hash = self.crypto.get_file_hash(file_name)
+            f_hash = self.crypto.get_file_hash(f)
             etree.SubElement(rah, '{%s}Hash' % ns).text = f_hash
-            mime_type = guess_type(file_name)[0]
+            mime_type = guess_type(f)[0]
             if not mime_type:
                 mime_type = 'application/octet-stream'
             etree.SubElement(
@@ -1067,8 +1075,8 @@ if __name__ == '__main__':
     #             wsdl="http://smev3-n0.test.gosuslugi.ru:7500/smev/v1.2/ws?wsdl",
     #             ftp_addr="ftp://smev3-n0.test.gosuslugi.ru/",
     #             crt_name='АДМИНИСТРАЦИЯ УССУРИЙСКОГО ГОРОДСКОГО ОКРУГА')
-    a = Adapter(serial='2F5D 25DB 6C79 E302 1D08 4786 DEFC C15A 0EAC B515',
-                container='ep_ov-2022',
+    a = Adapter(serial='00AB 63BB BD9B 3728 C624 1DC9 C482 6264 F4',
+                container='ep_ov-2023',
                 wsdl="http://172.20.3.12:7500/smev/v1.2/ws?wsdl",
                 ftp_addr="ftp://172.20.3.12/",
                 crt_name='АДМИНИСТРАЦИЯ УССУРИЙСКОГО ГОРОДСКОГО ОКРУГА')
@@ -1146,7 +1154,7 @@ if __name__ == '__main__':
             }
         }
     }
-    a.create_orders_request(orders)
+    # a.create_orders_request(orders)
 
     orders = {
         'order': {
@@ -1162,7 +1170,7 @@ if __name__ == '__main__':
             }
         }
     }
-    # a.update_orders_request(orders, ['D:\\dmsis\\smev.py'])
+    a.update_orders_request(orders, [{'path': 'D:\\dmsis\\smev.py', 'name': "smev.txt"}])
 
     import time
     time.sleep(10)

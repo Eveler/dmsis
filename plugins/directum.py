@@ -1165,7 +1165,8 @@ class IntegrationServices:
 
         attachments = []
         for fsuuid in fsuids:
-            attachments.append({'attachment': {'FSuuid': fsuuid, 'docTypeId': 'ELK_RESULT'}})
+            attachments.append({'attachment': {'FSuuid': ''.join(fsuuid.keys()) if isinstance(fsuuid, dict) else fsuuid,
+                                               'docTypeId': 'ELK_RESULT'}})
 
         elk_num = card.findtext('.//Requisite[@Name="LongString56"]')
         from datetime import datetime
