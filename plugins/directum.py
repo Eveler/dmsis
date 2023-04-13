@@ -220,6 +220,54 @@ class IntegrationServices:
             requisite.appendChild(text)
             section.appendChild(requisite)
 
+        # Паспорт
+        if human.passport_serial:
+            requisite = xml_package.createElement("Requisite")
+            requisite.setAttribute("Name", u"Section5")
+            requisite.setAttribute("Type", "String")
+            text = xml_package.createTextNode(human.passport_serial)
+            requisite.appendChild(text)
+            section.appendChild(requisite)
+
+            requisite = xml_package.createElement("Requisite")
+            requisite.setAttribute("Name", u"Строка3")
+            requisite.setAttribute("Type", "String")
+            text = xml_package.createTextNode(human.passport_number)
+            requisite.appendChild(text)
+            section.appendChild(requisite)
+
+            requisite = xml_package.createElement("Requisite")
+            requisite.setAttribute("Name", u"LongString3")
+            requisite.setAttribute("Type", "String")
+            text = xml_package.createTextNode(human.passport_agency)
+            requisite.appendChild(text)
+            section.appendChild(requisite)
+
+            requisite = xml_package.createElement("Requisite")
+            requisite.setAttribute("Name", u"Дата2")
+            requisite.setAttribute("Type", "String")
+            text = xml_package.createTextNode(human.passport_date.strftime('%d.%m.%Y'))
+            requisite.appendChild(text)
+            section.appendChild(requisite)
+
+        # ИНН
+        if human.inn:
+            requisite = xml_package.createElement("Requisite")
+            requisite.setAttribute("Name", u"ИНН")
+            requisite.setAttribute("Type", "String")
+            text = xml_package.createTextNode(human.inn)
+            requisite.appendChild(text)
+            section.appendChild(requisite)
+
+        # СНИЛС
+        if human.snils:
+            requisite = xml_package.createElement("Requisite")
+            requisite.setAttribute("Name", u"Реквизит")
+            requisite.setAttribute("Type", "String")
+            text = xml_package.createTextNode(human.snils)
+            requisite.appendChild(text)
+            section.appendChild(requisite)
+
         # Запись
         rec = xml_package.createElement("Record")
         rec.setAttribute("ID", '')
