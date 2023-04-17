@@ -285,7 +285,7 @@ class Integration:
                                     "ДПУ", request.directum_id, [{'Name': 'LongString56', 'Type': 'String',
                                                                   'Value': "%s (3)" % elk_num}])
                                 if res[0]:
-                                    logging.warning(res + " when " + str(status))
+                                    logging.warning(str(res) + " when " + str(status))
                                 else:
                                     logging.info(
                                         "Отправлен конечный статус для дела Id=%s, num=%s %s" %
@@ -357,7 +357,7 @@ class Integration:
                             res = self.directum.update_reference(
                                 "ДПУ", declar_id, [{'Name': 'LongString56', 'Type': 'String', 'Value': elk_num}])
                             if res[0]:
-                                logging.warning(res + " when " + str(status))
+                                logging.warning(str(res) + " when " + str(status))
                             else:
                                 logging.info(
                                     "Отправлен начальный статус для дела Id=%s, num=%s %s" %
@@ -405,7 +405,7 @@ class Integration:
                                 "ДПУ", declar_id,
                                 [{'Name': 'LongString56', 'Type': 'String', 'Value': "%s (3)" % elk_num}])
                             if res[0]:
-                                logging.warning(res + " when " + str(status))
+                                logging.warning(str(res) + " when " + str(status))
                             else:
                                 logging.info(
                                     "Отправлен конечный статус для дела Id=%s, num=%s %s" %
