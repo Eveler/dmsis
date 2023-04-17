@@ -869,7 +869,7 @@ class Adapter:
 
     def get_orders_response(self, resp_name='ElkOrderResponse', uri='http://epgu.gosuslugi.ru/elk/status/1.0.2'):
         import time
-        time.sleep(10)
+        time.sleep(10)  # TODO: Avoid time.sleep
         res = self.get_response(resp_name, uri, None)
         while not res:
             time.sleep(10)
