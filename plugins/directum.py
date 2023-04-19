@@ -1360,7 +1360,7 @@ class IntegrationServices:
         if not applied_docs:
             docs = self.get_bind_docs('ДПУ', directum_id)
             for doc in docs:
-                if doc.get('TKED') in ('КИК', 'ИК1', 'ИК2', 'ПСИ'):
+                if doc.get('TKED') in ('КИК', 'ИК1', 'ИК2', 'ПСИ', 'РД_АУГО', 'ДГД', 'РУАУГО'):
                     ad = DocumentInfo()
                     doc_id = doc.get('ID')
                     ad.date = doc.get('ISBEDocCreateDate')
