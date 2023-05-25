@@ -269,7 +269,7 @@ class Integration:
                         self.db.commit()
 
                         # Send final status to ELK
-                        st_list = self.directum.get_declar_status_data(request.directum_id, uuids, '3')
+                        st_list = self.directum.get_declar_status_data(request.directum_id, permanent_status='3')
                         for status in st_list:
                             files = []
                             for item in uuids:
