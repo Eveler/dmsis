@@ -1223,7 +1223,8 @@ class IntegrationServices:
                      'senderInn': '2511004094',
                      'statusHistoryList':
                          {'statusHistory': {'status': status,
-                                            'statusDate': datetime.now().strftime('%Y-%m-%dT%H:%M:%S+10:00')}}}
+                                            # 'statusDate': datetime.now().strftime('%Y-%m-%dT%H:%M:%S+10:00')}}}
+                                            'statusDate': datetime.now().strftime('%Y-%m-%dT%H:00:00+10:00')}}}
             if attachments:
                 order['attachments'] = attachments
             res.append({'order': order})
