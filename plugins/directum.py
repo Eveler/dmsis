@@ -1217,14 +1217,14 @@ class IntegrationServices:
                                                'docTypeId': 'ELK_RESULT'}})
 
         elk_num = card.findtext('.//Requisite[@Name="LongString56"]')
-        from datetime import datetime
+        from datetime import datetime, timedelta
         if elk_num:
             order = {'orderNumber': card.findtext('.//Requisite[@Name="Дополнение3"]'),'senderKpp': '251101001',
                      'senderInn': '2511004094',
                      'statusHistoryList':
                          {'statusHistory': {'status': status,
                                             # 'statusDate': datetime.now().strftime('%Y-%m-%dT%H:%M:%S+10:00')}}}
-                                            'statusDate': datetime.now().strftime('%Y-%m-%dT%H:00:00+10:00')}}}
+                                            'statusDate': (datetime.now() + timedelta(hours=-10)).strftime('%Y-%m-%dT%H:%M:%S')}}}
             if attachments:
                 order['attachments'] = attachments
             res.append({'order': order})
@@ -1241,12 +1241,29 @@ class IntegrationServices:
                 series = person.findtext('.//Requisite[@Name="Section5"]')
                 num = person.findtext('.//Requisite[@Name="Строка3"]')
                 snils = person.findtext('.//Requisite[@Name="Реквизит"]')
+                birddate = person.findtext('.//Requisite[@Name="Дата"]')[:10]
+                lastname = person.findtext('.//Requisite[@Name="Дополнение"]')
+                firstname = person.findtext('.//Requisite[@Name="Дополнение2"]')
+                middlename = person.findtext('.//Requisite[@Name="Дополнение3"]')
                 if inn or (series and num) or snils:
-                    user = {'userPersonalDoc': {
-                        'PersonalDocType': '1', 'series': series, 'number': num,
-                        'lastName': person.findtext('.//Requisite[@Name="Дополнение"]'),
-                        'firstName': person.findtext('.//Requisite[@Name="Дополнение2"]'),
-                        'middleName': person.findtext('.//Requisite[@Name="Дополнение3"]'), 'citizenship': '643'}}
+                    if snils:
+                        if birddate:
+                            user = {'userDocSnilsBirthDate': {
+                                'citizenship': '643', 'snils': snils.strip(), 'birthDate': birddate}}
+                        else:
+                            user = {'userDocSnils': {
+                                'snils': snils.strip(), 'lastName': lastname, 'firstName': firstname,
+                                'middleName': middlename, 'citizenship': '643'}}
+                    elif inn:
+                        user = {'userDocInn': {
+                            'INN': inn.strip(),
+                            'lastName': lastname, 'firstName': firstname, 'middleName': middlename,
+                            'citizenship': '643'}}
+                    else:
+                        user = {'userPersonalDoc': {
+                            'PersonalDocType': '1', 'series': series, 'number': num,
+                            'lastName': lastname, 'firstName': firstname, 'middleName': middlename,
+                            'citizenship': '643'}}
                     users.append(user)
         # Get organisations
         orgs = []
@@ -1259,8 +1276,6 @@ class IntegrationServices:
                 ogrn = org.findtext('.//Requisite[@Name="ОГРН"]')
                 if inn:
                     orgs.append({'ogrn_inn_UL': {'inn_kpp': {'inn': inn.strip()}}})
-                    if ogrn:
-                        orgs.append({'ogrn_inn_UL': {'ogrn': ogrn.strip()}})
                 elif ogrn:
                     orgs.append({'ogrn_inn_UL': {'ogrn': ogrn.strip()}})
 
@@ -1278,7 +1293,8 @@ class IntegrationServices:
                                         },
                          'statusHistoryList': {'statusHistory': {
                              'status': status,
-                             'statusDate': datetime.now().strftime('%Y-%m-%dT%H:%M:%S+10:00')}}}
+                             # 'statusDate': datetime.now().strftime('%Y-%m-%dT%H:%M:%S+10:00')}}}
+                             'statusDate': (datetime.now() + timedelta(hours=-10)).strftime('%Y-%m-%dT%H:%M:%S')}}}
                 if attachments:
                     order['attachments'] = attachments
                 res.append({'order': order})
@@ -1292,20 +1308,22 @@ class IntegrationServices:
                                         },
                          'statusHistoryList': {'statusHistory': {
                              'status': status,
-                             'statusDate': datetime.now().strftime('%Y-%m-%dT%H:%M:%S+10:00')}}}
+                             # 'statusDate': datetime.now().strftime('%Y-%m-%dT%H:%M:%S+10:00')}}}
+                             'statusDate': (datetime.now() + timedelta(hours=-10)).strftime('%Y-%m-%dT%H:%M:%S')}}}
                 if attachments:
                     order['attachments'] = attachments
                 res.append({'order': order})
         return res
 
-    def get_result_docs(self, directum_id, declar_num, crt_name='Администрация Уссурийского городского округа',
-                        zip_signed_doc=False):
+    def get_result_docs(self, directum_id, crt_name='Администрация Уссурийского городского округа',
+                        zip_signed_doc=False, days_old=-3):
         """
         Loads files from DIRECTUM bounded as result
         :param directum_id: DIRECTUM record id
-        :param declar_num: Declar number
         :param crt_name: Certificate name
         :param zip_signed_doc: Compress signed document together with .sig
+        :param days_old: Difference between declar end_date and document last modified date in days which takes into
+         account
         :return: List of class DocumentInfo
         """
         # Stub class for document info
@@ -1321,47 +1339,52 @@ class IntegrationServices:
         from crypto import clean_pkcs7
         applied_docs = []
 
-        # Search for newest procedures with document bound for that declar
-        procs = self.search('ПРОУ', "Kod2='%s' AND ProcState<>'Исключена вручную'" % declar_num,
-                            order_by='Дата4', ascending=False)
-        for proc in procs:
-            if proc.get('Ведущая аналитика') == str(directum_id):
-                try:
-                    docs = self.get_bind_docs(
-                        'ПРОУ',
-                        proc.get('Аналитика-оригинал') if proc.get('Аналитика-оригинал') else proc.get('ИДЗапГлавРазд'))
-                    for doc in docs:
-                        if doc.get('TKED') not in ('КИК', 'ИК1', 'ИК2', 'ПСИ', 'РД_АУГО', 'ДГД', 'РУАУГО'):
-                            continue
-                        doc_id = doc.get('ID')
-                        ad = DocumentInfo()
-                        ad.date = doc.get('ISBEDocCreateDate')
-                        ad.file_name = doc.get('ID') + '.' + doc.get('Extension').lower()
-                        ad.number = doc.get('Дополнение') if doc.get('Дополнение') else doc.get('NumberEDoc')
-                        ad.title = doc.get('ISBEDocName')
-                        # Get only last version
-                        versions = self.get_doc_versions(doc_id)
-                        data = self.get_doc(doc_id, versions[0])
-                        file, file_n = mkstemp()
-                        os.write(file, data)
-                        os.close(file)
-                        certs = clean_pkcs7(self.run_script('GetEDocCertificates', [('DocID', doc_id)]), crt_name)
-                        if zip_signed_doc and certs:
-                            from smev import Adapter
-                            ad.file = Adapter.make_sig_zip(ad.file_name, file_n, certs)
-                            ad.file_name = doc.get('ID') + '.zip'
-                        else:
-                            ad.file = file_n
-                            ad.certs = certs
-                        applied_docs.append(ad)
-                except:
-                    logging.warning('', exc_info=True)
+        # # Search for newest procedures with document bound for that declar
+        # procs = self.search('ПРОУ', "Kod2='%s' AND ProcState<>'Исключена вручную'" % declar_num,
+        #                     order_by='Дата4', ascending=False)
+        # for proc in procs:
+        #     if proc.get('Ведущая аналитика') == str(directum_id):
+        #         try:
+        #             docs = self.get_bind_docs(
+        #                 'ПРОУ',
+        #                 proc.get('Аналитика-оригинал') if proc.get('Аналитика-оригинал') else proc.get('ИДЗапГлавРазд'))
+        #             for doc in docs:
+        #                 if doc.get('TKED') not in ('КИК', 'ИК1', 'ИК2', 'ПСИ', 'РД_АУГО', 'ДГД', 'РУАУГО'):
+        #                     continue
+        #                 doc_id = doc.get('ID')
+        #                 ad = DocumentInfo()
+        #                 ad.date = doc.get('ISBEDocCreateDate')
+        #                 ad.file_name = doc.get('ID') + '.' + doc.get('Extension').lower()
+        #                 ad.number = doc.get('Дополнение') if doc.get('Дополнение') else doc.get('NumberEDoc')
+        #                 ad.title = doc.get('ISBEDocName')
+        #                 # Get only last version
+        #                 versions = self.get_doc_versions(doc_id)
+        #                 data = self.get_doc(doc_id, versions[0])
+        #                 file, file_n = mkstemp()
+        #                 os.write(file, data)
+        #                 os.close(file)
+        #                 certs = clean_pkcs7(self.run_script('GetEDocCertificates', [('DocID', doc_id)]), crt_name)
+        #                 if zip_signed_doc and certs:
+        #                     from smev import Adapter
+        #                     ad.file = Adapter.make_sig_zip(ad.file_name, file_n, certs)
+        #                     ad.file_name = doc.get('ID') + '.zip'
+        #                 else:
+        #                     ad.file = file_n
+        #                     ad.certs = certs
+        #                 applied_docs.append(ad)
+        #         except:
+        #             logging.warning('', exc_info=True)
 
         # Get bound docs from declar if there is no procedures with docs bound
         if not applied_docs:
+            from datetime import datetime, timedelta
             docs = self.get_bind_docs('ДПУ', directum_id)
+            card = fromstring(self.proxy.service.GetEntity('ДПУ', directum_id))
+            end_date = datetime.strptime(card.findtext('.//Requisite[@Name="Дата5"]')[:10], '%Y-%m-%d')
             for doc in docs:
-                if doc.get('TKED') in ('КИК', 'ИК1', 'ИК2', 'ПСИ', 'РД_АУГО', 'ДГД', 'РУАУГО'):
+                if doc.get('TKED') in ('КИК', 'ИК1', 'ИК2', 'ПСИ', 'РД_АУГО', 'ДГД', 'РУАУГО', 'ТКД_ПРОЧИЕ') \
+                        and end_date + timedelta(days=days_old) <= \
+                        datetime.strptime(doc.get('ISBEDocModifyDate')[:10], '%Y-%m-%d') <= end_date:
                     ad = DocumentInfo()
                     doc_id = doc.get('ID')
                     ad.date = doc.get('ISBEDocCreateDate')

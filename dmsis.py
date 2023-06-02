@@ -242,7 +242,7 @@ class Integration:
 
                 # For all requests check if declar`s end date is set
                 if declar and declar[0].get('Дата5'):
-                    applied_docs = self.directum.get_result_docs(request.directum_id, request.declar_num, self.crt_name,
+                    applied_docs = self.directum.get_result_docs(request.directum_id, self.crt_name,
                                                                  self.zip_signed_doc)
 
                     text = 'Услуга предоставлена'
@@ -274,7 +274,8 @@ class Integration:
                             files = []
                             for item in uuids:
                                 uuid, ad = item.popitem()
-                                files.append({'path': ad.get('full_name'), "name": ad.get('name'), 'uuid': uuid})
+                                # files.append({'path': ad.get('full_name'), "name": ad.get('name'), 'uuid': uuid})
+                                files.append({'path': ad.get('full_name'), "name": ad.get('name')})
                             if 'user' in status['order'] or 'organization' in status['order']:
                                 self.smev.create_orders_request(status, files)
                             else:
@@ -290,10 +291,7 @@ class Integration:
                                     logging.info(
                                         "Отправлен конечный статус для дела Id=%s, num=%s %s" %
                                         (request.directum_id, request.declar_num,
-                                         "для %s %s %s" % (status['order']['user']['userPersonalDoc']['lastName'],
-                                                           status['order']['user']['userPersonalDoc']['firstName'],
-                                                           status['order']['user']['userPersonalDoc']['middleName'])
-                                         if 'user' in status['order'] else ""))
+                                         declar[0].get('Наименование')))
                     except:
                         self.report_error()
                     finally:
@@ -362,10 +360,7 @@ class Integration:
                                 logging.info(
                                     "Отправлен начальный статус для дела Id=%s, num=%s %s" %
                                     (declar_id, rec.findtext('.//Section[@Index="0"]/Requisite[@Name="Дополнение3"]'),
-                                     "для %s %s %s" % (status['order']['user']['userPersonalDoc']['lastName'],
-                                                       status['order']['user']['userPersonalDoc']['firstName'],
-                                                       status['order']['user']['userPersonalDoc']['middleName'])
-                                     if 'user' in status['order'] else ""))
+                                     rec.findtext('.//Section[@Index="0"]/Requisite[@Name="Наименование"]')))
         except:
             logging.error('Error send initial status to ELK', exc_info=True)
 
@@ -384,9 +379,7 @@ class Integration:
                     declar_id = rec.findtext('.//Section[@Index="0"]/Requisite[@Name="ИД"]')
                     st_list = self.directum.get_declar_status_data(declar_id, permanent_status='3')
                     for status in st_list:
-                        applied_docs = self.directum.get_result_docs(
-                            declar_id, rec.findtext('.//Section[@Index="0"]/Requisite[@Name="Дополнение3"]'), self.crt_name,
-                            self.zip_signed_doc)
+                        applied_docs = self.directum.get_result_docs(declar_id, self.crt_name, self.zip_signed_doc)
                         files = []
                         for ad in applied_docs:
                             files.append({'path': ad.file, 'name': ad.file_name})
@@ -410,10 +403,7 @@ class Integration:
                                 logging.info(
                                     "Отправлен конечный статус для дела Id=%s, num=%s %s" %
                                     (declar_id, rec.findtext('.//Section[@Index="0"]/Requisite[@Name="Дополнение3"]'),
-                                     "для %s %s %s" % (status['order']['user']['userPersonalDoc']['lastName'],
-                                                       status['order']['user']['userPersonalDoc']['firstName'],
-                                                       status['order']['user']['userPersonalDoc']['middleName'])
-                                     if 'user' in status['order'] else ""))
+                                     rec.findtext('.//Section[@Index="0"]/Requisite[@Name="Наименование"]')))
         except:
             logging.error('Error send final status to ELK', exc_info=True)
 

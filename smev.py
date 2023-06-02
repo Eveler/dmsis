@@ -1149,6 +1149,7 @@ if __name__ == '__main__':
                 'statusHistory': {
                     'status': '6',  # ЕЛК. Статусы - Заявление принято (https://esnsi.gosuslugi.ru/classifiers/7212/view/86)
                     'IsInformed': 'true',
+                    # 'statusDate': datetime.now().strftime('%Y-%m-%dT%H:%M:%S+10:00')
                     'statusDate': datetime.now().strftime('%Y-%m-%dT%H:%M:%S+10:00')
                 }
             }
