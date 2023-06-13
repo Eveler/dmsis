@@ -289,9 +289,9 @@ class Integration:
                                     logging.warning(str(res) + " when " + str(status))
                                 else:
                                     logging.info(
-                                        "Отправлен конечный статус для дела Id=%s, num=%s %s" %
+                                        "Отправлен конечный статус для дела Id=%s, num=%s %s. ELK = %s" %
                                         (request.directum_id, request.declar_num,
-                                         declar[0].get('Наименование')))
+                                         declar[0].get('Наименование'), elk_num))
                     except:
                         self.report_error()
                     finally:
@@ -344,7 +344,7 @@ class Integration:
                     (date.today() - timedelta(days=days), date.today() + timedelta(days=1)), raw=True)
                 for rec in xml.findall('.//Object/Record'):
                     declar_id = rec.findtext('.//Section[@Index="0"]/Requisite[@Name="ИД"]')
-                    st_list = self.directum.get_declar_status_data(declar_id, dclar_xml=rec)
+                    st_list = self.directum.get_declar_status_data(declar_id, declar_xml=rec)
                     for status in st_list:
                         if 'user' in status['order'] or 'organization' in status['order']:
                             self.smev.create_orders_request(status)
@@ -358,9 +358,9 @@ class Integration:
                                 logging.warning(str(res) + " when " + str(status))
                             else:
                                 logging.info(
-                                    "Отправлен начальный статус для дела Id=%s, num=%s %s" %
+                                    "Отправлен начальный статус для дела Id=%s, num=%s %s. ELK = %s" %
                                     (declar_id, rec.findtext('.//Section[@Index="0"]/Requisite[@Name="Дополнение3"]'),
-                                     rec.findtext('.//Section[@Index="0"]/Requisite[@Name="Наименование"]')))
+                                     rec.findtext('.//Section[@Index="0"]/Requisite[@Name="Наименование"]'), elk_num))
         except:
             logging.error('Error send initial status to ELK', exc_info=True)
 
@@ -401,9 +401,9 @@ class Integration:
                                 logging.warning(str(res) + " when " + str(status))
                             else:
                                 logging.info(
-                                    "Отправлен конечный статус для дела Id=%s, num=%s %s" %
+                                    "Отправлен конечный статус для дела Id=%s, num=%s %s. ELK = %s" %
                                     (declar_id, rec.findtext('.//Section[@Index="0"]/Requisite[@Name="Дополнение3"]'),
-                                     rec.findtext('.//Section[@Index="0"]/Requisite[@Name="Наименование"]')))
+                                     rec.findtext('.//Section[@Index="0"]/Requisite[@Name="Наименование"]'), elk_num))
         except:
             logging.error('Error send final status to ELK', exc_info=True)
 
