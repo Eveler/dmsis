@@ -342,9 +342,11 @@ class Integration:
                     'СпособДост<>5652824 and СпособДост<>6953048 and СпособДост<>5652821 and Дата3>=%s and Дата3<%s'
                     ' and Дата5 is null and LongString56 is null' %
                     (date.today() - timedelta(days=days), date.today() + timedelta(days=1)), raw=True)
-                for rec in xml.findall('.//Object/Record'):
+                recs = xml.findall('.//Object/Record')
+                logging.info("************* Проверка начальных статусов для %s дел" % len(recs))
+                for rec in recs:
                     declar_id = rec.findtext('.//Section[@Index="0"]/Requisite[@Name="ИД"]')
-                    st_list = self.directum.get_declar_status_data(declar_id, declar_xml=rec)
+                    st_list = self.directum.get_declar_status_data(declar_id)
                     for status in st_list:
                         if 'user' in status['order'] or 'organization' in status['order']:
                             self.smev.create_orders_request(status)
@@ -372,12 +374,14 @@ class Integration:
                     'ДПУ',
                     "СпособДост<>5652824 and СпособДост<>6953048 and СпособДост<>5652821 and Дата5>=%s and Дата5<%s" %
                     (date.today() - timedelta(days=days), date.today() + timedelta(days=1)), raw=True)
-                for rec in xml.findall('.//Object/Record'):
+                recs = xml.findall('.//Object/Record')
+                logging.info("************** Проверка конечных статусов для %s дел" % len(recs))
+                for rec in recs:
                     elk_num = rec.findtext('.//Section[@Index="0"]/Requisite[@Name="LongString56"]')
                     if '(3)' in elk_num:
                         continue
                     declar_id = rec.findtext('.//Section[@Index="0"]/Requisite[@Name="ИД"]')
-                    st_list = self.directum.get_declar_status_data(declar_id, permanent_status='3', declar_xml=rec)
+                    st_list = self.directum.get_declar_status_data(declar_id, permanent_status='3')
                     for status in st_list:
                         applied_docs = self.directum.get_result_docs(declar_id, self.crt_name, self.zip_signed_doc)
                         files = []

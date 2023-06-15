@@ -1187,17 +1187,16 @@ class IntegrationServices:
             res.append(card_map)
         return res
 
-    def get_declar_status_data(self, declar_id=None, fsuids: list = (), permanent_status='6', declar_xml=None):
+    def get_declar_status_data(self, declar_id=None, fsuids: list = (), permanent_status='6'):
         """
         Returns declar status in format required by http://epgu.gosuslugi.ru/elk/status/1.0.2
         :param declar_id: Declar ID in DIRECTUM
         :param fsuids: List of uids of files uploaded to ftp
         :param permanent_status: Default = 6 - ЕЛК. Статусы - Заявление принято (https://esnsi.gosuslugi.ru/classifiers/7212/view/86)
-        :param declar_xml: Daclar data
         :return: list
         """
         res = []
-        card = declar_xml if declar_xml else fromstring(self.proxy.service.GetEntity('ДПУ', declar_id))
+        card = fromstring(self.proxy.service.GetEntity('ДПУ', declar_id))
         # Get declar status
         if not permanent_status:
             ent = fromstring(self.proxy.service.GetEntity(
