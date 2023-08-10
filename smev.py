@@ -39,10 +39,11 @@ class Adapter:
         self.log = logging.getLogger('smev.adapter')
         self.log.setLevel(logging.root.level)
         self.ftp_addr = ftp_addr
-        self.crypto = Crypto()
-        self.crypto.serial = serial
-        self.crypto.crt_name = crt_name
-        self.crypto.container = container
+        if 'win32' in platform:
+            self.crypto = Crypto()
+            self.crypto.serial = serial
+            self.crypto.crt_name = crt_name
+            self.crypto.container = container
         self.method = method
 
         if history:
