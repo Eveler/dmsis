@@ -428,7 +428,7 @@ class Integration:
             from os.path import expanduser
             lst = cfg.read(
                 ["c:/dmsis/dmsis.ini", expanduser("~/dmsis.ini"), "./dmsis.ini",
-                 config_path])
+                 config_path], encoding='windows-1251')
             if lst:
                 logging.info('Configuration loaded from: %s' % lst)
             else:
