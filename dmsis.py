@@ -9,16 +9,17 @@
 import logging
 import os
 from datetime import date, timedelta
-from sys import version_info
+from sys import version_info, platform
 
 from dateutil.utils import today
 
 from smev_cnsi import Cnsi
 
-if version_info.major == 3 and version_info.minor <= 5:
-    from win32._service import SERVICE_STOP_PENDING
-else:
-    from win32.win32service import SERVICE_STOP_PENDING
+if 'win32' in platform:
+    if version_info.major == 3 and version_info.minor <= 5:
+        from win32._service import SERVICE_STOP_PENDING
+    else:
+        from win32.win32service import SERVICE_STOP_PENDING
 #from win32serviceutil import ServiceFramework, HandleCommandLine
 
 import requests
