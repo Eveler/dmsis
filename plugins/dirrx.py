@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import logging
+
 # import requests
 # import pyodata
 from odata import ODataService

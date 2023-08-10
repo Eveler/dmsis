@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 import logging
+from os import path, remove
 from xml.dom.minidom import Document
 from xml.etree.ElementTree import fromstring
-from os import path, remove
 
 from zeep import Client
 

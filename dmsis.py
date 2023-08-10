@@ -1,16 +1,17 @@
 # -*- encoding: utf-8 -*-
-from datetime import date, timedelta
 
 # Twisted reactor sends GetRequest by timer
 # Got requests stored in DB
 
 # Then it queries Directum for changed status for stored requests and sends
 # SendResponse if status changed
+
 import logging
 import os
+from datetime import date, timedelta
+from sys import version_info
 
 from dateutil.utils import today
-from sys import version_info
 
 from smev_cnsi import Cnsi
 

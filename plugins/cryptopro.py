@@ -4,8 +4,9 @@ import logging
 import os
 import subprocess
 import tempfile
-from encodings.base64_codec import base64_encode
 from sys import platform
+
+from encodings.base64_codec import base64_encode
 
 if 'win32' not in platform:
     raise Exception('This is for Windows only')

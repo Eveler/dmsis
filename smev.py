@@ -11,18 +11,20 @@ from datetime import datetime, date
 from mimetypes import guess_type, guess_extension
 from os import close, write, path, remove
 from os.path import basename
+from sys import platform
 from urllib.parse import urlparse
 from uuid import uuid1
-
 # from datetime import date
 from zipfile import ZipFile, ZIP_DEFLATED
 
+from lxml import etree, objectify
 from zeep.exceptions import XMLParseError
 
 import six
 from declar import Declar
-from lxml import etree, objectify
-from plugins.cryptopro import Crypto
+
+if 'win32' in platform:
+    from plugins.cryptopro import Crypto
 from translit import translate
 from zeep import Client
 from zeep.plugins import HistoryPlugin
