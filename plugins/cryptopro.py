@@ -9,8 +9,10 @@ from sys import platform
 from encodings.base64_codec import base64_encode
 
 if 'win32' not in platform:
-    raise Exception('This is for Windows only')
-
+    from sys import path
+    path.append('../3dparty/')
+    path.append('3dparty/')
+    import pycades\
 
 class Crypto:
     CAPICOM_CURRENT_USER_STORE = 2
@@ -87,6 +89,8 @@ class Crypto:
             return self.sign_csp(xml)
 
     def get_file_hash(self, file_path):
+        if 'win32' not in platform:
+            raise Exception('This is for Windows only')
         csptest_path = 'C:\\Program Files (x86)\\Crypto Pro\\CSP\\csptest.exe'
         if not os.path.exists(csptest_path):
             csptest_path = 'C:\\Program Files\\Crypto Pro\\CSP\\csptest.exe'
@@ -118,6 +122,8 @@ class Crypto:
 
     def get_file_sign(self, file_path, crt_name=None, crt_file=None):
         """ Generates PKCS #7 signature"""
+        if 'win32' not in platform:
+            raise Exception('This is for Windows only')
         csptest_path = 'C:\\Program Files (x86)\\Crypto Pro\\CSP\\csptest.exe'
         if not os.path.exists(csptest_path):
             csptest_path = 'C:\\Program Files\\Crypto Pro\\CSP\\csptest.exe'
@@ -162,6 +168,8 @@ class Crypto:
 
     # TODO: Enveloped signature
     def sign_csp(self, xml):
+        if 'win32' not in platform:
+            raise Exception('This is for Windows only')
         csptest_path = 'C:\\Program Files (x86)\\Crypto Pro\\CSP\\csptest.exe'
         intmp_f, intmp_fn = tempfile.mkstemp()
         outtmp_f, outtmp_fn = tempfile.mkstemp()
