@@ -9,7 +9,7 @@
 import logging
 import os
 from datetime import date, timedelta
-from sys import version_info, platform
+from sys import version_info, platform, exc_info
 
 from dateutil.utils import today
 
@@ -30,10 +30,40 @@ from twisted.internet import task, reactor
 from twisted.python import log
 
 
+class IntegrationServiceWrapper:
+    def __init__(self, wsdl, url, use_rx, username='', password=''):
+        self.__wsdl = wsdl
+        self.__url = url
+        self.__use_rx = use_rx
+        self.__dir = IntegrationServices(wsdl)
+        if use_rx:
+            from plugins.dirrx import DirectumRX, DirectumRXException
+            self.__rx = DirectumRX(url, username, password)
+
+    def __with_rx(self, item):
+        def inner(*args, **kwargs):
+            return self.__call_with_rx(item, *args, **kwargs)
+        return inner
+
+    def __call_with_rx(self, item, *args, **kwargs):
+        try:
+            res = getattr(self.__rx, item)(*args, **kwargs)
+            logging.info(res)
+        except:
+            logging.error(exc_info=exc_info())
+        return getattr(self.__dir, item)(*args, **kwargs)
+
+    def __getattr__(self, item):
+        if self.__use_rx:
+            return self.__with_rx(item)
+        return getattr(self.__dir, item)
+
+
 class Integration:
-    def __init__(self, use_config=True, config_path='./dmsis.ini'):
+    def __init__(self, use_config=True, config_path='./dmsis.ini', use_rx=False):
         self.__smev = None
         self.__directum = None
+        self.__use_rx = use_rx
         logging.basicConfig(
             format='%(asctime)s %(name)s:%(module)s(%(lineno)d): '
                    '%(levelname)s: %(message)s', level=logging.INFO)
@@ -44,6 +74,10 @@ class Integration:
             self.smev_wsdl = "http://smev3-d.test.gosuslugi.ru:7500/smev/v1.2/ws?wsdl"
             self.smev_ftp = "ftp://smev3-d.test.gosuslugi.ru/"
             self.directum_wsdl = "http://snadb:8082/IntegrationService.svc?singleWsdl"
+            self.rx_url = "http://rxtest.adm-ussuriisk.ru/Integration/odata/" if use_rx else None
+            self.__use_rx = use_rx
+            self.__rx_user = ''
+            self.__rx_pass = ''
             self.smev_uri = 'urn://augo/smev/uslugi/1.0.0'
             self.local_name = 'directum'
             self.cert_method = 'sharp'
@@ -63,10 +97,10 @@ class Integration:
         except Exception:
             self.report_error()
 
-        try:
-            self.__directum = IntegrationServices(self.directum_wsdl)
-        except Exception:
-            self.report_error()
+        # try:
+        #     self.__directum = IntegrationServices(self.directum_wsdl)
+        # except Exception:
+        #     self.report_error()
 
         self.db = Db()
 
@@ -74,7 +108,9 @@ class Integration:
     def directum(self):
         if not self.__directum:
             try:
-                self.__directum = IntegrationServices(self.directum_wsdl)
+                self.__directum = IntegrationServiceWrapper(self.directum_wsdl, self.rx_url, self.__use_rx,
+                                                            self.__rx_user, self.__rx_pass) \
+                    if self.__use_rx else IntegrationServices(self.directum_wsdl)
             except Exception:
                 self.report_error()
 
@@ -546,7 +582,9 @@ class Integration:
                     'directum', 'wsdl',
                     "http://servdir1:8083/IntegrationService.svc?singleWsdl")
             self.directum_wsdl = cfg.get('directum', 'wsdl')
-
+            self.rx_url = cfg.get('directum', 'rx_url')
+            self.__rx_user = cfg.get('directum', 'rx_user')
+            self.__rx_pass = cfg.get('directum', 'rx_pass')
             if not cfg.has_section("integration"):
                 do_write = True
                 cfg.add_section('integration')
@@ -639,7 +677,7 @@ def main():
 
     from optparse import OptionParser
 
-    parser = OptionParser(version="%prog ver. 1.15",
+    parser = OptionParser(version="%prog ver. 1.17",
                           conflict_handler="resolve")
     parser.print_version()
     parser.add_option("-r", "--run", action="store_true", dest="run",
@@ -647,10 +685,12 @@ def main():
     parser.add_option("-o", "--once", action="store_true", dest="once",
                       help="Do the job and exit. Don`t use Twisted manager and "
                            "don`t run continuously.")
+    parser.add_option("-u", "--use_rx", action="store_true", dest="rx",
+                      help="Use DirectumRX API also.", default=False)
     # parser.add_option("--startup")
     (options, args) = parser.parse_args()
     if options.once and options.run:
-        a = Integration()
+        a = Integration(use_rx=options.rx)
         a.step()
     elif options.run:
         run()

@@ -7,7 +7,7 @@ from zipfile import ZipFile
 
 from lxml import etree
 
-from plugins import IntegrationServices
+from plugins import DirectumRX
 from smev import Adapter
 
 
@@ -243,7 +243,7 @@ if __name__ == '__main__':
         print(revisions, max(revisions), max_revision)
         res = cnsi.get_data('ELK_STATUS', max_revision)
         print(etree.tostring(res) if isinstance(res, etree._Element) else res)
-        dis = IntegrationServices("http://127.0.0.1:8082/IntegrationService.svc?singleWsdl")
+        dis = DirectumRX("http://127.0.0.1:8082/IntegrationService.svc?singleWsdl")
         res = dis.update_elk_status(res)
         print(res)
 
