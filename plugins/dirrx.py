@@ -32,7 +32,27 @@ class DirectumRX:
         self._service = ODataService(url, auth=my_auth, reflect_entities=True)
 
     def add_declar(self, declar, files):
+        data = [{"Name": 'Note', "Value": 'From integration'}]
+        # Individual
+        if len(declar.person) > 0:
+            for person in declar.person:
+                res = rx.search(
+                        'IPersons',
+                        "Status eq 'Active' and LastName eq '%s' and FirstName eq '%s' %s %s" %
+                        (person.surname, person.first_name,
+                         "and MiddleName eq '%s'" % person.patronymic if person.patronymic else '',
+                         " and (LegalAddress eq '%s' or LegalAddress eq null)" % person.address), raw=False)
+            data.append({"Name": 'ApplicantsPP', "Value": res})
+            raise "Not released yet"
+        res = rx.search('ICompanies', "Status eq 'Active' and Name eq 'АйТиСи'", raw=False)
+        data.append({"Name": 'Correspondent', "Value": res[0]})
+        res = rx.search('IMunicipalServicesServiceKinds',
+                        "Code eq '119' or contains(ShortName,'119') or contains(FullName,'119')", raw=False)
+        data.append({"Name": 'ServiceKind', "Value": res[0]})
+        res = rx.search('IMailDeliveryMethods', "Name eq 'СМЭВ'", raw=False)
+        data.append({"Name": 'DeliveryMethod', "Value": res[0]})
         raise "Not released yet"
+        rx.update_reference('IMunicipalServicesServiceCases', data=data)
 
     def run_script(self, script_name, params=()):
         raise "Not released yet"
@@ -40,7 +60,11 @@ class DirectumRX:
     def search(self, code, criteria, tp=REF, order_by='', ascending=True, raw=True):
         if code in self.__d_rx_ref_translate:
             code = self.__d_rx_ref_translate[code]
-        entity = self._service.entities[code]
+        try:
+            entity = self._service.entities[code]
+        except KeyError:
+            logging.debug(self._service.entities.keys())
+            raise
         query = self._service.query(entity)
         if raw:
             query_params = {'$expand': '*'}
@@ -50,9 +74,11 @@ class DirectumRX:
                 query_params['$orderby'] = order_by + (' asc' if ascending else ' desc')
             return query.raw(query_params)
         else:
-            query.options['$filter'] = [criteria]
-            query.options['$orderby'] = [order_by] if isinstance(order_by, SortOrder) \
-                else [order_by + (' asc' if ascending else ' desc')]
+            if criteria:
+                query.options['$filter'] = [criteria]
+            if order_by:
+                query.options['$orderby'] = [order_by] if isinstance(order_by, SortOrder) \
+                    else [order_by + (' asc' if ascending else ' desc')]
             return query.all()
 
     def get_result_docs(self, directum_id, crt_name='Администрация Уссурийского городского округа',
@@ -101,21 +127,26 @@ if __name__ == '__main__':
     #     print(r)
     # print(rx._service.entities.keys())
     # exit()
-    # res = rx.search('ICounterparties', '')
-    pers = rx._service.entities['IPersons']
+    # pers = rx._service.entities['IPersons']
     # res = rx.search(
     #     'IPersons', Query.and_(pers.FirstName == 'Илья',
     #                            Query.and_(pers.MiddleName == 'Владимирович', pers.LastName == 'Елисеев')),
     #     order_by=pers.FirstName.asc(), raw=False)
-    res = rx.search(
-        'IPersons',
-        "FirstName eq 'Илья' and MiddleName eq 'Владимирович' and LastName eq 'Елисеев'",
-        order_by="FirstName", raw=False)
-    # res = rx.search('ICompanies', '')
-    for r in res:
-        print(r)
-    exit()
-    rx.update_reference('IMunicipalServicesServiceCases')
+    # res = rx.search(
+    #     'IPersons',
+    #     "FirstName eq 'Илья' and MiddleName eq 'Владимирович' and LastName eq 'Елисеев'",
+    #     order_by="FirstName", raw=False)
+    # for r in res:
+    #     print(r)
+    declar = object()
+    declar.person = []
+    le = object()
+    le.full_name = ''
+    le.name = 'АйТиСи'
+    le.inn = ''
+    declar.legal_entity = [le]
+    res = rx.add_declar(declar, '')
+    print(res)
     exit()
     # print(query.raw({'$expand': '*'}))
     query.options['$expand'] = ['Author', 'DeliveryMethod']
