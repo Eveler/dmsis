@@ -32,30 +32,58 @@ class DirectumRX:
         self._service = ODataService(url, auth=my_auth, reflect_entities=True)
 
     def add_declar(self, declar, files):
-        data = [{"Name": 'Note', "Value": 'From integration'}]
+        data = [{"Name": 'Note', "Value": 'By integration'}]
         # Individual
         if len(declar.person) > 0:
             for person in declar.person:
-                res = rx.search(
+                res = self.search(
                         'IPersons',
-                        "Status eq 'Active' and LastName eq '%s' and FirstName eq '%s' %s %s" %
+                        "Status eq 'Active' and LastName eq '%s' and FirstName eq '%s'%s%s" %
                         (person.surname, person.first_name,
-                         "and MiddleName eq '%s'" % person.patronymic if person.patronymic else '',
+                         " and MiddleName eq '%s'" % person.patronymic if person.patronymic else '',
                          " and (LegalAddress eq '%s' or LegalAddress eq null)" % person.address), raw=False)
             data.append({"Name": 'ApplicantsPP', "Value": res})
+            # data.append({"Name": 'Correspondent', "Value": res[0]})
             raise "Not released yet"
-        res = rx.search('ICompanies', "Status eq 'Active' and Name eq 'АйТиСи'", raw=False)
-        data.append({"Name": 'Correspondent', "Value": res[0]})
-        res = rx.search('IMunicipalServicesServiceKinds',
+        # LegalEntity
+        if len(declar.legal_entity):
+            apps_le = []
+            for entity in declar.legal_entity:
+                res = self.search('ICompanies', "Status eq 'Active'%s%s%s" %
+                                (" and LegalName eq '%s'" % entity.full_name if entity.full_name else '',
+                                 " and Name eq '%s'" % entity.name if entity.name else '',
+                                 " and TIN eq '%s'" % entity.inn if entity.inn else ''), raw=False)
+                if res:
+                    apps_le.append(res[0])
+                else:
+                    # Create new company
+                    corr = self._service.entities['ICompanies']()
+                    corr.Name = entity.name if entity.name else entity.full_name
+                    if not corr.Name:
+                        raise DirectumRXException("Company name must be filled")
+                    corr.LegalName = entity.full_name
+                    corr.TIN = entity.inn
+                    corr.TRRC = entity.kpp
+                    corr.LegalAddress = entity.address
+                    corr.Note = 'By integration'
+                    corr.Status = 'Active'
+                    self._service.save(corr)
+                    apps_le.append(corr)
+            data.append({"Name": 'ApplicantsLE', "Value": apps_le})
+        res = self.search('IMunicipalServicesServiceKinds',
                         "Code eq '119' or contains(ShortName,'119') or contains(FullName,'119')", raw=False)
         data.append({"Name": 'ServiceKind', "Value": res[0]})
-        res = rx.search('IMailDeliveryMethods', "Name eq 'СМЭВ'", raw=False)
+        res = self.search('IMailDeliveryMethods', "Name eq 'СМЭВ'", raw=False)
         data.append({"Name": 'DeliveryMethod', "Value": res[0]})
-        raise "Not released yet"
+        res = self.search('IDocumentKinds', "Name eq 'Дело по оказанию услуг'", raw=False)
+        data.append({"Name": 'DocumentKind', "Value": res[0]})
+
+        # data.append({"Name": 'Status', "Value": 'Active'})
+
         rx.update_reference('IMunicipalServicesServiceCases', data=data)
 
     def run_script(self, script_name, params=()):
-        raise "Not released yet"
+        raise DirectumRXException("Not released yet")
 
     def search(self, code, criteria, tp=REF, order_by='', ascending=True, raw=True):
         if code in self.__d_rx_ref_translate:
@@ -82,8 +110,8 @@ class DirectumRX:
             return query.all()
 
     def get_result_docs(self, directum_id, crt_name='Администрация Уссурийского городского округа',
-                    zip_signed_doc=False, days_old=-3):
-        raise "Not released yet"
+                        zip_signed_doc=False, days_old=-3):
+        raise DirectumRXException("Not released yet")
 
     def get_declar_status_data(self, declar_id=None, fsuids: list = (), permanent_status='6'):
         raise "Not released yet"
@@ -104,7 +132,7 @@ class DirectumRX:
         return res
 
     def update_elk_status(self, data):
-        raise "Not released yet"
+        raise DirectumRXException("Not released yet")
 
 
 if __name__ == '__main__':
@@ -138,14 +166,26 @@ if __name__ == '__main__':
     #     order_by="FirstName", raw=False)
     # for r in res:
     #     print(r)
-    declar = object()
-    declar.person = []
-    le = object()
-    le.full_name = ''
-    le.name = 'АйТиСи'
-    le.inn = ''
-    declar.legal_entity = [le]
-    res = rx.add_declar(declar, '')
+
+    # corr = rx._service.entities['ICompanies']()
+    # corr.Name = 'АйТиСи2'
+    # corr.LegalName = entity.full_name
+    # corr.TIN = entity.inn
+    # corr.TRRC = entity.kpp
+    # corr.LegalAddress = entity.address
+    # corr.Note = 'By integration'
+    # corr.Status = 'Active'
+    # res = rx._service.save(corr)
+    # print(res)
+    # exit()
+    class Declar:
+        person = []
+        class LE:
+            full_name = ''
+            name = 'АйТиСи'
+            inn = ''
+        legal_entity = [LE()]
+    res = rx.add_declar(Declar(), '')
     print(res)
     exit()
     # print(query.raw({'$expand': '*'}))
