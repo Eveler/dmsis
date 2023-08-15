@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import datetime
 import logging
 
 # import requests
@@ -50,9 +51,9 @@ class DirectumRX:
             apps_le = []
             for entity in declar.legal_entity:
                 res = self.search('ICompanies', "Status eq 'Active'%s%s%s" %
-                                (" and LegalName eq '%s'" % entity.full_name if entity.full_name else '',
-                                 " and Name eq '%s'" % entity.name if entity.name else '',
-                                 " and TIN eq '%s'" % entity.inn if entity.inn else ''), raw=False)
+                                  (" and LegalName eq '%s'" % entity.full_name if entity.full_name else '',
+                                   " and Name eq '%s'" % entity.name if entity.name else '',
+                                   " and TIN eq '%s'" % entity.inn if entity.inn else ''), raw=False)
                 if res:
                     apps_le.append(res[0])
                 else:
@@ -70,13 +71,29 @@ class DirectumRX:
                     self._service.save(corr)
                     apps_le.append(corr)
             data.append({"Name": 'ApplicantsLE', "Value": apps_le})
+            res = self.search('IContacts', self._service.entities['IContacts'].Company == apps_le[0], raw=False)
+            data.append({"Name": 'Contact', "Value": res[0]})
+            data.append({"Name": 'Correspondent', "Value": apps_le[0]})
         res = self.search('IMunicipalServicesServiceKinds',
-                        "Code eq '119' or contains(ShortName,'119') or contains(FullName,'119')", raw=False)
+                          "Code eq '119' or contains(ShortName,'119') or contains(FullName,'119')", raw=False)
         data.append({"Name": 'ServiceKind', "Value": res[0]})
+        res = self.search('IEmployees', "Id eq %s" % res[0].ServPerformer.Id, raw=False)
+        data.append({"Name": 'Addressee', "Value": res[0]})
+        data.append({"Name": 'ManyAddresseesLabel', "Value": res[0].Name})
+        res = self.search('IDepartments', "Id eq %s" % res[0].Department.Id, raw=False)
+        data.append({"Name": 'AddresseeDep', "Value": res[0]})
         res = self.search('IMailDeliveryMethods', "Name eq 'СМЭВ'", raw=False)
         data.append({"Name": 'DeliveryMethod', "Value": res[0]})
         res = self.search('IDocumentKinds', "Name eq 'Дело по оказанию услуг'", raw=False)
         data.append({"Name": 'DocumentKind', "Value": res[0]})
+        res = self.search('IBusinessUnits', "Name eq 'Администрация Уссурийского городского округа'", raw=False)
+        data.append({"Name": 'BusinessUnit', "Value": res[0]})
+        res = self.search('IDepartments', "Name eq 'Отдел информатизации'", raw=False)
+        data.append({"Name": 'Department', "Value": res[0]})
+        data.append({"Name": 'Created', "Value": datetime.datetime.now()})
+        data.append({"Name": 'IsManyAddressees', "Value": False})
+        res = self.search('IEmployees', "Id eq 13", raw=False)
+        data.append({"Name": 'Author', "Value": res[0]})
 
         # data.append({"Name": 'Status', "Value": 'Active'})
 
@@ -102,6 +119,7 @@ class DirectumRX:
                 query_params['$orderby'] = order_by + (' asc' if ascending else ' desc')
             return query.raw(query_params)
         else:
+            query.options['$expand'] = ['*']
             if criteria:
                 query.options['$filter'] = [criteria]
             if order_by:
