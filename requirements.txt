@@ -7,3 +7,5 @@ python-dateutil~=2.8.2
 ctypescrypto~=0.5
 python-odata~=0.5.4
 soapfish2~=0.7.2
+holidays~=0.30
+numpy~=1.24.4
