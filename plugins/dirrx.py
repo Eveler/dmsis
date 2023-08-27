@@ -2,6 +2,7 @@
 import datetime
 import logging
 from datetime import timedelta
+from os import path, remove
 
 from holidays import country_holidays
 from numpy import busday_offset
@@ -49,128 +50,145 @@ class DirectumRX:
         self._service = ODataService(url, auth=my_auth, reflect_entities=True)
 
     def add_declar(self, declar, files):
-        res = self.search("IMunicipalServicesServiceCases", "RegistrationNumber eq '%s' and MFCRegDate eq %s" %
-                          (declar.declar_number, declar.register_date.strftime("%Y-%m-%dT00:00:00Z")))
-        if res:
-            raise DirectumRXException("Declar %s %s found. Document addion need to released.")
-        else:
+        data = self.search("IMunicipalServicesServiceCases", "RegistrationNumber eq '%s' and MFCRegDate eq %s" %
+                          (declar.declar_number, declar.register_date.strftime("%Y-%m-%dT00:00:00Z")), raw=False)
+        if not data:
             data = self._service.entities['IMunicipalServicesServiceCases']()
-        # data = [{"Name": 'Note', "Value": 'By integration'}]
-        # Individual
-        apps_p = []
-        if len(declar.person) > 0:
-            for person in declar.person:
-                res = self.search(
-                    'IPersons',
-                    "Status eq 'Active' and LastName eq '%s' and FirstName eq '%s'%s%s" %
-                    (person.surname, person.first_name,
-                     " and MiddleName eq '%s'" % person.patronymic if person.patronymic else '',
-                     " and (LegalAddress eq '%s' or LegalAddress eq null)" % person.address), raw=False)
-            data.ApplicantsPP = res
-            # data.append({"Name": 'Correspondent', "Value": res[0]})
-            raise "Not released yet"
-        # LegalEntity
-        apps_le = []
-        if len(declar.legal_entity):
-            for entity in declar.legal_entity:
-                res = self.search('ICompanies', "Status eq 'Active'%s%s%s" %
-                                  (" and LegalName eq '%s'" % entity.full_name if entity.full_name else '',
-                                   " and Name eq '%s'" % entity.name if entity.name else '',
-                                   " and TIN eq '%s'" % entity.inn if entity.inn else ''), raw=False)
-                if res:
-                    apps_le.append(res[0])
+            # data = [{"Name": 'Note', "Value": 'By integration'}]
+            # Individual
+            apps_p = []
+            if len(declar.person) > 0:
+                for person in declar.person:
+                    res = self.search(
+                        'IPersons',
+                        "Status eq 'Active' and LastName eq '%s' and FirstName eq '%s'%s%s" %
+                        (person.surname, person.first_name,
+                         " and MiddleName eq '%s'" % person.patronymic if person.patronymic else '',
+                         " and (LegalAddress eq '%s' or LegalAddress eq null)" % person.address), raw=False)
+                data.ApplicantsPP = res
+                # data.append({"Name": 'Correspondent', "Value": res[0]})
+                raise "Not released yet"
+            # LegalEntity
+            apps_le = []
+            if len(declar.legal_entity):
+                for entity in declar.legal_entity:
+                    res = self.search('ICompanies', "Status eq 'Active'%s%s%s" %
+                                      (" and LegalName eq '%s'" % entity.full_name if entity.full_name else '',
+                                       " and Name eq '%s'" % entity.name if entity.name else '',
+                                       " and TIN eq '%s'" % entity.inn if entity.inn else ''), raw=False)
+                    if res:
+                        apps_le.append(res[0])
+                    else:
+                        # Create new company
+                        corr = self._service.entities['ICompanies']()
+                        corr.Name = entity.name if entity.name else entity.full_name
+                        if not corr.Name:
+                            raise DirectumRXException("Company name must be filled")
+                        corr.LegalName = entity.full_name
+                        corr.TIN = entity.inn
+                        corr.TRRC = entity.kpp
+                        corr.LegalAddress = entity.address
+                        corr.Note = 'By integration'
+                        corr.Status = 'Active'
+                        self._service.save(corr)
+                        apps_le.append(corr)
+                res = self.search("ICounterparties", "Id eq %s" % apps_le[0].Id, raw=False)
+                data.Correspondent = res[0]  # Required "Заявитель"
+            res = self.search('IMunicipalServicesServiceKinds',
+                              "Code eq '119' or contains(ShortName,'119') or contains(FullName,'119')", raw=False)
+            data.ServiceKind = res[0]  # Required "Услуга"
+            now = datetime.datetime.now()
+            holidays = country_holidays("RU")
+            now = busday_offset(now, res[0].ProvisionTerm, roll='forward', holidays=holidays) \
+                if res[0].TermType == 'WorkDays' \
+                else (now + timedelta(days=res[0].ProvisionTerm))
+            if now in holidays or now.weekday() > 5:
+                now = busday_offset(now, 1, roll='forward', holidays=holidays)
+            res = self.search('IMailDeliveryMethods', "Name eq 'СМЭВ'", raw=False)
+            data.DeliveryMethod = res[0]  # Required "Способ доставки"
+            res = self.search('IDocumentRegisters', "Name eq 'Дела по оказанию муниципальных услуг'", raw=False)
+            data.DocumentRegister = res[0]  # Required "Журнал регистрации"
+            data.RegistrationNumber = declar.declar_number
+            data.Subject = declar.object_address
+            data.HasRelations = False
+            data.HasVersions = False  # Required
+            data.VersionsLocked = False  # Required
+            data.HasPublicBody = False  # Required
+            data.Name = ("Дело по оказанию услуг №%s от %s" %
+                         (declar.declar_number, declar.register_date.strftime("%d.%m.%Y")))  # Required
+            data.MFCRegDate = declar.register_date  # Required
+            data.RegistrationDate = datetime.datetime.now()  # Required "Дата регистрации в органе"
+            data.Created = datetime.datetime.now()  # Required "Создано"
+            data.ServiceEndPlanData = now  # Required
+
+            # rx.update_reference('IMunicipalServicesServiceCases', data=data)
+            # return self._service.save(data)
+            url = data.__odata_url__()
+            if url is None:
+                msg = 'Cannot insert Entity that does not belong to EntitySet: {0}'.format(entity)
+                raise ODataError(msg)
+            es = data.__odata__
+            insert_data = es.data_for_insert()
+
+            insert_data["ApplicantsLE"] = [{"Id": a.Id} for a in apps_le if apps_le != data.Correspondent]
+            # insert_data["ServiceEndPlanData"] = now.strftime("%Y-%m-%dT%H:%M:%SZ")  # Required
+            # # insert_data["Addressees"] = [{"Id": data.Addressee.Id, "Number": 1}]
+
+            saved_data = self._service.default_context.connection.execute_post(url, insert_data)
+            es.reset()
+            es.connection = self._service.default_context.connection
+            es.persisted = True
+            if saved_data is not None:
+                es.update(saved_data)
+                logging.info('Добавлено дело № %s от %s ID = %s' %
+                             (declar.declar_number, declar.register_date.strftime('%d.%m.%Y'), data.Id))
+            else:
+                return False
+        doc_ids = []
+        if hasattr(declar, "AppliedDocument") and declar.AppliedDocument:
+            for doc in declar.AppliedDocument:
+                if doc.number:
+                    s_str = "contains(Name,'%s') and RegistrationNumber eq '%s' and RegistrationDate eq '%s'" % \
+                            (doc.title, doc.number, doc.date.strftime('%d.%m.%Y'))
                 else:
-                    # Create new company
-                    corr = self._service.entities['ICompanies']()
-                    corr.Name = entity.name if entity.name else entity.full_name
-                    if not corr.Name:
-                        raise DirectumRXException("Company name must be filled")
-                    corr.LegalName = entity.full_name
-                    corr.TIN = entity.inn
-                    corr.TRRC = entity.kpp
-                    corr.LegalAddress = entity.address
-                    corr.Note = 'By integration'
-                    corr.Status = 'Active'
-                    self._service.save(corr)
-                    apps_le.append(corr)
-            # data.append({"Name": 'ApplicantsLE', "Value": apps_le})
-            res = self.search("ICounterparties", "Id eq %s" % apps_le[0].Id, raw=False)
-            data.Correspondent = res[0]
-            data.ApplicantsLE = apps_le
-            res = self.search('IContacts', self._service.entities['IContacts'].Company == apps_le[0], raw=False)
-            data.Contact = res[0]  # Required
-        res = self.search('IMunicipalServicesServiceKinds',
-                          "Code eq '119' or contains(ShortName,'119') or contains(FullName,'119')", raw=False)
-        data.ServiceKind = res[0]  # Required
-        now = datetime.datetime.now()
-        now = busday_offset(
-            now, res[0].ProvisionTerm, holidays=country_holidays("RU")) if res[0].TermType == 'WorkDays' \
-            else (now + timedelta(days=res[0].ProvisionTerm))
-        res = self.search('IEmployees', "Id eq %s" % res[0].ServPerformer.Id, raw=False)
-        data.Addressee = res[0]  # Required
-        data.PreparedBy = res[0]
-        data.ManyAddresseesLabel = res[0].Name
-        res = self.search('IDepartments', "Id eq %s" % res[0].Department.Id, raw=False)
-        data.AddresseeDep = res[0]
-        res = self.search('IMailDeliveryMethods', "Name eq 'СМЭВ'", raw=False)
-        data.DeliveryMethod = res[0]  # Required
-        res = self.search('IDocumentKinds', "Name eq 'Дело по оказанию услуг'", raw=False)
-        data.DocumentKind = res[0]
-        res = self.search('IBusinessUnits', "Name eq 'Администрация Уссурийского городского округа'", raw=False)
-        data.BusinessUnit = res[0]
-        res = self.search('IDepartments', "Name eq 'Отдел информатизации'", raw=False)
-        data.Department = res[0]
-        data.IsManyAddressees = False
-        res = self.search('IUsers', "Id eq 13", raw=False)
-        data.Author = res[0]
-        res = self.search('IDocumentRegisters', "Name eq 'Дела по оказанию муниципальных услуг'", raw=False)
-        data.DocumentRegister = res[0]
-        data.RegistrationNumber = "SMEV_TEST"
-        data.Subject = declar.object_address
-        data.LifeCycleState = "Active"
-        data.RegistrationState = "Registered"
-        data.InternalApprovalState = "OnApproval"
-        data.LocationState = "Документ находится в группе регистрации «Муниципальные услуги»."
-        data.LastVersionApproved = False
-        data.HasRelations = False
-        data.HasVersions = False
-        data.VersionsLocked = False
-        data.HasPublicBody = False
-        data.IsReturnRequired = False
-        data.IsHeldByCounterParty = False
-        data.Name = ("Дело по оказанию услуг №%s от %s" %
-                     (declar.declar_number, declar.register_date.strftime("%d.%m.%Y")))  # Required
+                    s_str = ("contains(Name,'%s') and (RegistrationNumber eq '' or RegistrationNumber eq null)"
+                             " and RegistrationDate eq '%s'") % (doc.title, doc.date.strftime('%d.%m.%Y'))
+                res = self.search('IAddendums', s_str)
+                if not len(res):
+                    doc_ids.append(str(self.__upload_doc(
+                        doc_getter, doc, files, data.Id, declar)))
+        elif files:
+            class D:
+                pass
+            for file_name, file_path in files.items():
+                fn, ext = path.splitext(file_name)
+                with open(file_path, 'rb') as f:
+                    doc_data = (f.read(), ext[1:].lower() if ext else 'txt')
+                remove(file_path)
+                doc = D()
+                doc.number = ''
+                doc.date = datetime.date.today()
+                doc.title = fn
+                res = self.add_doc(doc, doc_data[1], doc_data[0])
+                # bind document with declar
+                params = [('ID', declar_id), ('DocID', res)]
+                self.run_script('BindEDocDPbyID', params)
+                doc_ids.append(str(res))
 
-        # data.append({"Name": 'Status', "Value": 'Active'})
-        # rx.update_reference('IMunicipalServicesServiceCases', data=data)
-        # return self._service.save(data)
-        url = data.__odata_url__()
-        if url is None:
-            msg = 'Cannot insert Entity that does not belong to EntitySet: {0}'.format(entity)
-            raise ODataError(msg)
-        es = data.__odata__
-        insert_data = es.data_for_insert()
+        # Send notification about new docs
+        if doc_ids:
+            params = [('ID', data.Id),
+                      ('Doc_IDs', ';'.join(doc_ids))]
+            res = self.run_script('notification_add_docs', params)
+            logging.info('Отправлено уведомление ID = %s' % res)
+        elif files:
+            for file_name, file_path in files.items():
+                try:
+                    remove(file_path)
+                except:
+                    pass
+        return data.Id
 
-        del insert_data["ApplicantsLE@odata.bind"]
-        insert_data["ApplicantsLE"] = [{"Id": a.Id} for a in apps_le]
-        insert_data['DocumentDate'] = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")
-        insert_data["MFCRegDate"] = declar.register_date.strftime("%Y-%m-%dT%H:%M:%SZ")
-        insert_data["RegistrationDate"] = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")
-        insert_data["Modified"] = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")
-        insert_data["Created"] = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")
-        insert_data["ServiceEndPlanData"] = now.strftime("%Y-%m-%dT%H:%M:%SZ")
-        insert_data["Versions"] = []
-        insert_data["Parameters"] = []
-        insert_data["Tracking"] = []
-        insert_data["Addressees"] = [{"Id": data.Addressee.Id, "Number": 1}]
-
-        saved_data = self._service.default_context.connection.execute_post(url, insert_data)
-        es.reset()
-        es.connection = self._service.default_context.connection
-        es.persisted = True
-        if saved_data is not None:
-            es.update(saved_data)
-            logging.debug("Declar id = %s" % data.Id)
 
     def run_script(self, script_name, params=()):
         raise DirectumRXException("Not released yet")
@@ -225,6 +243,19 @@ class DirectumRX:
     def update_elk_status(self, data):
         raise DirectumRXException("Not released yet")
 
+    def add_doc(self, requisites, data_format, data):
+        doc = self._service.entities['IAddendums']()
+        doc.Name = requisites.title
+        doc.RegistrationNumber = requisites.number
+        doc.RegistrationDate = requisites.date
+        res = self.search("IAssociatedApplications", "Extension eq '%s'" % data_format)
+        doc.Versions(res[0]).Body = data
+        self._service.save(doc)
+        logging.info('Добавлен документ: %s № %s от %s = %s' % (requisites.title, requisites.number,
+                                                                requisites.date.strftime('%d.%m.%Y'), doc.Id))
+        logging.debug("Doc ID = %s" % doc.Id)
+        return doc.Id
+
 
 if __name__ == '__main__':
     logging.basicConfig(
@@ -241,52 +272,22 @@ if __name__ == '__main__':
 
     url = "https://rxtest.adm-ussuriisk.ru/Integration/odata/"
     rx = DirectumRX(url, 'Service User', '[1AnAr1]')
-    # res = rx.search('IMunicipalServicesServiceCases', 'ServEndDateFact eq null', order_by='Created', ascending=False)
-    # for r in res:
-    #     print(r)
-    # print(rx._service.entities.keys())
-    # exit()
-    # pers = rx._service.entities['IPersons']
-    # res = rx.search(
-    #     'IPersons', Query.and_(pers.FirstName == 'Илья',
-    #                            Query.and_(pers.MiddleName == 'Владимирович', pers.LastName == 'Елисеев')),
-    #     order_by=pers.FirstName.asc(), raw=False)
-    # res = rx.search(
-    #     'IPersons',
-    #     "FirstName eq 'Илья' and MiddleName eq 'Владимирович' and LastName eq 'Елисеев'",
-    #     order_by="FirstName", raw=False)
-    # for r in res:
-    #     print(r)
-
-    # corr = rx._service.entities['ICompanies']()
-    # corr.Name = 'АйТиСи2'
-    # # corr.LegalName = entity.full_name
-    # # corr.TIN = entity.inn
-    # # corr.TRRC = entity.kpp
-    # # corr.LegalAddress = entity.address
-    # corr.Note = 'By integration'
-    # corr.Status = 'Active'
-    # res = rx.search('IEmployees', "Id eq 64", raw=False)
-    # corr.Responsible = res[0]
-    # res = rx._service.save(corr)
+    # class Declar:
+    #     person = []
+    #     class LE:
+    #         full_name = ''
+    #         name = 'АйТиСи'
+    #         inn = ''
+    #     legal_entity = [LE()]
+    #     declar_number = 'SMEV_TEST'
+    #     register_date = datetime.datetime.now()
+    #     object_address = "г.Уссурийск, ул. Космонавтов, д.15"
+    # res = rx.add_declar(Declar(), '')
     # print(res)
     # exit()
-    class Declar:
-        person = []
-        class LE:
-            full_name = ''
-            name = 'АйТиСи'
-            inn = ''
-        legal_entity = [LE()]
-        declar_number = ''
-        register_date = datetime.datetime.now()
-        object_address = "г.Уссурийск, ул. Космонавтов, д.15"
-    res = rx.add_declar(Declar(), '')
-    print(res)
-    exit()
-    # print(query.raw({'$expand': '*'}))
-    query.options['$expand'] = ['Author', 'DeliveryMethod']
-    # query.expand(declar.Author, declar.DeliveryMethod)
-    for ent in query.all():
-        print(ent.Name, ent.__dict__)
-        print(ent.DeliveryMethod.Name, ent.Author.Name)
+    class Doc:
+        title = "SMEV TEST"
+        number = "111111111"
+        date = datetime.date.today()
+    d = Doc()
+    rx.add_doc(d, "txt", "Test String For Body")
