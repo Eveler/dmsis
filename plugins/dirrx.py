@@ -169,7 +169,7 @@ class DirectumRX:
                 doc.number = ''
                 doc.date = datetime.date.today()
                 doc.title = fn
-                res = self.add_doc(doc, doc_data[1], doc_data[0])
+                res = self.add_doc(doc, doc_data[1], doc_data[0], data)
                 # bind document with declar
                 params = [('ID', declar_id), ('DocID', res)]
                 self.run_script('BindEDocDPbyID', params)
@@ -243,13 +243,22 @@ class DirectumRX:
     def update_elk_status(self, data):
         raise DirectumRXException("Not released yet")
 
-    def add_doc(self, requisites, data_format, data):
+    def add_doc(self, requisites, data_format, data, lead_doc=None):
         doc = self._service.entities['IAddendums']()
+        print(doc.__dict__)
         doc.Name = requisites.title
         doc.RegistrationNumber = requisites.number
         doc.RegistrationDate = requisites.date
+        doc.LeadingDocument = lead_doc
+        doc.HasRelations = False
+        doc.HasVersions = False  # Required
+        doc.VersionsLocked = False  # Required
+        doc.HasPublicBody = False  # Required
+        res = self.search('IDocumentRegisters', "Name eq 'Дела по оказанию муниципальных услуг'", raw=False)
+        doc.DocumentRegister = res[0]  # Required "Журнал регистрации"
+        doc.Created = datetime.datetime.now()
         res = self.search("IAssociatedApplications", "Extension eq '%s'" % data_format)
-        doc.Versions(res[0]).Body = data
+        doc.Versions.append({"Id": res[0], "Body": data})
         self._service.save(doc)
         logging.info('Добавлен документ: %s № %s от %s = %s' % (requisites.title, requisites.number,
                                                                 requisites.date.strftime('%d.%m.%Y'), doc.Id))
@@ -285,9 +294,10 @@ if __name__ == '__main__':
     # res = rx.add_declar(Declar(), '')
     # print(res)
     # exit()
+    res = rx.search("IMunicipalServicesServiceCases", "Id eq 222", raw=False)
     class Doc:
         title = "SMEV TEST"
         number = "111111111"
-        date = datetime.date.today()
+        date = datetime.datetime.now()
     d = Doc()
-    rx.add_doc(d, "txt", "Test String For Body")
+    rx.add_doc(d, "txt", "Test String For Body", res[0])
