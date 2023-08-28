@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import base64
 import datetime
 import logging
 from datetime import timedelta
@@ -125,7 +126,7 @@ class DirectumRX:
             # return self._service.save(data)
             url = data.__odata_url__()
             if url is None:
-                msg = 'Cannot insert Entity that does not belong to EntitySet: {0}'.format(entity)
+                msg = 'Cannot insert Entity that does not belong to EntitySet: {0}'.format(data)
                 raise ODataError(msg)
             es = data.__odata__
             insert_data = es.data_for_insert()
@@ -245,24 +246,26 @@ class DirectumRX:
 
     def add_doc(self, requisites, data_format, data, lead_doc=None):
         doc = self._service.entities['IAddendums']()
-        print(doc.__dict__)
         doc.Name = requisites.title
         doc.RegistrationNumber = requisites.number
         doc.RegistrationDate = requisites.date
         doc.LeadingDocument = lead_doc
         doc.HasRelations = False
-        doc.HasVersions = False  # Required
         doc.VersionsLocked = False  # Required
         doc.HasPublicBody = False  # Required
         res = self.search('IDocumentRegisters', "Name eq 'Дела по оказанию муниципальных услуг'", raw=False)
         doc.DocumentRegister = res[0]  # Required "Журнал регистрации"
         doc.Created = datetime.datetime.now()
-        res = self.search("IAssociatedApplications", "Extension eq '%s'" % data_format)
-        doc.Versions.append({"Id": res[0], "Body": data})
+        doc.HasVersions = True  # Required
         self._service.save(doc)
+        res = self.search("IAssociatedApplications", "Extension eq '%s'" % data_format, raw=False)
+        doc.Versions = [{"Number": 1, "AssociatedApplication": {"Id": res[0].Id},
+                         "Body": {"Value": base64.b64encode(data).decode()}}]
+        self._service.save(doc)
+        # doc.Versions[0].Body = data
+        # self._service.save(doc)
         logging.info('Добавлен документ: %s № %s от %s = %s' % (requisites.title, requisites.number,
                                                                 requisites.date.strftime('%d.%m.%Y'), doc.Id))
-        logging.debug("Doc ID = %s" % doc.Id)
         return doc.Id
 
 
@@ -294,10 +297,17 @@ if __name__ == '__main__':
     # res = rx.add_declar(Declar(), '')
     # print(res)
     # exit()
+    res = rx.search("IAddendums", "Id eq 255", raw=False)
+    logging.debug(res[0].Versions[0].__odata__)
+    res[0].Versions[0].Body = {"Value": base64.b64encode(b"Test String For Body")}
+    rx._service.save(res[0])
+    res = rx.search("IAddendums", "Id eq 257", raw=False)
+    logging.debug(res[0].Versions[0].__odata__)
+    exit()
     res = rx.search("IMunicipalServicesServiceCases", "Id eq 222", raw=False)
     class Doc:
         title = "SMEV TEST"
         number = "111111111"
         date = datetime.datetime.now()
     d = Doc()
-    rx.add_doc(d, "txt", "Test String For Body", res[0])
+    rx.add_doc(d, "txt", b"Test String For Body", res[0])
