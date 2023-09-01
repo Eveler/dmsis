@@ -246,10 +246,11 @@ class DirectumRX:
 
     def add_doc(self, requisites, data_format, data, lead_doc=None):
         doc = self._service.entities['IAddendums']()
-        doc.Name = requisites.title
+        # doc.Name = requisites.title
         doc.RegistrationNumber = requisites.number
         doc.RegistrationDate = requisites.date
         doc.LeadingDocument = lead_doc
+        doc.Subject = requisites.title
         doc.HasRelations = False
         doc.VersionsLocked = False  # Required
         doc.HasPublicBody = False  # Required
@@ -258,14 +259,26 @@ class DirectumRX:
         doc.Created = datetime.datetime.now()
         doc.HasVersions = True  # Required
         self._service.save(doc)
-        res = self.search("IAssociatedApplications", "Extension eq '%s'" % data_format, raw=False)
-        doc.Versions = [{"Number": 1, "AssociatedApplication": {"Id": res[0].Id},
-                         "Body": {"Value": base64.b64encode(data).decode()}}]
-        self._service.save(doc)
-        # doc.Versions[0].Body = data
-        # self._service.save(doc)
-        logging.info('Добавлен документ: %s № %s от %s = %s' % (requisites.title, requisites.number,
-                                                                requisites.date.strftime('%d.%m.%Y'), doc.Id))
+        try:
+            res = self.search("IAssociatedApplications", "Extension eq '%s'" % data_format, raw=False)
+            doc.Versions = [{"Number": 1, "AssociatedApplication": {"Id": res[0].Id}}]
+            self._service.save(doc)
+            doc = self.search("IAddendums", "Id eq %s" % doc.Id, raw=False)[0]
+            saved_data = self._service.default_context.connection.execute_post(
+                "%s/Versions(%s)/Body" % (doc.__odata__.instance_url, doc.Versions[0].Id),
+                {"Value": base64.b64encode(data).decode()})
+            # doc.__odata__.reset()
+            # doc.__odata__.connection = self._service.default_context.connection
+            # doc.__odata__.persisted = True
+            # if saved_data is not None:
+            #     doc.__odata__.update(saved_data)
+            logging.info('Добавлен документ: %s № %s от %s = %s' % (requisites.title, requisites.number,
+                                                                    requisites.date.strftime('%d.%m.%Y'), doc.Id))
+        except ODataError:
+            logging.warning("Ошибка сохранения документа %s № %s от %s" % (requisites.title, requisites.number,
+                                                                           requisites.date.strftime('%d.%m.%Y')),
+                            exc_info=True)
+            self._service.delete(doc)
         return doc.Id
 
 
@@ -297,13 +310,6 @@ if __name__ == '__main__':
     # res = rx.add_declar(Declar(), '')
     # print(res)
     # exit()
-    res = rx.search("IAddendums", "Id eq 255", raw=False)
-    logging.debug(res[0].Versions[0].__odata__)
-    res[0].Versions[0].Body = {"Value": base64.b64encode(b"Test String For Body")}
-    rx._service.save(res[0])
-    res = rx.search("IAddendums", "Id eq 257", raw=False)
-    logging.debug(res[0].Versions[0].__odata__)
-    exit()
     res = rx.search("IMunicipalServicesServiceCases", "Id eq 222", raw=False)
     class Doc:
         title = "SMEV TEST"
