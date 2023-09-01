@@ -45,6 +45,11 @@ class DirectumRX:
                             'ТКД_ПРОЧИЕ': 'IAddendums',  # 'SimpleDocument', 'OfficialDocument'
                             'ELK_STATUS': 'IMunicipalServicesUPAStatuses'
                             }
+    __d_rx_crit_translate = {"ИД": "Id",
+                             "СпособДост": "DeliveryMethod",
+                             "Дата3": "ServBegDateFact",
+                             "Дата5": "ServEndDateFact",
+                             "LongString56": "NumELK"}
 
     def __init__(self, url, username='', password=''):
         my_auth = HTTPBasicAuth(username, password) if username else None
@@ -171,10 +176,7 @@ class DirectumRX:
                 doc.date = datetime.date.today()
                 doc.title = fn
                 res = self.add_doc(doc, doc_data[1], doc_data[0], data)
-                # bind document with declar
-                params = [('ID', declar_id), ('DocID', res)]
-                self.run_script('BindEDocDPbyID', params)
-                doc_ids.append(str(res))
+                # doc_ids.append(str(res))
 
         # Send notification about new docs
         if doc_ids:
@@ -192,9 +194,17 @@ class DirectumRX:
 
 
     def run_script(self, script_name, params=()):
+        # IMunicipalServicesServiceCases.SendForApproval
         raise DirectumRXException("Not released yet")
 
     def search(self, code, criteria, tp=REF, order_by='', ascending=True, raw=True):
+        if isinstance(criteria, str):
+            for key, val in self.__d_rx_crit_translate.items():
+                if key in criteria:
+                    criteria = criteria.replace(key, val)
+            for f, t in (('<>', ' ne '), ('<=', ' le '), ('>=', ' ge '), ('=', ' eq '), ('<', ' lt '), ('>', ' gt ')):
+                if f in criteria:
+                    criteria = criteria.replace(f, t)
         if code in self.__d_rx_ref_translate:
             code = self.__d_rx_ref_translate[code]
         try:
