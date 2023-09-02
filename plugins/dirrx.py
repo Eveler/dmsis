@@ -205,6 +205,7 @@ class DirectumRX:
             for f, t in (('<>', ' ne '), ('<=', ' le '), ('>=', ' ge '), ('=', ' eq '), ('<', ' lt '), ('>', ' gt ')):
                 if f in criteria:
                     criteria = criteria.replace(f, t)
+
         if code in self.__d_rx_ref_translate:
             code = self.__d_rx_ref_translate[code]
         try:
@@ -231,7 +232,33 @@ class DirectumRX:
 
     def get_result_docs(self, directum_id, crt_name='Администрация Уссурийского городского округа',
                         zip_signed_doc=False, days_old=-3):
-        raise DirectumRXException("Not released yet")
+        class DocumentInfo(object):
+            date = None
+            file_name = None
+            number = None
+            title = None
+            file = None
+            certs = None
+
+        def make_doc(data):
+            ad = DocumentInfo()
+            ad.date = data.RegistrationDate if hasattr(data, "RegistrationDate") and data.RegistrationDate else data.Created
+            ad.file_name = "%s.%s" % (data.Id, data.AssociatedApplication.Extension)
+            ad.number = data.RegistrationNumber
+            ad.title = data.Subject
+            # Get only last version
+            return ad
+
+        declar = self.search("IMunicipalServicesServiceCases", "Id eq %s" % directum_id, raw=False)
+        if not declar:
+            return declar
+        applied_docs = []
+        if isinstance(declar[0].ResultingDocument, list):
+            for doc in declar[0].ResultingDocument:
+                applied_docs.append(make_doc(doc))
+        else:
+            applied_docs.append(make_doc(declar[0].ResultingDocument))
+        return applied_docs
 
     def get_declar_status_data(self, declar_id=None, fsuids: list = (), permanent_status='6'):
         raise "Not released yet"
