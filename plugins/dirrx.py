@@ -3,7 +3,8 @@ import base64
 import datetime
 import logging
 from datetime import timedelta
-from os import path, remove
+import os
+from tempfile import mkstemp
 
 from holidays import country_holidays
 from numpy import busday_offset
@@ -167,10 +168,10 @@ class DirectumRX:
             class D:
                 pass
             for file_name, file_path in files.items():
-                fn, ext = path.splitext(file_name)
+                fn, ext = os.path.splitext(file_name)
                 with open(file_path, 'rb') as f:
                     doc_data = (f.read(), ext[1:].lower() if ext else 'txt')
-                remove(file_path)
+                os.remove(file_path)
                 doc = D()
                 doc.number = ''
                 doc.date = datetime.date.today()
@@ -187,7 +188,7 @@ class DirectumRX:
         elif files:
             for file_name, file_path in files.items():
                 try:
-                    remove(file_path)
+                    os.remove(file_path)
                 except:
                     pass
         return data.Id
@@ -241,12 +242,36 @@ class DirectumRX:
             certs = None
 
         def make_doc(data):
+            data = self.search("IOfficialDocuments", "Id eq %s" % data.Id, raw=False)[0]
             ad = DocumentInfo()
             ad.date = data.RegistrationDate if hasattr(data, "RegistrationDate") and data.RegistrationDate else data.Created
             ad.file_name = "%s.%s" % (data.Id, data.AssociatedApplication.Extension)
             ad.number = data.RegistrationNumber
             ad.title = data.Subject
             # Get only last version
+            i = len(data.Versions) - 1
+            while i >= 0:
+                if not data.Versions[i].IsHidden:
+                    file, file_n = mkstemp()
+                    try:
+                        version = self._service.default_context.connection.execute_get(
+                            "%s/Versions(%s)?$expand=Body" % (data.__odata__.instance_url, data.Versions[i].Id))
+                        logging.debug(version)
+                        os.write(file, base64.b64decode(version.get('Body', {}).get('Value', '')))
+                        os.close(file)
+                        # TODO: certs = clean_pkcs7(self.run_script('GetEDocCertificates', [('DocID', doc_id)]), crt_name)
+                        certs = None
+                        if zip_signed_doc and certs:
+                            from smev import Adapter
+                            ad.file = Adapter.make_sig_zip(ad.file_name, file_n, certs)
+                        else:
+                            ad.file = file_n
+                            ad.certs = certs
+                    except:
+                        logging.error("Error loading resulting document %s" % data.Name, exc_info=True)
+                        os.close(file)
+                        os.remove(file_n)
+                i -= 1
             return ad
 
         declar = self.search("IMunicipalServicesServiceCases", "Id eq %s" % directum_id, raw=False)
@@ -347,10 +372,5 @@ if __name__ == '__main__':
     # res = rx.add_declar(Declar(), '')
     # print(res)
     # exit()
-    res = rx.search("IMunicipalServicesServiceCases", "Id eq 222", raw=False)
-    class Doc:
-        title = "SMEV TEST"
-        number = "111111111"
-        date = datetime.datetime.now()
-    d = Doc()
-    rx.add_doc(d, "txt", b"Test String For Body", res[0])
+    res = rx.get_result_docs(116)
+    print(res)
