@@ -286,7 +286,101 @@ class DirectumRX:
         return applied_docs
 
     def get_declar_status_data(self, declar_id=None, fsuids: list = (), permanent_status='6'):
-        raise "Not released yet"
+        declar = self.search("IMunicipalServicesServiceCases", "Id eq %s" % declar_id, raw=False)[0]
+        if not permanent_status:
+            status = declar.UPAStatus.Id
+        else:
+            status = permanent_status
+
+        attachments = []
+        for fsuuid in fsuids:
+            attachments.append({'attachment': {'FSuuid': ''.join(fsuuid.keys()) if isinstance(fsuuid, dict) else fsuuid,
+                                               'docTypeId': 'ELK_RESULT'}})
+
+        res = []
+        elk_num = declar.NumELK
+        if elk_num:
+            order = {'orderNumber': declar.RegistrationNumber, 'senderKpp': '251101001',
+                     'senderInn': '2511004094',
+                     'statusHistoryList':
+                         {'statusHistory': {'status': status,
+                                            # 'statusDate': datetime.now().strftime('%Y-%m-%dT%H:%M:%S+10:00')}}}
+                                            'statusDate': (datetime.datetime.now() + timedelta(hours=-10)).strftime(
+                                                '%Y-%m-%dT%H:%M:%S')}}}
+            if attachments:
+                order['attachments'] = attachments
+            res.append({'order': order})
+            return res
+
+        # Get persons
+        users = []
+        for fl in declar.ApplicantsPP:
+            applicant = self._service.default_context.connection.execute_get(
+                "%s/ApplicantsPP(%s)?$expand=Body" % (declar.__odata__.instance_url, fl.Id))
+            series = num = ''
+            if applicant.TIN or (series and num) or applicant.INILA:
+                if applicant.INILA:
+                    if applicant.DateOfBirth:
+                        user = {'userDocSnilsBirthDate': {
+                            'citizenship': '643', 'snils': applicant.INILA.strip(), 'birthDate': applicant.DateOfBirth}}
+                    else:
+                        user = {'userDocSnils': {
+                            'snils': applicant.INILA.strip(), 'lastName': applicant.LastName,
+                            'firstName': applicant.FirstName, 'middleName': applicant.MiddleName, 'citizenship': '643'}}
+                elif applicant.TIN:
+                    user = {'userDocInn': {
+                        'INN': applicant.TIN.strip(),
+                        'lastName': applicant.LastName, 'firstName': applicant.FirstName,
+                        'middleName': applicant.MiddleName, 'citizenship': '643'}}
+                else:
+                    user = {'userPersonalDoc': {
+                        'PersonalDocType': '1', 'series': series, 'number': num, 'lastName': applicant.LastName,
+                        'firstName': applicant.FirstName, 'middleName': applicant.MiddleName, 'citizenship': '643'}}
+                users.append(user)
+        # Get organisations
+        orgs = []
+        for ul in declar.ApplicantsLE:
+            applicant = self._service.default_context.connection.execute_get(
+                "%s/ApplicantsLE(%s)?$expand=Body" % (declar.__odata__.instance_url, ul.Id))
+            if applicant.TIN:
+                orgs.append({'ogrn_inn_UL': {'inn_kpp': {'inn': applicant.TIN.strip()}}})
+            elif applicant.PSRN:
+                orgs.append({'ogrn_inn_UL': {'ogrn': applicant.PSRN.strip()}})
+
+        if users or orgs:
+            for user in users:
+                order = {'user': user, 'senderKpp': '251101001', 'senderInn': '2511004094',
+                         'serviceTargetCode': declar.ServiceKind.Code, 'userSelectedRegion': '00000000',
+                         'orderNumber': declar.RegistrationNumber,
+                         'requestDate': declar.RegistrationDate,
+                         'OfficeInfo': {'ApplicationAcceptance': '4'
+                                        # ЕЛК. Канал приема - Подразделение ведомства (https://esnsi.gosuslugi.ru/classifiers/7213/view/8)
+                                        },
+                         'statusHistoryList': {'statusHistory': {
+                             'status': status,
+                             # 'statusDate': datetime.now().strftime('%Y-%m-%dT%H:%M:%S+10:00')}}}
+                             'statusDate': (datetime.datetime.now() + timedelta(hours=-10)).strftime(
+                                 '%Y-%m-%dT%H:%M:%S')}}}
+                if attachments:
+                    order['attachments'] = attachments
+                res.append({'order': order})
+            for org in orgs:
+                order = {'organization': org, 'senderKpp': '251101001', 'senderInn': '2511004094',
+                         'serviceTargetCode': declar.ServiceKind.Code, 'userSelectedRegion': '00000000',
+                         'orderNumber': declar.RegistrationNumber,
+                         'requestDate': declar.RegistrationDate,
+                         'OfficeInfo': {'ApplicationAcceptance': '4'
+                                        # ЕЛК. Канал приема - Подразделение ведомства (https://esnsi.gosuslugi.ru/classifiers/7213/view/8)
+                                        },
+                         'statusHistoryList': {'statusHistory': {
+                             'status': status,
+                             # 'statusDate': datetime.now().strftime('%Y-%m-%dT%H:%M:%S+10:00')}}}
+                             'statusDate': (datetime.datetime.now() + timedelta(hours=-10)).strftime(
+                                 '%Y-%m-%dT%H:%M:%S')}}}
+                if attachments:
+                    order['attachments'] = attachments
+                res.append({'order': order})
+        return res
 
     def update_reference(self, ref_name, rec_id=None, data: list = None):
         if rec_id:
