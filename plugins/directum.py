@@ -1084,7 +1084,7 @@ class IntegrationServices:
         obj = xml_pack.createElement('Object')
         obj.setAttribute('Type', 'Reference')
         obj.setAttribute('Name', 'ELK_STATUS')
-        code_values = []
+        code_values = name_values = []
         for key, value in data.items():
             if value['name'] == 'Код':
                 code_values = value['values']

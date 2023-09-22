@@ -398,7 +398,28 @@ class DirectumRX:
         return res
 
     def update_elk_status(self, data):
-        raise DirectumRXException("Not released yet")
+        if not data and not isinstance(data, dict):
+            return
+        code_values = name_values = []
+        for key, value in data.items():
+            if value['name'] == 'Код':
+                code_values = value['values']
+            if value['name'] == 'Наименование':
+                name_values = value['values']
+        index = 0
+        while index < len(code_values):
+            res = self.search('IMunicipalServicesUPAStatuss', "StatusID eq '%s'" % code_values[index], raw=True)
+            for r in res:
+                if r.Name != name_values[index]:
+                    r.Name = name_values[index]
+                    self._service.save(r)
+            if not res:
+                elk = self._service.entities['IMunicipalServicesUPAStatuss']()
+                elk.Name = name_values[index]
+                elk.StatusID = code_values[index]
+                elk.Type = "AtWork"
+                self._service.save(elk)
+            index += 1
 
     def add_doc(self, requisites, data_format, data, lead_doc=None):
         doc = self._service.entities['IAddendums']()

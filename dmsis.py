@@ -37,7 +37,7 @@ class IntegrationServiceWrapper:
         self.__use_rx = use_rx
         self.__dir = IntegrationServices(wsdl)
         if use_rx:
-            from plugins.dirrx import DirectumRX, DirectumRXException
+            from plugins.dirrx import DirectumRX
             self.__rx = DirectumRX(url, username, password)
 
     def __with_rx(self, item):
@@ -50,7 +50,7 @@ class IntegrationServiceWrapper:
             res = getattr(self.__rx, item)(*args, **kwargs)
             logging.info(res)
         except:
-            logging.error(exc_info=exc_info())
+            logging.error("Error call rx %s" % item, exc_info=exc_info())
         return getattr(self.__dir, item)(*args, **kwargs)
 
     def __getattr__(self, item):
