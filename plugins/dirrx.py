@@ -44,13 +44,15 @@ class DirectumRX:
                             'ВМУ': 'IMunicipalServicesServiceKinds',
                             'ОРГ': 'ICompanies',
                             'ТКД_ПРОЧИЕ': 'IAddendums',  # 'SimpleDocument', 'OfficialDocument'
-                            'ELK_STATUS': 'IMunicipalServicesUPAStatuses'
+                            'ELK_STATUS': 'IMunicipalServicesUPAStatuses',
+                            'СтартЗадачПоМУ': 'StartDeclar'
                             }
     __d_rx_crit_translate = {"ИД": "Id",
                              "СпособДост": "DeliveryMethod",
                              "Дата3": "ServBegDateFact",
                              "Дата5": "ServEndDateFact",
-                             "LongString56": "NumELK"}
+                             "LongString56": "NumELK",
+                             "ID": "Id"}
 
     def __init__(self, url, username='', password=''):
         my_auth = HTTPBasicAuth(username, password) if username else None
@@ -193,10 +195,20 @@ class DirectumRX:
                     pass
         return data.Id
 
-
     def run_script(self, script_name, params=()):
-        # IMunicipalServicesServiceCases.SendForApproval
-        raise DirectumRXException("Not released yet")
+        script_name = self.__dir_ref_subst(script_name)
+        if isinstance(params, dict):
+            params = {self.__d_rx_crit_translate[key] if key in self.__d_rx_crit_translate else key: val
+                      for key, val in params.items()}
+        else:
+            params = {self.__d_rx_crit_translate[key] if key in self.__d_rx_crit_translate else key: val
+                      for key, value in params}
+        return self._service.functions[script_name](**params)
+
+    def __dir_ref_subst(self, name):
+        if name in self.__d_rx_ref_translate:
+            name = self.__d_rx_ref_translate[name]
+        return name
 
     def search(self, code, criteria, tp=REF, order_by='', ascending=True, raw=True):
         if isinstance(criteria, str):
@@ -207,8 +219,7 @@ class DirectumRX:
                 if f in criteria:
                     criteria = criteria.replace(f, t)
 
-        if code in self.__d_rx_ref_translate:
-            code = self.__d_rx_ref_translate[code]
+        code = self.__dir_ref_subst(code)
         try:
             entity = self._service.entities[code]
         except KeyError:
