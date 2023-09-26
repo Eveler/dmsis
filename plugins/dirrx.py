@@ -55,12 +55,56 @@ class DirectumRX:
                              "ID": "Id"}
 
     def __init__(self, url, username='', password=''):
+        # # Increase logging level by one step to filter unneeded messages from odata module
+        # logging.getLogger('odata.connection').setLevel(logging.getLogger().level + logging.DEBUG)
+        # logging.getLogger('odata.metadata').setLevel(logging.getLogger().level + logging.DEBUG)
+
         my_auth = HTTPBasicAuth(username, password) if username else None
         self._service = ODataService(url, auth=my_auth, reflect_entities=True)
 
+    def add_individual(self, person):
+        pers = self._service.entities['IPersons']()
+        pers.FirstName = person.first_name
+        pers.LastName = person.surname
+        pers.MiddleName = person.patronymic
+        pers.LegalAddress = str(person.fact_address)
+        pers.PostalAddress = str(person.address)
+        pers.DateOfBirth = person.birthdate
+        pers.TIN = person.inn
+        pers.Note = 'Паспорт серия %s № %s выдан %s %s' % (
+            person.passport_serial, person.passport_number, person.passport_date.strftime("%d.%m.%Y"),
+            person.passport_agency)
+        pers.Phones = ', '.join(person.phone)
+        pers.Sex = "Male" if person.sex == 'Муж' else 'Female'
+        pers.INILA = person.snils
+        pers.Status = "Active"
+        pers.Name = '%s %s %s' % (person.surname, person.first_name, person.patronymic)
+        pers.ShortName = '%s %s.%s.' % (person.surname, person.first_name[0].upper(),
+                                        person.patronymic[0].upper())
+        pers.CanExchange = False
+        pers.Nonresident = False
+        self._service.save(pers)
+        logging.info('Добавлен заявитель ФЛ: %s, регистрация: %s' % (pers.Name, pers.LegalAddress))
+        return pers
+
+    def add_legal_entity(self, entity):
+        corr = self._service.entities['ICompanies']()
+        corr.Name = entity.name if entity.name else entity.full_name
+        if not corr.Name:
+            raise DirectumRXException("Company name must be filled")
+        corr.LegalName = entity.full_name
+        corr.TIN = entity.inn
+        corr.TRRC = entity.kpp
+        corr.LegalAddress = entity.address
+        corr.Note = 'By integration'
+        corr.Status = 'Active'
+        self._service.save(corr)
+        logging.info('Добавлен заявитель ЮЛ: %s' % (entity.name if entity.name else entity.full_name))
+        return corr
+
     def add_declar(self, declar, files):
         data = self.search("IMunicipalServicesServiceCases", "RegistrationNumber eq '%s' and MFCRegDate eq %s" %
-                          (declar.declar_number, declar.register_date.strftime("%Y-%m-%dT00:00:00Z")), raw=False)
+                           (declar.declar_number, declar.register_date.strftime("%Y-%m-%dT00:00:00Z")), raw=False)
         if not data:
             data = self._service.entities['IMunicipalServicesServiceCases']()
             # data = [{"Name": 'Note', "Value": 'By integration'}]
@@ -68,15 +112,18 @@ class DirectumRX:
             apps_p = []
             if len(declar.person) > 0:
                 for person in declar.person:
-                    res = self.search(
+                    persons = self.search(
                         'IPersons',
                         "Status eq 'Active' and LastName eq '%s' and FirstName eq '%s'%s%s" %
                         (person.surname, person.first_name,
                          " and MiddleName eq '%s'" % person.patronymic if person.patronymic else '',
                          " and (LegalAddress eq '%s' or LegalAddress eq null)" % person.address), raw=False)
-                data.ApplicantsPP = res
-                # data.append({"Name": 'Correspondent', "Value": res[0]})
-                raise "Not released yet"
+                    if persons:
+                        apps_p.append(persons[0])
+                    else:
+                        apps_p.append(self.add_individual(person))
+                res = self.search("ICounterparties", "Id eq %s" % apps_p[0].Id, raw=False)
+                data.Correspondent = res[0]  # Required "Заявитель"
             # LegalEntity
             apps_le = []
             if len(declar.legal_entity):
@@ -88,19 +135,7 @@ class DirectumRX:
                     if res:
                         apps_le.append(res[0])
                     else:
-                        # Create new company
-                        corr = self._service.entities['ICompanies']()
-                        corr.Name = entity.name if entity.name else entity.full_name
-                        if not corr.Name:
-                            raise DirectumRXException("Company name must be filled")
-                        corr.LegalName = entity.full_name
-                        corr.TIN = entity.inn
-                        corr.TRRC = entity.kpp
-                        corr.LegalAddress = entity.address
-                        corr.Note = 'By integration'
-                        corr.Status = 'Active'
-                        self._service.save(corr)
-                        apps_le.append(corr)
+                        apps_le.append(self.add_legal_entity(entity))
                 res = self.search("ICounterparties", "Id eq %s" % apps_le[0].Id, raw=False)
                 data.Correspondent = res[0]  # Required "Заявитель"
             res = self.search('IMunicipalServicesServiceKinds',
@@ -139,8 +174,8 @@ class DirectumRX:
             es = data.__odata__
             insert_data = es.data_for_insert()
 
-            insert_data["ApplicantsLE"] = [{"Id": a.Id} for a in apps_le if apps_le != data.Correspondent]
-            # insert_data["ServiceEndPlanData"] = now.strftime("%Y-%m-%dT%H:%M:%SZ")  # Required
+            insert_data["ApplicantsLE"] = [{"Id": a.Id} for a in apps_le if a != data.Correspondent]
+            insert_data["ApplicantsPP"] = [{"Id": a.Id} for a in apps_p if a != data.Correspondent]
             # # insert_data["Addressees"] = [{"Id": data.Addressee.Id, "Number": 1}]
 
             saved_data = self._service.default_context.connection.execute_post(url, insert_data)
