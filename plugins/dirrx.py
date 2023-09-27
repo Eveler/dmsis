@@ -14,6 +14,9 @@ from odata import ODataService, ODataError
 from odata.property import SortOrder
 from requests.auth import HTTPBasicAuth
 
+from soapfish import xsd
+from soapfish.xsd_types import XSDDate
+
 
 def add_weekdays(start_date, days: int):
     import operator
@@ -55,6 +58,7 @@ class DirectumRX:
                              "ID": "Id"}
 
     def __init__(self, url, username='', password=''):
+        # TODO: Uncomment after debugging
         # # Increase logging level by one step to filter unneeded messages from odata module
         # logging.getLogger('odata.connection').setLevel(logging.getLogger().level + logging.DEBUG)
         # logging.getLogger('odata.metadata').setLevel(logging.getLogger().level + logging.DEBUG)
@@ -67,14 +71,15 @@ class DirectumRX:
         pers.FirstName = person.first_name
         pers.LastName = person.surname
         pers.MiddleName = person.patronymic
-        pers.LegalAddress = str(person.fact_address)
-        pers.PostalAddress = str(person.address)
+        pers.LegalAddress = str(person.fact_address) if person.fact_address else None
+        pers.PostalAddress = str(person.address) if person.address else None
         pers.DateOfBirth = person.birthdate
         pers.TIN = person.inn
         pers.Note = 'Паспорт серия %s № %s выдан %s %s' % (
             person.passport_serial, person.passport_number, person.passport_date.strftime("%d.%m.%Y"),
             person.passport_agency)
         pers.Phones = ', '.join(person.phone)
+        pers.Email = ', '.join(person.email)
         pers.Sex = "Male" if person.sex == 'Муж' else 'Female'
         pers.INILA = person.snils
         pers.Status = "Active"
@@ -84,7 +89,7 @@ class DirectumRX:
         pers.CanExchange = False
         pers.Nonresident = False
         self._service.save(pers)
-        logging.info('Добавлен заявитель ФЛ: %s, регистрация: %s' % (pers.Name, pers.LegalAddress))
+        logging.info('Добавлен заявитель ФЛ: %s, регистрация: %s, Id: %s' % (pers.Name, pers.LegalAddress, pers.Id))
         return pers
 
     def add_legal_entity(self, entity):
@@ -95,7 +100,7 @@ class DirectumRX:
         corr.LegalName = entity.full_name
         corr.TIN = entity.inn
         corr.TRRC = entity.kpp
-        corr.LegalAddress = entity.address
+        corr.LegalAddress = str(entity.address) if entity.address else None
         corr.Note = 'By integration'
         corr.Status = 'Active'
         self._service.save(corr)
@@ -117,7 +122,9 @@ class DirectumRX:
                         "Status eq 'Active' and LastName eq '%s' and FirstName eq '%s'%s%s" %
                         (person.surname, person.first_name,
                          " and MiddleName eq '%s'" % person.patronymic if person.patronymic else '',
-                         " and (LegalAddress eq '%s' or LegalAddress eq null)" % person.address), raw=False)
+                         " and ((PostalAddress eq '%(addr)s' or PostalAddress eq null) "
+                         "or (LegalAddress eq '%(addr)s' or LegalAddress eq null))" % {"addr": person.address}),
+                        raw=False)
                     if persons:
                         apps_p.append(persons[0])
                     else:
@@ -139,7 +146,13 @@ class DirectumRX:
                 res = self.search("ICounterparties", "Id eq %s" % apps_le[0].Id, raw=False)
                 data.Correspondent = res[0]  # Required "Заявитель"
             res = self.search('IMunicipalServicesServiceKinds',
-                              "Code eq '119' or contains(ShortName,'119') or contains(FullName,'119')", raw=False)
+                              "Code eq '%(cod)s' or contains(ShortName,'%(cod)s') or contains(FullName,'%(cod)s')" %
+                              {"cod": declar.service}, raw=False)
+            # TODO: For debug. Remove
+            if not res:
+                res = self.search('IMunicipalServicesServiceKinds',
+                            "Code eq '119' or contains(ShortName,'119') or contains(FullName,'119')", raw=False)
+            #####################
             data.ServiceKind = res[0]  # Required "Услуга"
             now = datetime.datetime.now()
             holidays = country_holidays("RU")
@@ -153,14 +166,16 @@ class DirectumRX:
             res = self.search('IDocumentRegisters', "Name eq 'Дела по оказанию муниципальных услуг'", raw=False)
             data.DocumentRegister = res[0]  # Required "Журнал регистрации"
             data.RegistrationNumber = declar.declar_number
-            data.Subject = declar.object_address
+            data.Subject = str(declar.object_address) if declar.object_address else None
             data.HasRelations = False
             data.HasVersions = False  # Required
             data.VersionsLocked = False  # Required
             data.HasPublicBody = False  # Required
             data.Name = ("Дело по оказанию услуг №%s от %s" %
                          (declar.declar_number, declar.register_date.strftime("%d.%m.%Y")))  # Required
-            data.MFCRegDate = declar.register_date  # Required
+            data.MFCRegDate = datetime.datetime(
+                declar.register_date.year, declar.register_date.month, declar.register_date.day) \
+                if isinstance(declar.register_date, (XSDDate, xsd.Date)) else declar.register_date  # Required
             data.RegistrationDate = datetime.datetime.now()  # Required "Дата регистрации в органе"
             data.Created = datetime.datetime.now()  # Required "Создано"
             data.ServiceEndPlanData = now  # Required
@@ -192,15 +207,15 @@ class DirectumRX:
         if hasattr(declar, "AppliedDocument") and declar.AppliedDocument:
             for doc in declar.AppliedDocument:
                 if doc.number:
-                    s_str = "contains(Name,'%s') and RegistrationNumber eq '%s' and RegistrationDate eq '%s'" % \
-                            (doc.title, doc.number, doc.date.strftime('%d.%m.%Y'))
+                    s_str = "contains(Name,'%s') and RegistrationNumber eq '%s' and RegistrationDate eq %s" % \
+                            (doc.title, doc.number, doc.date.strftime('%Y-%m-%d'))
                 else:
                     s_str = ("contains(Name,'%s') and (RegistrationNumber eq '' or RegistrationNumber eq null)"
-                             " and RegistrationDate eq '%s'") % (doc.title, doc.date.strftime('%d.%m.%Y'))
+                             " and RegistrationDate eq %s") % (doc.title, doc.date.strftime('%Y-%m-%d'))
                 res = self.search('IAddendums', s_str)
-                if not len(res):
-                    doc_ids.append(str(self.__upload_doc(
-                        doc_getter, doc, files, data.Id, declar)))
+                if not res:
+                    res = self.__upload_doc(None, doc, files, data.Id, declar)
+                    # doc_ids.append(str(res))
         elif files:
             class D:
                 pass
@@ -229,6 +244,48 @@ class DirectumRX:
                 except:
                     pass
         return data.Id
+
+    def __upload_doc(self, doc_getter, doc, files, declar_id, declar, i=0):
+        if doc_getter:
+            doc_data = doc_getter(doc.url, doc.file_name)
+        elif hasattr(doc, 'file') and doc.file:
+            fn, ext = os.path.splitext(doc.file_name)
+            with open(doc.file, 'rb') as f:
+                doc_data = (f.read(), ext[1:].lower() if ext else 'txt')
+        elif hasattr(declar, 'files') and declar.files:
+            found = False
+            for file_path, file_name in declar.files:
+                if file_name.lower() == doc.file_name.lower():
+                    found = file_path
+            if not found:
+                found, file_name = declar.files[i]
+            fn, ext = os.path.splitext(doc.file_name)
+            with open(found, 'rb') as f:
+                doc_data = (f.read(), ext[1:] if ext else 'txt')
+        elif files:
+            file_name = doc.file_name if doc.file_name else doc.url
+            fn, ext = os.path.splitext(file_name)
+            found = files.get(file_name)
+            if not found:
+                found = files.get(fn + '.zip')
+                ext = '.zip'
+            if not found:
+                found = files.get(fn + '..zip')
+                ext = '.zip'
+            if not found:
+                raise DirectumRXException("Cannot find file '%s' in %s" % (file_name, files))
+            try:
+                with open(found, 'rb') as f:
+                    doc_data = (
+                        f.read(), ext[1:].lower() if ext else 'txt')
+                os.remove(found)
+            except FileNotFoundError:
+                logging.warning("Cannot find file '%s'" % file_name, exc_info=True)
+                doc_data = (b'No file', 'txt')
+        else:
+            doc_data = (b'No file', 'txt')
+        res = self.add_doc(doc, doc_data[1], doc_data[0])
+        return res
 
     def run_script(self, script_name, params=()):
         script_name = self.__dir_ref_subst(script_name)
@@ -332,7 +389,11 @@ class DirectumRX:
         return applied_docs
 
     def get_declar_status_data(self, declar_id=None, fsuids: list = (), permanent_status='6'):
-        declar = self.search("IMunicipalServicesServiceCases", "Id eq %s" % declar_id, raw=False)[0]
+        declar = self.search("IMunicipalServicesServiceCases", "Id eq %s" % declar_id, raw=False)
+        if declar:
+            declar = declar[0]
+        else:
+            return []
         if not permanent_status:
             status = declar.UPAStatus.Id
         else:
