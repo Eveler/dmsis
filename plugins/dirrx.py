@@ -71,8 +71,8 @@ class DirectumRX:
         pers.FirstName = person.first_name
         pers.LastName = person.surname
         pers.MiddleName = person.patronymic
-        pers.LegalAddress = str(person.fact_address) if person.fact_address else None
-        pers.PostalAddress = str(person.address) if person.address else None
+        pers.LegalAddress = str(person.address) if person.address else None
+        pers.PostalAddress = str(person.fact_address) if person.fact_address else None
         pers.DateOfBirth = person.birthdate
         pers.TIN = person.inn
         pers.Note = 'Паспорт серия %s № %s выдан %s %s' % (
@@ -110,9 +110,10 @@ class DirectumRX:
     def add_declar(self, declar, files):
         data = self.search("IMunicipalServicesServiceCases", "RegistrationNumber eq '%s' and MFCRegDate eq %s" %
                            (declar.declar_number, declar.register_date.strftime("%Y-%m-%dT00:00:00Z")), raw=False)
-        if not data:
+        if data:
+            data = data[0]
+        else:
             data = self._service.entities['IMunicipalServicesServiceCases']()
-            # data = [{"Name": 'Note', "Value": 'By integration'}]
             # Individual
             apps_p = []
             if len(declar.person) > 0:
@@ -166,7 +167,7 @@ class DirectumRX:
             res = self.search('IDocumentRegisters', "Name eq 'Дела по оказанию муниципальных услуг'", raw=False)
             data.DocumentRegister = res[0]  # Required "Журнал регистрации"
             data.RegistrationNumber = declar.declar_number
-            data.Subject = str(declar.object_address) if declar.object_address else None
+            data.Subject = str(declar.object_address) if declar.object_address else "Приморский край, г. Уссурийск"
             data.HasRelations = False
             data.HasVersions = False  # Required
             data.VersionsLocked = False  # Required
@@ -214,7 +215,7 @@ class DirectumRX:
                              " and RegistrationDate eq %s") % (doc.title, doc.date.strftime('%Y-%m-%d'))
                 res = self.search('IAddendums', s_str)
                 if not res:
-                    res = self.__upload_doc(None, doc, files, data.Id, declar)
+                    res = self.__upload_doc(None, doc, files, declar, lead_doc=data)
                     # doc_ids.append(str(res))
         elif files:
             class D:
@@ -223,7 +224,8 @@ class DirectumRX:
                 fn, ext = os.path.splitext(file_name)
                 with open(file_path, 'rb') as f:
                     doc_data = (f.read(), ext[1:].lower() if ext else 'txt')
-                os.remove(file_path)
+                # TODO: Uncomment after debug
+                # os.remove(file_path)
                 doc = D()
                 doc.number = ''
                 doc.date = datetime.date.today()
@@ -237,15 +239,16 @@ class DirectumRX:
                       ('Doc_IDs', ';'.join(doc_ids))]
             res = self.run_script('notification_add_docs', params)
             logging.info('Отправлено уведомление ID = %s' % res)
-        elif files:
-            for file_name, file_path in files.items():
-                try:
-                    os.remove(file_path)
-                except:
-                    pass
+        # TODO: Uncomment after debug
+        # elif files:
+            # for file_name, file_path in files.items():
+            #     try:
+            #         os.remove(file_path)
+            #     except:
+            #         pass
         return data.Id
 
-    def __upload_doc(self, doc_getter, doc, files, declar_id, declar, i=0):
+    def __upload_doc(self, doc_getter, doc, files, declar, i=0, lead_doc=None):
         if doc_getter:
             doc_data = doc_getter(doc.url, doc.file_name)
         elif hasattr(doc, 'file') and doc.file:
@@ -276,26 +279,36 @@ class DirectumRX:
                 raise DirectumRXException("Cannot find file '%s' in %s" % (file_name, files))
             try:
                 with open(found, 'rb') as f:
-                    doc_data = (
-                        f.read(), ext[1:].lower() if ext else 'txt')
-                os.remove(found)
+                    doc_data = (f.read(), ext[1:].lower() if ext else 'txt')
+                # TODO: Uncomment after debug
+                # os.remove(found)
             except FileNotFoundError:
                 logging.warning("Cannot find file '%s'" % file_name, exc_info=True)
                 doc_data = (b'No file', 'txt')
         else:
             doc_data = (b'No file', 'txt')
-        res = self.add_doc(doc, doc_data[1], doc_data[0])
+        res = self.add_doc(doc, doc_data[1], doc_data[0], lead_doc)
         return res
 
-    def run_script(self, script_name, params=()):
+    def run_script(self, script_name, params=(), entity=None):
         script_name = self.__dir_ref_subst(script_name)
         if isinstance(params, dict):
             params = {self.__d_rx_crit_translate[key] if key in self.__d_rx_crit_translate else key: val
                       for key, val in params.items()}
         else:
             params = {self.__d_rx_crit_translate[key] if key in self.__d_rx_crit_translate else key: val
-                      for key, value in params}
-        return self._service.functions[script_name](**params)
+                      for key, val in params}
+
+        if entity:
+            if isinstance(entity, str):
+                entity = self._service.entities[entity]
+            func = getattr(entity, script_name)
+            res = func(**params)
+        else:
+            params = ["%s=%s" % (key, "'%s'" % val if isinstance(val, str) else val) for key, val in params.items()]
+            func = "%s%s(%s)" % (self._service.url, script_name, ', '.join(params))
+            res = self._service.default_context.connection.execute_get(func)
+        return res
 
     def __dir_ref_subst(self, name):
         if name in self.__d_rx_ref_translate:
@@ -532,7 +545,8 @@ class DirectumRX:
         doc = self._service.entities['IAddendums']()
         # doc.Name = requisites.title
         doc.RegistrationNumber = requisites.number
-        doc.RegistrationDate = requisites.date
+        doc.RegistrationDate = datetime.datetime(requisites.date.year, requisites.date.month, requisites.date.day) \
+            if isinstance(requisites.date, (XSDDate, xsd.Date)) else requisites.date
         doc.LeadingDocument = lead_doc
         doc.Subject = requisites.title
         doc.HasRelations = False
@@ -594,5 +608,5 @@ if __name__ == '__main__':
     # res = rx.add_declar(Declar(), '')
     # print(res)
     # exit()
-    res = rx.get_result_docs(116)
+    res = rx.run_script('MunicipalServices/StartDeclar', {"Id": 315})
     print(res)
