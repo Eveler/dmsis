@@ -48,7 +48,7 @@ class DirectumRX:
                             'ОРГ': 'ICompanies',
                             'ТКД_ПРОЧИЕ': 'IAddendums',  # 'SimpleDocument', 'OfficialDocument'
                             'ELK_STATUS': 'IMunicipalServicesUPAStatuses',
-                            'СтартЗадачПоМУ': 'StartDeclar'
+                            'СтартЗадачПоМУ': 'MunicipalServices/StartDeclar'
                             }
     __d_rx_crit_translate = {"ИД": "Id",
                              "СпособДост": "DeliveryMethod",
@@ -298,16 +298,34 @@ class DirectumRX:
         else:
             params = {self.__d_rx_crit_translate[key] if key in self.__d_rx_crit_translate else key: val
                       for key, val in params}
-
+        res = None
         if entity:
             if isinstance(entity, str):
                 entity = self._service.entities[entity]
             func = getattr(entity, script_name)
-            res = func(**params)
+            try:
+                res = func(**params)
+            except:
+                logging.warning("Error call %s(%s)" % (script_name, ', '.join(
+                    ["%s=%s" % (key, val) for key, val in params.items()])), exc_info=True)
         else:
-            params = ["%s=%s" % (key, "'%s'" % val if isinstance(val, str) else val) for key, val in params.items()]
-            func = "%s%s(%s)" % (self._service.url, script_name, ', '.join(params))
-            res = self._service.default_context.connection.execute_get(func)
+            if script_name in self._service.functions or script_name in self._service.actions:
+                func = self._service.functions[script_name] if script_name in self._service.functions \
+                    else self._service.actions[script_name]
+                try:
+                    res = func(**params)
+                except:
+                    logging.warning("Error call %s(%s)" % (script_name, ', '.join(
+                        ["%s=%s" % (key, val) for key, val in params.items()])), exc_info=True)
+            else:
+                # https://rxtest.adm-ussuriisk.ru/Integration/odata/MunicipalServices/StartDeclar(Id=315)
+                params = ["%s=%s" % (key, "'%s'" % val if isinstance(val, str) else val)
+                          for key, val in params.items()]
+                func = "%s%s(%s)" % (self._service.url, script_name, ', '.join(params))
+                try:
+                    res = self._service.default_context.connection.execute_get(func)
+                except:
+                    logging.warning("Error call %s(%s)" % (script_name, ', '.join(params)), exc_info=True)
         return res
 
     def __dir_ref_subst(self, name):
@@ -594,7 +612,7 @@ if __name__ == '__main__':
     # http://192.168.0.134/Integration/odata/IMunicipalServicesServiceCases?$expand=*&$count=true&$filter=ServEndDateFact%20eq%20null
 
     url = "https://rxtest.adm-ussuriisk.ru/Integration/odata/"
-    rx = DirectumRX(url, 'Service User', '[1AnAr1]')
+    rx = DirectumRX(url, 'IntegrationService', '[1AnAr1]')
     # class Declar:
     #     person = []
     #     class LE:
@@ -608,5 +626,5 @@ if __name__ == '__main__':
     # res = rx.add_declar(Declar(), '')
     # print(res)
     # exit()
-    res = rx.run_script('MunicipalServices/StartDeclar', {"Id": 315})
+    res = rx.run_script('MunicipalServices/StartDeclar', {"Id": 310})
     print(res)
