@@ -51,7 +51,7 @@ class DirectumRX:
                             'СтартЗадачПоМУ': 'MunicipalServices/StartDeclar'
                             }
     __d_rx_crit_translate = {"ИД": "Id",
-                             "СпособДост": "DeliveryMethod",
+                             "СпособДост": "DeliveryMethod/Id",
                              "Дата3": "ServBegDateFact",
                              "Дата5": "ServEndDateFact",
                              "LongString56": "NumELK",
@@ -338,7 +338,8 @@ class DirectumRX:
             for key, val in self.__d_rx_crit_translate.items():
                 if key in criteria:
                     criteria = criteria.replace(key, val)
-            for f, t in (('<>', ' ne '), ('<=', ' le '), ('>=', ' ge '), ('=', ' eq '), ('<', ' lt '), ('>', ' gt ')):
+            for f, t in (('<>', ' ne '), ('<=', ' le '), ('>=', ' ge '), ('=', ' eq '), ('<', ' lt '),
+                         ('>', ' gt '), (' is ', ' eq ')):
                 if f in criteria:
                     criteria = criteria.replace(f, t)
 
@@ -546,48 +547,46 @@ class DirectumRX:
                 name_values = value['values']
         index = 0
         while index < len(code_values):
-            res = self.search('IMunicipalServicesUPAStatuss', "StatusID eq '%s'" % code_values[index], raw=True)
-            for r in res:
-                if r.Name != name_values[index]:
-                    r.Name = name_values[index]
-                    self._service.save(r)
+            res = self.search('IMunicipalServicesUPAStatuss', "StatusID eq '%s'" % code_values[index], raw=False)
             if not res:
                 elk = self._service.entities['IMunicipalServicesUPAStatuss']()
                 elk.Name = name_values[index]
                 elk.StatusID = code_values[index]
-                elk.Type = "AtWork"
+                name = elk.Name.lower()
+                elk.Type = "Final" if "оказан" in name or "отказ" in name else "AtWork"
+                elk.Status = "Active"
                 self._service.save(elk)
+            else:
+                for r in res:
+                    if r.Name != name_values[index]:
+                        r.Name = name_values[index]
+                        self._service.save(r)
             index += 1
 
     def add_doc(self, requisites, data_format, data, lead_doc=None):
         doc = self._service.entities['IAddendums']()
         # doc.Name = requisites.title
+        doc.HasRelations = False
+        doc.HasVersions = True  # Required
+        doc.VersionsLocked = False  # Required
+        doc.HasPublicBody = False  # Required
+        doc.Created = datetime.datetime.now()
         doc.RegistrationNumber = requisites.number
         doc.RegistrationDate = datetime.datetime(requisites.date.year, requisites.date.month, requisites.date.day) \
             if isinstance(requisites.date, (XSDDate, xsd.Date)) else requisites.date
-        doc.LeadingDocument = lead_doc
         doc.Subject = requisites.title
-        doc.HasRelations = False
-        doc.VersionsLocked = False  # Required
-        doc.HasPublicBody = False  # Required
         res = self.search('IDocumentRegisters', "Name eq 'Дела по оказанию муниципальных услуг'", raw=False)
         doc.DocumentRegister = res[0]  # Required "Журнал регистрации"
-        doc.Created = datetime.datetime.now()
-        doc.HasVersions = True  # Required
+        doc.LeadingDocument = lead_doc
         self._service.save(doc)
         try:
             res = self.search("IAssociatedApplications", "Extension eq '%s'" % data_format, raw=False)
             doc.Versions = [{"Number": 1, "AssociatedApplication": {"Id": res[0].Id}}]
             self._service.save(doc)
             doc = self.search("IAddendums", "Id eq %s" % doc.Id, raw=False)[0]
-            saved_data = self._service.default_context.connection.execute_post(
+            self._service.default_context.connection.execute_post(
                 "%s/Versions(%s)/Body" % (doc.__odata__.instance_url, doc.Versions[0].Id),
                 {"Value": base64.b64encode(data).decode()})
-            # doc.__odata__.reset()
-            # doc.__odata__.connection = self._service.default_context.connection
-            # doc.__odata__.persisted = True
-            # if saved_data is not None:
-            #     doc.__odata__.update(saved_data)
             logging.info('Добавлен документ: %s № %s от %s = %s' % (requisites.title, requisites.number,
                                                                     requisites.date.strftime('%d.%m.%Y'), doc.Id))
         except ODataError:
@@ -612,7 +611,7 @@ if __name__ == '__main__':
     # http://192.168.0.134/Integration/odata/IMunicipalServicesServiceCases?$expand=*&$count=true&$filter=ServEndDateFact%20eq%20null
 
     url = "https://rxtest.adm-ussuriisk.ru/Integration/odata/"
-    rx = DirectumRX(url, 'IntegrationService', '[1AnAr1]')
+    rx = DirectumRX(url, 'Service User', '[1AnAr1]')
     # class Declar:
     #     person = []
     #     class LE:
@@ -626,5 +625,5 @@ if __name__ == '__main__':
     # res = rx.add_declar(Declar(), '')
     # print(res)
     # exit()
-    res = rx.run_script('MunicipalServices/StartDeclar', {"Id": 310})
+    res = rx.run_script('MunicipalServices/StartDeclar', {"Id": 340})
     print(res)
