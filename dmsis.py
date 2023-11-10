@@ -24,7 +24,7 @@ if 'win32' in platform:
 
 import requests
 from db import Db
-from plugins.directum import IntegrationServices, IntegrationServicesException
+from plugins import IntegrationServices, IntegrationServicesException, DirectumRXException
 from smev import Adapter
 from twisted.internet import task, reactor
 from twisted.python import log
@@ -60,10 +60,10 @@ class IntegrationServiceWrapper:
 
 
 class Integration:
-    def __init__(self, use_config=True, config_path='./dmsis.ini', use_rx=False):
-        self.__smev = None
-        self.__directum = None
+    def __init__(self, use_config=True, config_path='./dmsis.ini', use_rx=False, dir_with_rx=False):
+        self.__smev = self.__directum = self.__rx = None
         self.__use_rx = use_rx
+        self.__dir_with_rx = dir_with_rx
         logging.basicConfig(
             format='%(asctime)s %(name)s:%(module)s(%(lineno)d): '
                    '%(levelname)s: %(message)s', level=logging.INFO)
@@ -75,8 +75,7 @@ class Integration:
             self.smev_ftp = "ftp://smev3-d.test.gosuslugi.ru/"
             self.directum_wsdl = "http://snadb:8082/IntegrationService.svc?singleWsdl"
             self.rx_url = "http://rxtest.adm-ussuriisk.ru/Integration/odata/" if use_rx else None
-            self.__use_rx = use_rx
-            self.__rx_user = ''
+            self.__rx_user = 'Service User'
             self.__rx_pass = ''
             self.smev_uri = 'urn://augo/smev/uslugi/1.0.0'
             self.local_name = 'directum'
@@ -105,12 +104,32 @@ class Integration:
         self.db = Db()
 
     @property
+    def use_dir(self):
+        return (self.__dir_with_rx and self.__use_rx) or self.__dir_with_rx or not self.__use_rx
+
+    @property
+    def use_rx(self):
+        return self.__use_rx
+
+    @property
+    def rx(self):
+        if self.__rx and self.__use_rx:
+            return self.__rx
+        if self.__use_rx:
+            try:
+                from plugins.dirrx import DirectumRX
+                self.__rx = DirectumRX(self.rx_url, self.__rx_user, self.__rx_pass)
+            except Exception:
+                self.report_error()
+        return self.__rx
+    @property
     def directum(self):
         if not self.__directum:
             try:
-                self.__directum = IntegrationServiceWrapper(self.directum_wsdl, self.rx_url, self.__use_rx,
-                                                            self.__rx_user, self.__rx_pass) \
-                    if self.__use_rx else IntegrationServices(self.directum_wsdl)
+                # self.__directum = IntegrationServiceWrapper(self.directum_wsdl, self.rx_url, self.__use_rx,
+                #                                             self.__rx_user, self.__rx_pass) \
+                #     if self.__use_rx else IntegrationServices(self.directum_wsdl)
+                self.__directum = IntegrationServices(self.directum_wsdl)
             except Exception:
                 self.report_error()
 
@@ -148,58 +167,44 @@ class Integration:
         try:
             for declar, files, reply_to, uuid in self.db.all_declars_as_xsd():
                 try:
-                    res = self.directum.add_declar(declar, files=files)
-                    self.db.add_update(uuid, declar.declar_number,
-                                       reply_to, directum_id=res)
+                    if self.use_rx:
+                        res = self.rx.add_declar(declar, files)
+                        self.db.add_update(uuid, declar.declar_number, reply_to, directum_id=res)
+                    if self.use_dir:
+                        res1 = self.directum.add_declar(declar, files=files)
+                        self.db.add_update(uuid, declar.declar_number, reply_to, directum_id=res1)
+                        res = '%s, rx id = %s' % (res1, res) if self.__use_rx else res1
+                        try:
+                            params = [('ID', res)]
+                            self.directum.run_script('СтартЗадачПоМУ', params)
+                        except:
+                            logging.warning('Error while run directum`s script "СтартЗадачПоМУ"', exc_info=True)
+                        sent = True
                     logging.info('Добавлено/обновлено дело с ID = %s' % res)
                     self.db.delete_declar(uuid)
-                    sent = True
                     try:
                         self.smev.send_ack(uuid)
                     except:
-                        logging.warning(
-                            'Failed to send AckRequest.', exc_info=True)
-                    try:
-                        params = [('ID', res)]
-                        self.directum.run_script('СтартЗадачПоМУ', params)
-                    except:
-                        logging.warning('Error while run directum`s script '
-                                        '"СтартЗадачПоМУ"', exc_info=True)
-                    # try:
-                    #     params = ['ID', res]
-                    #     self.directum.run_script('СтартЗадачПоМУ', params)
-                    # except:
-                    #     logging.warning('Error while run directum`s script '
-                    #                     '"СтартЗадачПоМУ"', exc_info=True)
-                except IntegrationServicesException as e:
+                        logging.warning('Failed to send AckRequest.', exc_info=True)
+                except (IntegrationServicesException, DirectumRXException) as e:
                     if "Услуга не найдена" in e.message:
                         logging.warning(
                             "Услуга '%s' не найдена. Дело № %s от %s" %
-                            (declar.service, declar.declar_number,
-                             declar.register_date.strftime('%d.%m.%Y')))
+                            (declar.service, declar.declar_number, declar.register_date.strftime('%d.%m.%Y')))
                         self.smev.send_ack(uuid, 'false')
                         self.smev.send_response(reply_to, declar.declar_number,
-                                                declar.register_date.strftime(
-                                                    '%d.%m.%Y'), 'ERROR',
+                                                declar.register_date.strftime('%d.%m.%Y'), 'ERROR',
                                                 "Услуга '%s' не найдена" % declar.service)
                         self.db.delete_declar(uuid)
                     else:
-                        logging.warning(
-                            'Failed to send saved data to DIRECTUM.',
-                            exc_info=True)
-                # except FileNotFoundError:
-                #     self.db.delete_declar(uuid)
+                        logging.warning('Failed to send saved data to DIRECTUM.', exc_info=True)
                 except:
-                    logging.warning(
-                        'Failed to send saved data to DIRECTUM.',
-                        exc_info=True)
+                    logging.warning('Failed to send saved data to DIRECTUM.', exc_info=True)
             if sent:
                 try:
                     self.directum.run_script('СтартЗадачПоМУ')
                 except:
-                    logging.warning(
-                        'Error while run directum`s script "СтартЗадачПоМУ"',
-                        exc_info=True)
+                    logging.warning('Error while run directum`s script "СтартЗадачПоМУ"', exc_info=True)
         except Exception:
             self.report_error()
             self.db.rollback()
@@ -213,49 +218,38 @@ class Integration:
                 declar, uuid, reply_to, files = self.smev.get_request(
                     uri='urn://augo/smev/uslugi/1.0.0', local_name='declar')
                 if declar:
-                    received = True
                     try:
-                        res = self.directum.add_declar(declar, files=files)
-                        self.db.add_update(uuid, declar.declar_number, reply_to,
-                                           directum_id=res)
+                        if self.use_rx:
+                            res = self.rx.add_declar(declar, files)
+                            self.db.add_update(uuid, declar.declar_number, reply_to, directum_id=res)
+                        if self.use_dir:
+                            res1 = self.directum.add_declar(declar, files=files)
+                            self.db.add_update(uuid, declar.declar_number, reply_to, directum_id=res1)
+                            res = '%s, rx id = %s' % (res1, res) if self.__use_rx else res1
+                            received = True
                         logging.info('Добавлено/обновлено дело с ID = %s' % res)
                         try:
                             self.smev.send_ack(uuid)
                         except:
-                            logging.warning(
-                                'Failed to send AckRequest.', exc_info=True)
+                            logging.warning('Failed to send AckRequest.', exc_info=True)
                         try:
                             params = [('ID', res)]
                             self.directum.run_script('СтартЗадачПоМУ', params)
                         except:
-                            logging.warning('Error while run directum`s script '
-                                            '"СтартЗадачПоМУ"', exc_info=True)
-                        # try:
-                        #     params = ['ID', res]
-                        #     self.directum.run_script('СтартЗадачПоМУ', params)
-                        # except:
-                        #     logging.warning('Error while run directum`s script '
-                        #                     '"СтартЗадачПоМУ"', exc_info=True)
-                    except IntegrationServicesException as e:
+                            logging.warning('Error while run directum`s script "СтартЗадачПоМУ"', exc_info=True)
+                    except (IntegrationServicesException, DirectumRXException) as e:
                         if "Услуга не найдена" in e.message:
                             logging.warning(
                                 "Услуга '%s' не найдена. Дело № %s от %s" %
-                                (declar.service, declar.declar_number,
-                                 declar.register_date.strftime('%d.%m.%Y')))
+                                (declar.service, declar.declar_number, declar.register_date.strftime('%d.%m.%Y')))
                             self.smev.send_ack(uuid)
-                            self.smev.send_response(reply_to,
-                                                    declar.declar_number,
-                                                    declar.register_date.strftime(
-                                                        '%d.%m.%Y'), 'ERROR',
+                            self.smev.send_response(reply_to, declar.declar_number,
+                                                    declar.register_date.strftime('%d.%m.%Y'), 'ERROR',
                                                     "Услуга '%s' не найдена" % declar.service)
                         else:
-                            logging.warning(
-                                'Failed to send saved data to DIRECTUM.',
-                                exc_info=True)
+                            logging.warning('Failed to send saved data to DIRECTUM.', exc_info=True)
                     except Exception:
-                        logging.warning(
-                            'Failed to send data to DIRECTUM. Saving locally.',
-                            exc_info=True)
+                        logging.warning('Failed to send data to DIRECTUM. Saving locally.', exc_info=True)
                         self.db.save_declar(declar, uuid, reply_to, files)
                         self.smev.send_ack(uuid)
                 else:
@@ -269,45 +263,51 @@ class Integration:
                 try:
                     self.directum.run_script('СтартЗадачПоМУ')
                 except:
-                    logging.warning(
-                        'Error while run directum`s script "СтартЗадачПоМУ"',
-                        exc_info=True)
+                    logging.warning('Error while run directum`s script "СтартЗадачПоМУ"', exc_info=True)
 
         # Send final response
         try:
             for request in self.db.all_not_done():
-                declar = self.directum.search('ДПУ', 'ИД=%s' % request.directum_id)
+                text = 'Услуга предоставлена'
+                do_send = False
 
-                # For all requests check if declar`s end date is set
-                if declar and declar[0].get('Дата5'):
-                    applied_docs = self.directum.get_result_docs(request.directum_id, self.crt_name,
-                                                                 self.zip_signed_doc)
+                if self.use_rx:
+                    declars = self.rx.search('ДПУ', 'ИД=%s' % request.directum_id, raw=False)
+                    for declar in declars:
+                        if declar.ServEndDateFact:
+                            applied_docs = self.rx.get_result_docs(
+                                request.directum_id, self.crt_name, self.zip_signed_doc)
+                            do_send = True
 
-                    text = 'Услуга предоставлена'
-                    # if declar[0].get('СтатусУслуги'):
-                    #     state = self.directum.search('СОУ', 'ИД=%s' % declar[0].get('СтатусУслуги'))
-                    #     if state[0].get('Наименование'):
-                    #         text += '. Статус: %s' % state[0].get('Наименование')
+                if self.use_dir:
+                    declar = self.directum.search('ДПУ', 'ИД=%s' % request.directum_id)
 
+                    # For all requests check if declar`s end date is set
+                    if declar and declar[0].get('Дата5'):
+                        applied_docs = self.directum.get_result_docs(
+                            request.directum_id, self.crt_name, self.zip_signed_doc)
+                        do_send = True
+
+                if do_send:
                     try:
-                        res, uuids = self.smev.send_response(request.reply_to, request.declar_num, request.declar_date,
-                                                        text=text, applied_documents=applied_docs,
-                                                        ftp_user=self.ftp_user, ftp_pass=self.ftp_pass)
+                        res, uuids = self.smev.send_response(
+                            request.reply_to, request.declar_num, request.declar_date, text=text,
+                            applied_documents=applied_docs, ftp_user=self.ftp_user, ftp_pass=self.ftp_pass)
                         logging.info(
-                            'Результат услуги отправлен. Дело № %s от %s' %
-                            (request.declar_num, request.declar_date))
+                            'Результат услуги отправлен. Дело № %s от %s' % (request.declar_num, request.declar_date))
                         if applied_docs:
                             logging.info('Прикреплены документы:')
                         for doc in applied_docs:
-                            logging.info(
-                                '%s от %s № %s' %
-                                (doc.title, doc.date[:19],
-                                 doc.number if doc.number else 'б/н'))
+                            logging.info('%s от %s № %s' %
+                                         (doc.title, doc.date[:19], doc.number if doc.number else 'б/н'))
                         request.done = True
                         self.db.commit()
 
                         # Send final status to ELK
-                        st_list = self.directum.get_declar_status_data(request.directum_id, permanent_status='3')
+                        if self.use_rx:
+                            st_list = self.rx.get_declar_status_data(request.directum_id, permanent_status='3')
+                        if self.use_dir:
+                            st_list = self.directum.get_declar_status_data(request.directum_id, permanent_status='3')
                         for status in st_list:
                             files = []
                             for item in uuids:
@@ -320,16 +320,33 @@ class Integration:
                                 self.smev.update_orders_request(status, files)
                             elk_num = self.smev.get_orders_response()
                             if elk_num and elk_num != '0':
-                                res = self.directum.update_reference(
-                                    "ДПУ", request.directum_id, [{'Name': 'LongString56', 'Type': 'String',
-                                                                  'Value': "%s (3)" % elk_num}])
-                                if res[0]:
-                                    logging.warning(str(res) + " when " + str(status))
-                                else:
-                                    logging.info(
-                                        "Отправлен конечный статус для дела Id=%s, num=%s %s. ELK = %s" %
-                                        (request.directum_id, request.declar_num,
-                                         declar[0].get('Наименование'), elk_num))
+                                if self.use_rx:
+                                    try:
+                                        self.rx.update_reference("ДПУ", request.directum_id,
+                                                                 [{'Name': 'NumELK', 'Value': "%s (3)" % elk_num}])
+                                        logging.info(
+                                            "Отправлен конечный статус для дела Id=%s, num=%s %s. ELK = %s" %
+                                            (request.directum_id, request.declar_num,
+                                             declar[0].Name, elk_num))
+                                    except:
+                                        logging.warning("Ошибка обновления кода ELK", exc_info=True)
+                                if self.use_dir:
+                                    res = self.directum.update_reference(
+                                        "ДПУ", request.directum_id,
+                                        [{'Name': 'LongString56', 'Type': 'String', 'Value': "%s (3)" % elk_num}])
+                                    if res[0]:
+                                        logging.warning(str(res) + " when " + str(status))
+                                    else:
+                                        logging.info(
+                                            "Отправлен конечный статус для дела Id=%s, num=%s %s. ELK = %s" %
+                                            (request.directum_id, request.declar_num,
+                                             declar[0].get('Наименование'), elk_num))
+                                if applied_docs:
+                                    logging.info('Прикреплены документы:')
+                                for doc in applied_docs:
+                                    logging.info('%s от %s № %s' %
+                                                 (
+                                                 doc.title, doc.date[:19], doc.number if doc.number else 'б/н'))
                     except:
                         self.report_error()
                     finally:
@@ -362,11 +379,14 @@ class Integration:
                     revisions, max_revision = revisions
                     res = cnsi.get_data('ELK_STATUS', max_revision)
                     try:
-                        res = self.directum.update_elk_status(res)
-                        logging.debug(res)
+                        if self.use_rx:
+                            self.rx.update_elk_status(res)
+                        if self.use_dir:
+                            res = self.directum.update_elk_status(res)
+                            logging.debug(res)
                         logging.info("Обновлён справочник ЕЛК.Статусы")
                     except:
-                        pass
+                        logging.warning("Ошибка при обновлении статуса", exc_info=True)
                     self.db.set_config_value('last_ELK_STATUS_update', date.today())
         except:
             logging.error('Error update ELK_STATUS', exc_info=True)
@@ -375,32 +395,60 @@ class Integration:
         try:
             if not last_update or date.fromisoformat(last_update) < date.today():
                 days = 3 if date.today().weekday() == 0 else 1  # On monday take sunday and saturday into account
-                xml = self.directum.search(
-                    'ДПУ',
-                    'СпособДост<>5652824 and СпособДост<>6953048 and СпособДост<>5652821 and Дата3>=%s and Дата3<%s'
-                    ' and Дата5 is null and LongString56 is null' %
-                    (date.today() - timedelta(days=days), date.today() + timedelta(days=1)), raw=True)
-                recs = xml.findall('.//Object/Record')
-                logging.info("************* Проверка начальных статусов для %s дел" % len(recs))
-                for rec in recs:
-                    declar_id = rec.findtext('.//Section[@Index="0"]/Requisite[@Name="ИД"]')
-                    st_list = self.directum.get_declar_status_data(declar_id)
-                    for status in st_list:
-                        if 'user' in status['order'] or 'organization' in status['order']:
-                            self.smev.create_orders_request(status)
-                        else:
-                            self.smev.update_orders_request(status)
-                        elk_num = self.smev.get_orders_response()
-                        if elk_num and elk_num != '0':
-                            res = self.directum.update_reference(
-                                "ДПУ", declar_id, [{'Name': 'LongString56', 'Type': 'String', 'Value': elk_num}])
-                            if res[0]:
-                                logging.warning(str(res) + " when " + str(status))
+                if self.use_rx:
+                    recs = self.rx.search(
+                        'ДПУ',
+                        'СпособДост<>5652824 and СпособДост<>6953048 and СпособДост<>5652821 and Дата3>=%s and Дата3<%s'
+                        ' and Дата5 is null and LongString56 is null' %
+                        (date.today() - timedelta(days=days), date.today() + timedelta(days=1)), raw=False)
+                    logging.info("************* Проверка начальных статусов для %s дел DirectumRX" % len(recs))
+                    for rec in recs:
+                        st_list = self.rx.get_declar_status_data(rec.Id)
+                        for status in st_list:
+                            if 'user' in status['order'] or 'organization' in status['order']:
+                                self.smev.create_orders_request(status)
                             else:
+                                self.smev.update_orders_request(status)
+                            elk_num = self.smev.get_orders_response()
+                            if elk_num and elk_num != '0':
+                                try:
+                                    self.rx.update_reference(
+                                        "ДПУ", rec.Id, [{'Name': 'NumELK', 'Value': elk_num}])
+                                except:
+                                    logging.warning("Ошибка обновления кода ELK", exc_info=True)
                                 logging.info(
                                     "Отправлен начальный статус для дела Id=%s, num=%s %s. ELK = %s" %
-                                    (declar_id, rec.findtext('.//Section[@Index="0"]/Requisite[@Name="Дополнение3"]'),
-                                     rec.findtext('.//Section[@Index="0"]/Requisite[@Name="Наименование"]'), elk_num))
+                                    (rec.Id, rec.RegistrationNumber, rec.Name, elk_num))
+                if self.use_dir:
+                    xml = self.directum.search(
+                        'ДПУ',
+                        'СпособДост<>5652824 and СпособДост<>6953048 and СпособДост<>5652821 and Дата3>=%s and Дата3<%s'
+                        ' and Дата5 is null and LongString56 is null' %
+                        (date.today() - timedelta(days=days), date.today() + timedelta(days=1)), raw=True)
+                    recs = xml.findall('.//Object/Record')
+                    logging.info("************* Проверка начальных статусов для %s дел" % len(recs))
+                    for rec in recs:
+                        declar_id = rec.findtext('.//Section[@Index="0"]/Requisite[@Name="ИД"]')
+                        st_list = self.directum.get_declar_status_data(declar_id)
+                        for status in st_list:
+                            if 'user' in status['order'] or 'organization' in status['order']:
+                                self.smev.create_orders_request(status)
+                            else:
+                                self.smev.update_orders_request(status)
+                            elk_num = self.smev.get_orders_response()
+                            if elk_num and elk_num != '0':
+                                res = self.directum.update_reference(
+                                    "ДПУ", declar_id,
+                                    [{'Name': 'LongString56', 'Type': 'String', 'Value': elk_num}])
+                                if res[0]:
+                                    logging.warning(str(res) + " when " + str(status))
+                                else:
+                                    logging.info(
+                                        "Отправлен начальный статус для дела Id=%s, num=%s %s. ELK = %s" %
+                                        (declar_id,
+                                         rec.findtext('.//Section[@Index="0"]/Requisite[@Name="Дополнение3"]'),
+                                         rec.findtext('.//Section[@Index="0"]/Requisite[@Name="Наименование"]'),
+                                         elk_num))
         except:
             logging.error('Error send initial status to ELK', exc_info=True)
 
@@ -408,44 +456,84 @@ class Integration:
         try:
             if not last_update or date.fromisoformat(last_update) < date.today():
                 days = 3 if date.today().weekday() == 0 else 1
-                xml = self.directum.search(
-                    'ДПУ',
-                    "СпособДост<>5652824 and СпособДост<>6953048 and СпособДост<>5652821 and Дата5>=%s and Дата5<%s" %
-                    (date.today() - timedelta(days=days), date.today() + timedelta(days=1)), raw=True)
-                recs = xml.findall('.//Object/Record')
-                logging.info("************** Проверка конечных статусов для %s дел" % len(recs))
-                for rec in recs:
-                    elk_num = rec.findtext('.//Section[@Index="0"]/Requisite[@Name="LongString56"]')
-                    if '(3)' in elk_num:
-                        continue
-                    declar_id = rec.findtext('.//Section[@Index="0"]/Requisite[@Name="ИД"]')
-                    st_list = self.directum.get_declar_status_data(declar_id, permanent_status='3')
-                    for status in st_list:
-                        applied_docs = self.directum.get_result_docs(declar_id, self.crt_name, self.zip_signed_doc)
-                        files = []
-                        for ad in applied_docs:
-                            files.append({'path': ad.file, 'name': ad.file_name})
-                        if 'user' in status['order'] or 'organization' in status['order']:
-                            self.smev.create_orders_request(status, files)
-                        else:
-                            self.smev.update_orders_request(status, files)
-                        for item in files:
-                            try:
-                                os.remove(item.get('path'))
-                            except:
-                                pass
-                        elk_num = self.smev.get_orders_response()
-                        if elk_num and elk_num != '0':
-                            res = self.directum.update_reference(
-                                "ДПУ", declar_id,
-                                [{'Name': 'LongString56', 'Type': 'String', 'Value': "%s (3)" % elk_num}])
-                            if res[0]:
-                                logging.warning(str(res) + " when " + str(status))
+                if self.use_rx:
+                    recs = self.rx.search(
+                        'ДПУ', "СпособДост<>5652824 and СпособДост<>6953048 and СпособДост<>5652821"
+                               " and Дата5>=%s and Дата5<%s" %
+                        (date.today() - timedelta(days=days), date.today() + timedelta(days=1)), raw=False)
+                    logging.info("************** Проверка конечных статусов для %s дел DirectumRX" % len(recs))
+                    for rec in recs:
+                        if '(3)' in rec.NumELK:
+                            continue
+                        st_list = self.rx.get_declar_status_data(rec.Id, permanent_status='3')
+                        for status in st_list:
+                            applied_docs = self.rx.get_result_docs(rec.Id, self.crt_name, self.zip_signed_doc)
+                            files = []
+                            for ad in applied_docs:
+                                files.append({'path': ad.file, 'name': ad.file_name})
+                            if 'user' in status['order'] or 'organization' in status['order']:
+                                self.smev.create_orders_request(status, files)
                             else:
+                                self.smev.update_orders_request(status, files)
+                            for item in files:
+                                try:
+                                    os.remove(item.get('path'))
+                                except:
+                                    pass
+                            elk_num = self.smev.get_orders_response()
+                            if elk_num and elk_num != '0':
+                                try:
+                                    self.rx.update_reference(
+                                        "ДПУ", rec.Id, [{'Name': 'NumELK', 'Value': "%s (3)" % elk_num}])
+                                except:
+                                    logging.warning("Ошибка обновления кода ELK", exc_info=True)
                                 logging.info(
                                     "Отправлен конечный статус для дела Id=%s, num=%s %s. ELK = %s" %
-                                    (declar_id, rec.findtext('.//Section[@Index="0"]/Requisite[@Name="Дополнение3"]'),
-                                     rec.findtext('.//Section[@Index="0"]/Requisite[@Name="Наименование"]'), elk_num))
+                                    (rec.Id, rec.RegistrationNumber, rec.Name, elk_num))
+                if self.use_dir:
+                    xml = self.directum.search(
+                        'ДПУ', "СпособДост<>5652824 and СпособДост<>6953048 and СпособДост<>5652821"
+                               " and Дата5>=%s and Дата5<%s" %
+                        (date.today() - timedelta(days=days), date.today() + timedelta(days=1)), raw=True)
+                    recs = xml.findall('.//Object/Record')
+                    logging.info("************** Проверка конечных статусов для %s дел" % len(recs))
+                    for rec in recs:
+                        elk_num = rec.findtext('.//Section[@Index="0"]/Requisite[@Name="LongString56"]')
+                        if '(3)' in elk_num:
+                            continue
+                        declar_id = rec.findtext('.//Section[@Index="0"]/Requisite[@Name="ИД"]')
+                        st_list = self.directum.get_declar_status_data(declar_id, permanent_status='3')
+                        for status in st_list:
+                            applied_docs = self.directum.get_result_docs(declar_id, self.crt_name, self.zip_signed_doc)
+                            files = []
+                            for ad in applied_docs:
+                                files.append({'path': ad.file, 'name': ad.file_name})
+                            if 'user' in status['order'] or 'organization' in status['order']:
+                                self.smev.create_orders_request(status, files)
+                            else:
+                                self.smev.update_orders_request(status, files)
+                            for item in files:
+                                try:
+                                    os.remove(item.get('path'))
+                                except:
+                                    pass
+                            elk_num = self.smev.get_orders_response()
+                            if elk_num and elk_num != '0':
+                                res = self.directum.update_reference(
+                                    "ДПУ", declar_id,
+                                    [{'Name': 'LongString56', 'Type': 'String', 'Value': "%s (3)" % elk_num}])
+                                if res[0]:
+                                    logging.warning(str(res) + " when " + str(status))
+                                else:
+                                    logging.info(
+                                        "Отправлен конечный статус для дела Id=%s, num=%s %s. ELK = %s" %
+                                        (declar_id, rec.findtext('.//Section[@Index="0"]/Requisite[@Name="Дополнение3"]'),
+                                         rec.findtext('.//Section[@Index="0"]/Requisite[@Name="Наименование"]'), elk_num))
+                if applied_docs:
+                    logging.info('Прикреплены документы:')
+                for doc in applied_docs:
+                    logging.info('%s от %s № %s' %
+                                 (doc.title, doc.date[:19], doc.number if doc.number else 'б/н'))
         except:
             logging.error('Error send final status to ELK', exc_info=True)
 
@@ -686,11 +774,13 @@ def main():
                       help="Do the job and exit. Don`t use Twisted manager and "
                            "don`t run continuously.")
     parser.add_option("-u", "--use_rx", action="store_true", dest="rx",
-                      help="Use DirectumRX API also.", default=False)
+                      help="Use DirectumRX odata API.", default=False)
+    parser.add_option("-d", "--dir_with_rx", action="store_true", dest="dir",
+                      help="Use Directum 5.x API when using DirectumRX odata API.", default=False)
     # parser.add_option("--startup")
     (options, args) = parser.parse_args()
     if options.once and options.run:
-        a = Integration(use_rx=options.rx)
+        a = Integration(use_rx=options.rx, dir_with_rx=options.dir)
         a.step()
     elif options.run:
         run()

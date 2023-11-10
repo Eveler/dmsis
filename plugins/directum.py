@@ -1380,11 +1380,14 @@ class IntegrationServices:
             from datetime import datetime, timedelta
             docs = self.get_bind_docs('ДПУ', directum_id)
             card = fromstring(self.proxy.service.GetEntity('ДПУ', directum_id))
-            end_date = datetime.strptime(card.findtext('.//Requisite[@Name="Дата5"]')[:10], '%Y-%m-%d')
+            end_date = card.findtext('.//Requisite[@Name="Дата5"]')
+            if not end_date:
+                return applied_docs
+            end_date = datetime.strptime(end_date[:10], '%Y-%m-%d')
             for doc in docs:
                 if doc.get('TKED') in ('КИК', 'ИК1', 'ИК2', 'ПСИ', 'РД_АУГО', 'ДГД', 'РУАУГО', 'ТКД_ПРОЧИЕ') \
                         and end_date + timedelta(days=days_old) <= \
-                        datetime.strptime(doc.get('ISBEDocModifyDate')[:10], '%Y-%m-%d') <= end_date:
+                        datetime.strptime(doc.get('ISBEDocCreateDate')[:10], '%Y-%m-%d') <= end_date:
                     ad = DocumentInfo()
                     doc_id = doc.get('ID')
                     ad.date = doc.get('ISBEDocCreateDate')
@@ -1432,32 +1435,41 @@ if __name__ == '__main__':
     wsdl = "http://127.0.0.1:8082/IntegrationService.svc?singleWsdl"
     dis = IntegrationServices(wsdl)
 
-    from datetime import date, timedelta
-    xml = dis.search(
-                'ДПУ',
-                'СпособДост<>5652824 and СпособДост<>6953048 and СпособДост<>5652821 and Дата3>=%s and Дата3<%s'
-                ' and Дата5 is null and LongString56 is null' % ('07.04.2023', date.today() + timedelta(days=1)), raw=True)
-    orders = []
-    for rec in xml.findall('.//Object/Record'):
-        declar_id = rec.findtext('.//Section[@Index="0"]/Requisite[@Name="ИД"]')
-        orders.extend(dis.get_declar_status_data(declar_id, ['gggrgr', 'fgghfdhfgh']))
-    print(orders, len(orders), sep="\n")
-
+    # from datetime import date, timedelta
     # xml = dis.search(
-    #     'ДПУ',
-    #     "СпособДост<>5652824 and СпособДост<>6953048 and СпособДост<>5652821 and Дата5>=%s and Дата5<%s" %
-    #     (date.today(), date.today() + timedelta(days=1)), raw=True)
+    #             'ДПУ',
+    #             'СпособДост<>5652824 and СпособДост<>6953048 and СпособДост<>5652821 and Дата3>=%s and Дата3<%s'
+    #             ' and Дата5 is null and LongString56 is null' % ('07.04.2023', date.today() + timedelta(days=1)), raw=True)
     # orders = []
     # for rec in xml.findall('.//Object/Record'):
-    #     elk_num = rec.findtext('.//Section[@Index="0"]/Requisite[@Name="LongString56"]')
-    #     if '(3)' in elk_num:
-    #         print(elk_num)
-    #         import time
-    #         time.sleep(2)
-    #         continue
-    #     id = rec.findtext('.//Section[@Index="0"]/Requisite[@Name="ИД"]')
-    #     res = dis.get_declar_status_data(id, permanent_status='3')
-    #     if res:
-    #         orders.extend(res)
-    # print(orders)
-    # print(len(orders))
+    #     declar_id = rec.findtext('.//Section[@Index="0"]/Requisite[@Name="ИД"]')
+    #     orders.extend(dis.get_declar_status_data(declar_id, ['gggrgr', 'fgghfdhfgh']))
+    # print(orders, len(orders), sep="\n")
+    #
+    # # xml = dis.search(
+    # #     'ДПУ',
+    # #     "СпособДост<>5652824 and СпособДост<>6953048 and СпособДост<>5652821 and Дата5>=%s and Дата5<%s" %
+    # #     (date.today(), date.today() + timedelta(days=1)), raw=True)
+    # # orders = []
+    # # for rec in xml.findall('.//Object/Record'):
+    # #     elk_num = rec.findtext('.//Section[@Index="0"]/Requisite[@Name="LongString56"]')
+    # #     if '(3)' in elk_num:
+    # #         print(elk_num)
+    # #         import time
+    # #         time.sleep(2)
+    # #         continue
+    # #     id = rec.findtext('.//Section[@Index="0"]/Requisite[@Name="ИД"]')
+    # #     res = dis.get_declar_status_data(id, permanent_status='3')
+    # #     if res:
+    # #         orders.extend(res)
+    # # print(orders)
+    # # print(len(orders))
+    res = dis.get_declar_status_data(8852663)
+    res2 = dis.get_result_docs(8852663)
+    print("StatusData:", res)
+    print("ResultDocs:", res2)
+    for ad in res2:
+        try:
+            remove(ad.file)
+        except:
+            pass

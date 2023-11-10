@@ -120,13 +120,16 @@ class DirectumRX:
                 for person in declar.person:
                     persons = self.search(
                         'IPersons',
-                        "Status eq 'Active' and LastName eq '%s' and FirstName eq '%s'%s%s" %
+                        "LastName eq '%s' and FirstName eq '%s'%s%s" %
                         (person.surname, person.first_name,
                          " and MiddleName eq '%s'" % person.patronymic if person.patronymic else '',
                          " and ((PostalAddress eq '%(addr)s' or PostalAddress eq null) "
                          "or (LegalAddress eq '%(addr)s' or LegalAddress eq null))" % {"addr": person.address}),
                         raw=False)
                     if persons:
+                        if persons[0].Status != "Active":
+                            persons[0].Status = "Active"
+                            self._service.save(persons[0])
                         apps_p.append(persons[0])
                     else:
                         apps_p.append(self.add_individual(person))
@@ -136,11 +139,14 @@ class DirectumRX:
             apps_le = []
             if len(declar.legal_entity):
                 for entity in declar.legal_entity:
-                    res = self.search('ICompanies', "Status eq 'Active'%s%s%s" %
+                    res = self.search('ICompanies', "%s%s%s" %
                                       (" and LegalName eq '%s'" % entity.full_name if entity.full_name else '',
                                        " and Name eq '%s'" % entity.name if entity.name else '',
                                        " and TIN eq '%s'" % entity.inn if entity.inn else ''), raw=False)
                     if res:
+                        if res[0].Status != "Active":
+                            res[0].Status = "Active"
+                            self._service.save(res[0])
                         apps_le.append(res[0])
                     else:
                         apps_le.append(self.add_legal_entity(entity))
@@ -154,6 +160,8 @@ class DirectumRX:
                 res = self.search('IMunicipalServicesServiceKinds',
                             "Code eq '119' or contains(ShortName,'119') or contains(FullName,'119')", raw=False)
             #####################
+            if not res:
+                raise DirectumRXException("Услуга не найдена")
             data.ServiceKind = res[0]  # Required "Услуга"
             now = datetime.datetime.now()
             holidays = country_holidays("RU")
@@ -233,7 +241,7 @@ class DirectumRX:
                 res = self.add_doc(doc, doc_data[1], doc_data[0], data)
                 # doc_ids.append(str(res))
 
-        # Send notification about new docs
+        # TODO: Send notification about new docs
         if doc_ids:
             params = [('ID', data.Id),
                       ('Doc_IDs', ';'.join(doc_ids))]
@@ -522,6 +530,7 @@ class DirectumRX:
         return res
 
     def update_reference(self, ref_name, rec_id=None, data: list = None):
+        ref_name = self.__dir_ref_subst(ref_name)
         if rec_id:
             ref = self.search(ref_name, 'Id eq %s' % rec_id, raw=False)
             logging.debug("Found ref: %s" % ref)
@@ -581,6 +590,8 @@ class DirectumRX:
         self._service.save(doc)
         try:
             res = self.search("IAssociatedApplications", "Extension eq '%s'" % data_format, raw=False)
+            if not res:
+                self.search("IAssociatedApplications", "Extension eq 'txt'", raw=False)
             doc.Versions = [{"Number": 1, "AssociatedApplication": {"Id": res[0].Id}}]
             self._service.save(doc)
             doc = self.search("IAddendums", "Id eq %s" % doc.Id, raw=False)[0]
