@@ -58,10 +58,10 @@ class DirectumRX:
                              "ID": "Id"}
 
     def __init__(self, url, username='', password=''):
-        # TODO: Uncomment after debugging
-        # # Increase logging level by one step to filter unneeded messages from odata module
-        # logging.getLogger('odata.connection').setLevel(logging.getLogger().level + logging.DEBUG)
-        # logging.getLogger('odata.metadata').setLevel(logging.getLogger().level + logging.DEBUG)
+        # Increase logging level by one step to filter unneeded messages from odata module
+        logging.getLogger('odata.connection').setLevel(logging.getLogger().level + logging.DEBUG)
+        logging.getLogger('odata.metadata').setLevel(logging.getLogger().level + logging.DEBUG)
+        logging.getLogger('odata.context').setLevel(logging.getLogger().level + logging.DEBUG)
 
         my_auth = HTTPBasicAuth(username, password) if username else None
         self._service = ODataService(url, auth=my_auth, reflect_entities=True)
@@ -155,10 +155,9 @@ class DirectumRX:
             res = self.search('IMunicipalServicesServiceKinds',
                               "Code eq '%(cod)s' or contains(ShortName,'%(cod)s') or contains(FullName,'%(cod)s')" %
                               {"cod": declar.service}, raw=False)
-            # TODO: For debug. Remove
-            if not res:
-                res = self.search('IMunicipalServicesServiceKinds',
-                            "Code eq '119' or contains(ShortName,'119') or contains(FullName,'119')", raw=False)
+            # if not res:
+            #     res = self.search('IMunicipalServicesServiceKinds',
+            #                 "Code eq '119' or contains(ShortName,'119') or contains(FullName,'119')", raw=False)
             #####################
             if not res:
                 raise DirectumRXException("Услуга не найдена")
@@ -232,8 +231,7 @@ class DirectumRX:
                 fn, ext = os.path.splitext(file_name)
                 with open(file_path, 'rb') as f:
                     doc_data = (f.read(), ext[1:].lower() if ext else 'txt')
-                # TODO: Uncomment after debug
-                # os.remove(file_path)
+                os.remove(file_path)
                 doc = D()
                 doc.number = ''
                 doc.date = datetime.date.today()
@@ -247,13 +245,12 @@ class DirectumRX:
                       ('Doc_IDs', ';'.join(doc_ids))]
             res = self.run_script('notification_add_docs', params)
             logging.info('Отправлено уведомление ID = %s' % res)
-        # TODO: Uncomment after debug
-        # elif files:
-            # for file_name, file_path in files.items():
-            #     try:
-            #         os.remove(file_path)
-            #     except:
-            #         pass
+        elif files:
+            for file_name, file_path in files.items():
+                try:
+                    os.remove(file_path)
+                except:
+                    pass
         return data.Id
 
     def __upload_doc(self, doc_getter, doc, files, declar, i=0, lead_doc=None):
@@ -288,8 +285,7 @@ class DirectumRX:
             try:
                 with open(found, 'rb') as f:
                     doc_data = (f.read(), ext[1:].lower() if ext else 'txt')
-                # TODO: Uncomment after debug
-                # os.remove(found)
+                os.remove(found)
             except FileNotFoundError:
                 logging.warning("Cannot find file '%s'" % file_name, exc_info=True)
                 doc_data = (b'No file', 'txt')
