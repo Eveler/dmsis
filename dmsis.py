@@ -157,57 +157,59 @@ class Integration:
         lc = task.LoopingCall(self.step)
         lc.start(self.repeat_every)
 
-    def step(self):
+    def step(self, skip_input=False):
         """
         Sends GetRequest. Then queries Directum for changed status for stored
         requests and sends SendResponse if status changed
         """
-        # Send to DIRECTUM previously saved declars
-        sent = False
-        try:
-            for declar, files, reply_to, uuid in self.db.all_declars_as_xsd():
-                try:
-                    if self.use_rx:
-                        res = self.rx.add_declar(declar, files)
-                        self.db.add_update(uuid, declar.declar_number, reply_to, directum_id=res)
-                    if self.use_dir:
-                        res1 = self.directum.add_declar(declar, files=files)
-                        self.db.add_update(uuid, declar.declar_number, reply_to, directum_id=res1)
-                        res = '%s, rx id = %s' % (res1, res) if self.__use_rx else res1
-                        try:
-                            params = [('ID', res)]
-                            self.directum.run_script('СтартЗадачПоМУ', params)
-                        except:
-                            logging.warning('Error while run directum`s script "СтартЗадачПоМУ"', exc_info=True)
-                        sent = True
-                    logging.info('Добавлено/обновлено дело с ID = %s' % res)
-                    self.db.delete_declar(uuid)
+        if not skip_input:
+            # Send to DIRECTUM previously saved declars
+            sent = False
+            try:
+                for declar, files, reply_to, uuid in self.db.all_declars_as_xsd():
                     try:
-                        self.smev.send_ack(uuid)
-                    except:
-                        logging.warning('Failed to send AckRequest.', exc_info=True)
-                except (IntegrationServicesException, DirectumRXException) as e:
-                    if "Услуга не найдена" in e.message:
-                        logging.warning(
-                            "Услуга '%s' не найдена. Дело № %s от %s" %
-                            (declar.service, declar.declar_number, declar.register_date.strftime('%d.%m.%Y')))
-                        self.smev.send_ack(uuid, 'false')
-                        self.smev.send_response(reply_to, declar.declar_number,
-                                                declar.register_date.strftime('%d.%m.%Y'), 'ERROR',
-                                                "Услуга '%s' не найдена" % declar.service)
+                        if self.use_rx:
+                            res = self.rx.add_declar(declar, files)
+                            self.db.add_update(uuid, declar.declar_number, reply_to, directum_id=res)
+                        if self.use_dir:
+                            res1 = self.directum.add_declar(declar, files=files)
+                            self.db.add_update(uuid, declar.declar_number, reply_to, directum_id=res1)
+                            res = '%s, rx id = %s' % (res1, res) if self.__use_rx else res1
+                            try:
+                                params = [('ID', res)]
+                                self.directum.run_script('СтартЗадачПоМУ', params)
+                            except:
+                                logging.warning('Error while run directum`s script "СтартЗадачПоМУ"', exc_info=True)
+                            sent = True
+                        logging.info('Добавлено/обновлено дело с ID = %s' % res)
                         self.db.delete_declar(uuid)
-                    else:
+                        try:
+                            self.smev.send_ack(uuid)
+                        except:
+                            logging.warning('Failed to send AckRequest.', exc_info=True)
+                    except (IntegrationServicesException, DirectumRXException) as e:
+                        if "Услуга не найдена" in e.message:
+                            logging.warning(
+                                "Услуга '%s' не найдена. Дело № %s от %s" %
+                                (declar.service, declar.declar_number, declar.register_date.strftime('%d.%m.%Y')))
+                            self.smev.send_ack(uuid, 'false')
+                            self.smev.send_response(reply_to, declar.declar_number,
+                                                    declar.register_date.strftime('%d.%m.%Y'), 'ERROR',
+                                                    "Услуга '%s' не найдена" % declar.service)
+                            self.db.delete_declar(uuid)
+                        else:
+                            logging.warning('Failed to send saved data to DIRECTUM.', exc_info=True)
+                    except:
                         logging.warning('Failed to send saved data to DIRECTUM.', exc_info=True)
-                except:
-                    logging.warning('Failed to send saved data to DIRECTUM.', exc_info=True)
-            if sent:
-                try:
-                    self.directum.run_script('СтартЗадачПоМУ')
-                except:
-                    logging.warning('Error while run directum`s script "СтартЗадачПоМУ"', exc_info=True)
-        except Exception:
-            self.report_error()
-            self.db.rollback()
+                if sent:
+                    try:
+                        if self.use_dir:
+                            self.directum.run_script('СтартЗадачПоМУ')
+                    except:
+                        logging.warning('Error while run directum`s script "СтартЗадачПоМУ"', exc_info=True)
+            except Exception:
+                self.report_error()
+                self.db.rollback()
 
         check_requests = requests.get('https://isdayoff.ru/' + today().strftime('%Y%m%d')).text == '0' \
             if self.check_workdays else True
@@ -232,11 +234,12 @@ class Integration:
                             self.smev.send_ack(uuid)
                         except:
                             logging.warning('Failed to send AckRequest.', exc_info=True)
-                        try:
-                            params = [('ID', res)]
-                            self.directum.run_script('СтартЗадачПоМУ', params)
-                        except:
-                            logging.warning('Error while run directum`s script "СтартЗадачПоМУ"', exc_info=True)
+                        if self.use_dir:
+                            try:
+                                params = [('ID', res)]
+                                self.directum.run_script('СтартЗадачПоМУ', params)
+                            except:
+                                logging.warning('Error while run directum`s script "СтартЗадачПоМУ"', exc_info=True)
                     except (IntegrationServicesException, DirectumRXException) as e:
                         if "Услуга не найдена" in e.message:
                             logging.warning(
@@ -259,7 +262,7 @@ class Integration:
             except Exception:
                 self.report_error()
                 self.db.rollback()
-            if received:
+            if received and self.use_dir:
                 try:
                     self.directum.run_script('СтартЗадачПоМУ')
                 except:
@@ -777,11 +780,13 @@ def main():
                       help="Use DirectumRX odata API.", default=False)
     parser.add_option("-d", "--dir_with_rx", action="store_true", dest="dir",
                       help="Use Directum 5.x API when using DirectumRX odata API.", default=False)
+    parser.add_option("-i", "--skip_input", action="store_true", dest="input",
+                      help="Skip input integration.", default=False)
     # parser.add_option("--startup")
     (options, args) = parser.parse_args()
     if options.once and options.run:
         a = Integration(use_rx=options.rx, dir_with_rx=options.dir)
-        a.step()
+        a.step(options.input)
     elif options.run:
         run()
     else:
