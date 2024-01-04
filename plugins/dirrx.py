@@ -381,7 +381,11 @@ class DirectumRX:
             certs = None
 
         def make_doc(data):
-            data = self.search("IOfficialDocuments", "Id eq %s" % data.Id, raw=False)[0]
+            data = self.search("IOfficialDocuments", "Id eq %s" % data['Id'], raw=False)
+            if data:
+                data = data[0]
+            else:
+                raise DirectumRXException("Document ID=%s not found" % data['Id'])
             ad = DocumentInfo()
             ad.date = data.RegistrationDate if hasattr(data, "RegistrationDate") and data.RegistrationDate else data.Created
             ad.file_name = "%s.%s" % (data.Id, data.AssociatedApplication.Extension)
@@ -417,11 +421,11 @@ class DirectumRX:
         if not declar:
             return declar
         applied_docs = []
-        if isinstance(declar[0].ResultingDocument, list):
-            for doc in declar[0].ResultingDocument:
-                applied_docs.append(make_doc(doc))
-        else:
-            applied_docs.append(make_doc(declar[0].ResultingDocument))
+        for doc in declar[0].ResultDocument:
+            doc = self._service.default_context.connection.execute_get(
+                "%s/ResultDocument(%s)?$expand=*" % (declar[0].__odata__.instance_url, doc.Id))
+            if doc['Document']:
+                applied_docs.append(make_doc(doc['Document']))
         return applied_docs
 
     def get_declar_status_data(self, declar_id=None, fsuids: list = (), permanent_status='6'):
@@ -632,5 +636,6 @@ if __name__ == '__main__':
     # res = rx.add_declar(Declar(), '')
     # print(res)
     # exit()
-    res = rx.run_script('MunicipalServices/StartDeclar', {"Id": 340})
+    # res = rx.run_script('MunicipalServices/StartDeclar', {"Id": 340})
+    res = rx.get_result_docs(1239)
     print(res)

@@ -459,6 +459,7 @@ class Integration:
         try:
             if not last_update or date.fromisoformat(last_update) < date.today():
                 days = 3 if date.today().weekday() == 0 else 1
+                applied_docs = []
                 if self.use_rx:
                     recs = self.rx.search(
                         'ДПУ', "СпособДост<>5652824 and СпособДост<>6953048 and СпособДост<>5652821"
