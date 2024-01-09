@@ -254,6 +254,7 @@ class DirectumRX:
         return data.Id
 
     def __upload_doc(self, doc_getter, doc, files, declar, i=0, lead_doc=None):
+        doc_data = ()
         if doc_getter:
             doc_data = doc_getter(doc.url, doc.file_name)
         elif hasattr(doc, 'file') and doc.file:
@@ -288,7 +289,8 @@ class DirectumRX:
                 os.remove(found)
             except FileNotFoundError:
                 logging.warning("Cannot find file '%s'" % file_name, exc_info=True)
-                doc_data = (b'No file', 'txt')
+                if not doc_data:
+                    doc_data = (b'No file', 'txt')
         else:
             doc_data = (b'No file', 'txt')
         res = self.add_doc(doc, doc_data[1], doc_data[0], lead_doc)
@@ -445,8 +447,7 @@ class DirectumRX:
                                                'docTypeId': 'ELK_RESULT'}})
 
         res = []
-        elk_num = declar.NumELK
-        if elk_num:
+        if declar.NumELK:
             order = {'orderNumber': declar.RegistrationNumber, 'senderKpp': '251101001',
                      'senderInn': '2511004094',
                      'statusHistoryList':
