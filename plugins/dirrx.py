@@ -108,8 +108,17 @@ class DirectumRX:
         return corr
 
     def add_declar(self, declar, files):
-        data = self.search("IMunicipalServicesServiceCases", "RegistrationNumber eq '%s' and MFCRegDate eq %s" %
-                           (declar.declar_number, declar.register_date.strftime("%Y-%m-%dT00:00:00Z")), raw=False)
+        try:
+            data = self.search(
+                "IMunicipalServicesServiceCases",
+                "(RegistrationNumber eq '%s' or SMEV_Number eq '%s') and MFCRegDate eq %s" %
+                (declar.declar_number, declar.declar_number,
+                 declar.register_date.strftime("%Y-%m-%dT00:00:00Z")), raw=False)
+        except ODataError:
+            data = self.search(
+                "IMunicipalServicesServiceCases",
+                "RegistrationNumber eq '%s' and MFCRegDate eq %s" %
+                (declar.declar_number, declar.register_date.strftime("%Y-%m-%dT00:00:00Z")), raw=False)
         if data:
             data = data[0]
         else:
@@ -153,12 +162,11 @@ class DirectumRX:
                 res = self.search("ICounterparties", "Id eq %s" % apps_le[0].Id, raw=False)
                 data.Correspondent = res[0]  # Required "Заявитель"
             res = self.search('IMunicipalServicesServiceKinds',
-                              "Code eq '%(cod)s' or contains(ShortName,'%(cod)s') or contains(FullName,'%(cod)s')" %
-                              {"cod": declar.service}, raw=False)
-            # if not res:
-            #     res = self.search('IMunicipalServicesServiceKinds',
-            #                 "Code eq '119' or contains(ShortName,'119') or contains(FullName,'119')", raw=False)
-            #####################
+                              "Code eq '%(cod)s'" % {"cod": declar.service}, raw=False)
+            if not res:
+                res = self.search('IMunicipalServicesServiceKinds',
+                                  "contains(ShortName,'%(cod)s') or contains(FullName,'%(cod)s')" %
+                                  {"cod": declar.service}, raw=False)
             if not res:
                 raise DirectumRXException("Услуга не найдена")
             data.ServiceKind = res[0]  # Required "Услуга"
@@ -187,7 +195,8 @@ class DirectumRX:
             data.RegistrationDate = datetime.datetime.now()  # Required "Дата регистрации в органе"
             data.Created = datetime.datetime.now()  # Required "Создано"
             data.ServiceEndPlanData = now  # Required
-
+            if hasattr(data, "SMEV_Number"):
+                data.SMEV_Number = declar.declar_number
             # rx.update_reference('IMunicipalServicesServiceCases', data=data)
             # return self._service.save(data)
             url = data.__odata_url__()
@@ -464,7 +473,7 @@ class DirectumRX:
         users = []
         for fl in declar.ApplicantsPP:
             applicant = self._service.default_context.connection.execute_get(
-                "%s/ApplicantsPP(%s)?$expand=Body" % (declar.__odata__.instance_url, fl.Id))
+                "%s/ApplicantsPP(%s)?$expand=*" % (declar.__odata__.instance_url, fl.Id))
             series = num = ''
             if applicant.TIN or (series and num) or applicant.INILA:
                 if applicant.INILA:
@@ -489,7 +498,7 @@ class DirectumRX:
         orgs = []
         for ul in declar.ApplicantsLE:
             applicant = self._service.default_context.connection.execute_get(
-                "%s/ApplicantsLE(%s)?$expand=Body" % (declar.__odata__.instance_url, ul.Id))
+                "%s/ApplicantsLE(%s)?$expand=*" % (declar.__odata__.instance_url, ul.Id))
             if applicant.TIN:
                 orgs.append({'ogrn_inn_UL': {'inn_kpp': {'inn': applicant.TIN.strip()}}})
             elif applicant.PSRN:
@@ -575,19 +584,23 @@ class DirectumRX:
 
     def add_doc(self, requisites, data_format, data, lead_doc=None):
         doc = self._service.entities['IAddendums']()
-        # doc.Name = requisites.title
+        doc_date = datetime.datetime(requisites.date.year, requisites.date.month, requisites.date.day) \
+            if isinstance(requisites.date, (XSDDate, xsd.Date)) else requisites.date
+        doc.Name = "%s%s%s" % (requisites.title, " № %s" % requisites.number if requisites.number else '',
+                               " от %s" % doc_date if doc_date else '')
         doc.HasRelations = False
         doc.HasVersions = True  # Required
         doc.VersionsLocked = False  # Required
         doc.HasPublicBody = False  # Required
         doc.Created = datetime.datetime.now()
-        doc.RegistrationNumber = requisites.number
-        doc.RegistrationDate = datetime.datetime(requisites.date.year, requisites.date.month, requisites.date.day) \
-            if isinstance(requisites.date, (XSDDate, xsd.Date)) else requisites.date
+        # doc.RegistrationNumber = requisites.number
+        # doc.RegistrationDate = doc_date
         doc.Subject = requisites.title
-        res = self.search('IDocumentRegisters', "Name eq 'Дела по оказанию муниципальных услуг'", raw=False)
-        doc.DocumentRegister = res[0]  # Required "Журнал регистрации"
+        # res = self.search('IDocumentRegisters', "Name eq 'Дела по оказанию муниципальных услуг'", raw=False)
+        # doc.DocumentRegister = res[0]  # Required "Журнал регистрации"
         doc.LeadingDocument = lead_doc
+        res = self.search("IDocumentKinds", "Id eq 3", raw=False)
+        doc.DocumentKind = res[0]
         self._service.save(doc)
         try:
             res = self.search("IAssociatedApplications", "Extension eq '%s'" % data_format, raw=False)
@@ -599,7 +612,7 @@ class DirectumRX:
             self._service.default_context.connection.execute_post(
                 "%s/Versions(%s)/Body" % (doc.__odata__.instance_url, doc.Versions[0].Id),
                 {"Value": base64.b64encode(data).decode()})
-            logging.info('Добавлен документ: %s № %s от %s = %s' % (requisites.title, requisites.number,
+            logging.info('Добавлен документ: %s № %s от %s Id = %s' % (requisites.title, requisites.number,
                                                                     requisites.date.strftime('%d.%m.%Y'), doc.Id))
         except ODataError:
             logging.warning("Ошибка сохранения документа %s № %s от %s" % (requisites.title, requisites.number,
@@ -638,5 +651,3 @@ if __name__ == '__main__':
     # print(res)
     # exit()
     # res = rx.run_script('MunicipalServices/StartDeclar', {"Id": 340})
-    res = rx.get_result_docs(1239)
-    print(res)
