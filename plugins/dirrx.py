@@ -78,14 +78,32 @@ class DirectumRX:
         pers.Note = 'Паспорт серия %s № %s выдан %s %s' % (
             person.passport_serial, person.passport_number, person.passport_date.strftime("%d.%m.%Y"),
             person.passport_agency)
-        pers.Phones = ', '.join(person.phone)
-        pers.Email = ', '.join(person.email)
+        try:
+            pers.Phones = ', '.join(phone.phone for phone in person.phone)
+        except:
+            try:
+                pers.Phones = ', '.join(person.phone)
+            except:
+                try:
+                    pers.Phones = str(person.phone)
+                except:
+                    pass
+        try:
+            pers.Email = ', '.join(email.email for email in person.email)
+        except:
+            try:
+                pers.Email = ', '.join(person.email)
+            except:
+                try:
+                    pers.Email = str(person.email)
+                except:
+                    pass
         pers.Sex = "Male" if person.sex == 'Муж' else 'Female'
         pers.INILA = person.snils
         pers.Status = "Active"
         pers.Name = '%s %s %s' % (person.surname, person.first_name, person.patronymic)
         pers.ShortName = '%s %s.%s.' % (person.surname, person.first_name[0].upper(),
-                                        person.patronymic[0].upper())
+                                        person.patronymic[0].upper() if person.patronymic else '')
         pers.CanExchange = False
         pers.Nonresident = False
         self._service.save(pers)
@@ -171,12 +189,14 @@ class DirectumRX:
                 raise DirectumRXException("Услуга не найдена")
             data.ServiceKind = res[0]  # Required "Услуга"
             now = datetime.datetime.now()
-            holidays = country_holidays("RU")
-            now = busday_offset(now, res[0].ProvisionTerm, roll='forward', holidays=holidays) \
+            holidays = country_holidays("RU", years=datetime.datetime.now().year)
+            now = busday_offset(now.date(), res[0].ProvisionTerm, roll='forward',
+                                holidays=[day[0] for day in holidays.items()]).astype(datetime.datetime) \
                 if res[0].TermType == 'WorkDays' \
                 else (now + timedelta(days=res[0].ProvisionTerm))
             if now in holidays or now.weekday() > 5:
-                now = busday_offset(now, 1, roll='forward', holidays=holidays)
+                now = busday_offset(now.date(), 1, roll='forward',
+                                    holidays=[day[0] for day in holidays.items()]).astype(datetime.datetime)
             res = self.search('IMailDeliveryMethods', "Name eq 'СМЭВ'", raw=False)
             data.DeliveryMethod = res[0]  # Required "Способ доставки"
             res = self.search('IDocumentRegisters', "Name eq 'Дела по оказанию муниципальных услуг'", raw=False)
