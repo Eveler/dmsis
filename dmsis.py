@@ -467,7 +467,7 @@ class Integration:
                         (date.today() - timedelta(days=days), date.today() + timedelta(days=1)), raw=False)
                     logging.info("************** Проверка конечных статусов для %s дел DirectumRX" % len(recs))
                     for rec in recs:
-                        if '(3)' in rec.NumELK:
+                        if rec.NumELK and '(3)' in rec.NumELK:
                             continue
                         st_list = self.rx.get_declar_status_data(rec.Id, permanent_status='3')
                         for status in st_list:

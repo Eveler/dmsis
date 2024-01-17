@@ -75,9 +75,9 @@ class DirectumRX:
         pers.PostalAddress = str(person.fact_address) if person.fact_address else None
         pers.DateOfBirth = person.birthdate
         pers.TIN = person.inn
-        pers.Note = 'Паспорт серия %s № %s выдан %s %s' % (
-            person.passport_serial, person.passport_number, person.passport_date.strftime("%d.%m.%Y"),
-            person.passport_agency)
+        # pers.Note = 'Паспорт серия %s № %s выдан %s %s' % (
+        #     person.passport_serial, person.passport_number, person.passport_date.strftime("%d.%m.%Y"),
+        #     person.passport_agency)
         try:
             pers.Phones = ', '.join(phone.phone for phone in person.phone)
         except:
@@ -107,6 +107,16 @@ class DirectumRX:
         pers.CanExchange = False
         pers.Nonresident = False
         self._service.save(pers)
+
+        pers_info = self._service.entities['IAUGOPartiesPersonAddInfos']()
+        pers_info.Person = pers
+        pers_info.Status = 'Active'
+        pers_info.Series = person.passport_serial
+        pers_info.Number = person.passport_number
+        pers_info.IssueDate = datetime.datetime.strptime(person.passport_date.strftime("%Y-%m-%d"), "%Y-%m-%d")
+        pers_info.Issued = person.passport_agency
+        self._service.save(pers_info)
+
         logging.info('Добавлен заявитель ФЛ: %s, регистрация: %s, Id: %s' % (pers.Name, pers.LegalAddress, pers.Id))
         return pers
 
@@ -126,17 +136,11 @@ class DirectumRX:
         return corr
 
     def add_declar(self, declar, files):
-        try:
-            data = self.search(
-                "IMunicipalServicesServiceCases",
-                "(RegistrationNumber eq '%s' or SMEV_Number eq '%s') and MFCRegDate eq %s" %
-                (declar.declar_number, declar.declar_number,
-                 declar.register_date.strftime("%Y-%m-%dT00:00:00Z")), raw=False)
-        except ODataError:
-            data = self.search(
-                "IMunicipalServicesServiceCases",
-                "RegistrationNumber eq '%s' and MFCRegDate eq %s" %
-                (declar.declar_number, declar.register_date.strftime("%Y-%m-%dT00:00:00Z")), raw=False)
+        data = self.search(
+            "IMunicipalServicesServiceCases",
+            "(RegistrationNumber eq '%s' or SMEVNumber eq '%s') and MFCRegDate eq %s" %
+            (declar.declar_number, declar.declar_number,
+             declar.register_date.strftime("%Y-%m-%dT00:00:00Z")), raw=False)
         if data:
             data = data[0]
         else:
@@ -167,9 +171,10 @@ class DirectumRX:
             if len(declar.legal_entity):
                 for entity in declar.legal_entity:
                     res = self.search('ICompanies', "%s%s%s" %
-                                      (" and LegalName eq '%s'" % entity.full_name if entity.full_name else '',
-                                       " and Name eq '%s'" % entity.name if entity.name else '',
-                                       " and TIN eq '%s'" % entity.inn if entity.inn else ''), raw=False)
+                                      ("LegalName eq '%s'" % entity.full_name if entity.full_name else '',
+                                       "%sName eq '%s'" % (" or " if entity.full_name else '',
+                                                           entity.name if entity.name else ''),
+                                       " or TIN eq '%s'" % entity.inn if entity.inn else ''), raw=False)
                     if res:
                         if res[0].Status != "Active":
                             res[0].Status = "Active"
@@ -215,8 +220,7 @@ class DirectumRX:
             data.RegistrationDate = datetime.datetime.now()  # Required "Дата регистрации в органе"
             data.Created = datetime.datetime.now()  # Required "Создано"
             data.ServiceEndPlanData = now  # Required
-            if hasattr(data, "SMEV_Number"):
-                data.SMEV_Number = declar.declar_number
+            data.SMEVNumber = declar.declar_number
             # rx.update_reference('IMunicipalServicesServiceCases', data=data)
             # return self._service.save(data)
             url = data.__odata_url__()
@@ -494,42 +498,63 @@ class DirectumRX:
         for fl in declar.ApplicantsPP:
             applicant = self._service.default_context.connection.execute_get(
                 "%s/ApplicantsPP(%s)?$expand=*" % (declar.__odata__.instance_url, fl.Id))
-            series = num = ''
-            if applicant.TIN or (series and num) or applicant.INILA:
-                if applicant.INILA:
-                    if applicant.DateOfBirth:
-                        user = {'userDocSnilsBirthDate': {
-                            'citizenship': '643', 'snils': applicant.INILA.strip(), 'birthDate': applicant.DateOfBirth}}
-                    else:
-                        user = {'userDocSnils': {
-                            'snils': applicant.INILA.strip(), 'lastName': applicant.LastName,
-                            'firstName': applicant.FirstName, 'middleName': applicant.MiddleName, 'citizenship': '643'}}
-                elif applicant.TIN:
-                    user = {'userDocInn': {
-                        'INN': applicant.TIN.strip(),
-                        'lastName': applicant.LastName, 'firstName': applicant.FirstName,
-                        'middleName': applicant.MiddleName, 'citizenship': '643'}}
-                else:
-                    user = {'userPersonalDoc': {
-                        'PersonalDocType': '1', 'series': series, 'number': num, 'lastName': applicant.LastName,
-                        'firstName': applicant.FirstName, 'middleName': applicant.MiddleName, 'citizenship': '643'}}
-                users.append(user)
+            if applicant['Applicant']:
+                add_info = self.search(
+                    "IAUGOPartiesPersonAddInfos", "Person/Id eq %s" % applicant['Applicant']['Id'], raw=False)
+                if add_info:
+                    add_info = add_info[0]
+                    series = add_info.Series
+                    num = add_info.Number
+                    if applicant['Applicant']['TIN'] or (series and num) or applicant['Applicant']['INILA']:
+                        if applicant['Applicant']['INILA']:
+                            if applicant['Applicant']['DateOfBirth']:
+                                user = {'userDocSnilsBirthDate': {
+                                    'citizenship': '643', 'snils': applicant['Applicant']['INILA'].strip(),
+                                    'birthDate': applicant['Applicant']['DateOfBirth'][:10]}}
+                            else:
+                                user = {'userDocSnils': {
+                                    'snils': applicant['Applicant']['INILA'].strip(),
+                                    'lastName': applicant['Applicant']['LastName'],
+                                    'firstName': applicant['Applicant']['FirstName'],
+                                    'middleName': applicant['Applicant']['MiddleName'], 'citizenship': '643'}}
+                        elif applicant['Applicant']['TIN']:
+                            user = {'userDocInn': {
+                                'INN': applicant['Applicant']['TIN'].strip(),
+                                'lastName': applicant['Applicant']['LastName'],
+                                'firstName': applicant['Applicant']['FirstName'],
+                                'middleName': applicant['Applicant']['MiddleName'], 'citizenship': '643'}}
+                        else:
+                            user = {'userPersonalDoc': {
+                                'PersonalDocType': '1', 'series': series, 'number': num,
+                                'lastName': applicant['Applicant']['LastName'],
+                                'firstName': applicant['Applicant']['FirstName'],
+                                'middleName': applicant['Applicant']['MiddleName'], 'citizenship': '643'}}
+                        users.append(user)
         # Get organisations
         orgs = []
         for ul in declar.ApplicantsLE:
             applicant = self._service.default_context.connection.execute_get(
                 "%s/ApplicantsLE(%s)?$expand=*" % (declar.__odata__.instance_url, ul.Id))
-            if applicant.TIN:
-                orgs.append({'ogrn_inn_UL': {'inn_kpp': {'inn': applicant.TIN.strip()}}})
-            elif applicant.PSRN:
-                orgs.append({'ogrn_inn_UL': {'ogrn': applicant.PSRN.strip()}})
+            if applicant['Applicant']:
+                if applicant['Applicant']['TIN']:
+                    orgs.append({'ogrn_inn_UL': {'inn_kpp': {'inn': applicant['Applicant']['TIN'].strip()}}})
+                elif applicant['Applicant']['PSRN']:
+                    orgs.append({'ogrn_inn_UL': {'ogrn': applicant['Applicant']['PSRN'].strip()}})
 
         if users or orgs:
+            service_kind = self.search("IMunicipalServicesServiceKinds",
+                                       "Id eq %s" % declar.ServiceKind.Id, raw=False)[0]
+            while (service_kind.LeadServiceKind and hasattr(service_kind.LeadServiceKind, "Id")
+                   and service_kind.LeadServiceKind.Id):
+                srv = self.search('IMunicipalServicesServiceKinds',
+                                  "Id eq %s" % service_kind.LeadServiceKind.Id, raw=False)
+                if srv:
+                    service_kind = srv[0]
             for user in users:
                 order = {'user': user, 'senderKpp': '251101001', 'senderInn': '2511004094',
-                         'serviceTargetCode': declar.ServiceKind.Code, 'userSelectedRegion': '00000000',
+                         'serviceTargetCode': service_kind.Code, 'userSelectedRegion': '00000000',
                          'orderNumber': declar.RegistrationNumber,
-                         'requestDate': declar.RegistrationDate,
+                         'requestDate': declar.RegistrationDate.strftime('%Y-%m-%dT%H:%M:%S'),
                          'OfficeInfo': {'ApplicationAcceptance': '4'
                                         # ЕЛК. Канал приема - Подразделение ведомства (https://esnsi.gosuslugi.ru/classifiers/7213/view/8)
                                         },
@@ -543,9 +568,9 @@ class DirectumRX:
                 res.append({'order': order})
             for org in orgs:
                 order = {'organization': org, 'senderKpp': '251101001', 'senderInn': '2511004094',
-                         'serviceTargetCode': declar.ServiceKind.Code, 'userSelectedRegion': '00000000',
+                         'serviceTargetCode': service_kind.Code, 'userSelectedRegion': '00000000',
                          'orderNumber': declar.RegistrationNumber,
-                         'requestDate': declar.RegistrationDate,
+                         'requestDate': declar.RegistrationDate.strftime('%Y-%m-%dT%H:%M:%S'),
                          'OfficeInfo': {'ApplicationAcceptance': '4'
                                         # ЕЛК. Канал приема - Подразделение ведомства (https://esnsi.gosuslugi.ru/classifiers/7213/view/8)
                                         },
@@ -563,6 +588,8 @@ class DirectumRX:
         ref_name = self.__dir_ref_subst(ref_name)
         if rec_id:
             ref = self.search(ref_name, 'Id eq %s' % rec_id, raw=False)
+            if ref:
+                ref = ref[0]
             logging.debug("Found ref: %s" % ref)
         else:
             ref = self._service.entities[ref_name]()
