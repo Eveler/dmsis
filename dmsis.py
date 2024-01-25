@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-
+import datetime
 # Twisted reactor sends GetRequest by timer
 # Got requests stored in DB
 
@@ -199,8 +199,6 @@ class Integration:
                             self.db.delete_declar(uuid)
                         else:
                             logging.warning('Failed to send saved data to DIRECTUM.', exc_info=True)
-                    except:
-                        logging.warning('Failed to send saved data to DIRECTUM.', exc_info=True)
                 if sent:
                     try:
                         if self.use_dir:
@@ -301,8 +299,10 @@ class Integration:
                         if applied_docs:
                             logging.info('Прикреплены документы:')
                         for doc in applied_docs:
-                            logging.info('%s от %s № %s' %
-                                         (doc.title, doc.date[:19], doc.number if doc.number else 'б/н'))
+                            logging.info(
+                                '%s от %s № %s' % (
+                                    doc.title, doc.date if isinstance(doc.date, datetime.datetime) else doc.date[:19],
+                                    doc.number if doc.number else 'б/н'))
                         request.done = True
                         self.db.commit()
 
@@ -328,9 +328,8 @@ class Integration:
                                         self.rx.update_reference("ДПУ", request.directum_id,
                                                                  [{'Name': 'NumELK', 'Value': "%s (3)" % elk_num}])
                                         logging.info(
-                                            "Отправлен конечный статус для дела Id=%s, num=%s %s. ELK = %s" %
-                                            (request.directum_id, request.declar_num,
-                                             declar[0].Name, elk_num))
+                                            "Отправлен конечный статус для дела Id=%s, num=%s от %s. ELK = %s" %
+                                            (request.directum_id, request.declar_num, request.declar_date, elk_num))
                                     except:
                                         logging.warning("Ошибка обновления кода ELK", exc_info=True)
                                 if self.use_dir:
@@ -347,9 +346,11 @@ class Integration:
                                 if applied_docs:
                                     logging.info('Прикреплены документы:')
                                 for doc in applied_docs:
-                                    logging.info('%s от %s № %s' %
-                                                 (
-                                                 doc.title, doc.date[:19], doc.number if doc.number else 'б/н'))
+                                    logging.info(
+                                        '%s от %s № %s' % (
+                                            doc.title,
+                                            doc.date if isinstance(doc.date, datetime.datetime) else doc.date[:19],
+                                            doc.number if doc.number else 'б/н'))
                     except:
                         self.report_error()
                     finally:
