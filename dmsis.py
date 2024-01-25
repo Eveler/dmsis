@@ -399,10 +399,11 @@ class Integration:
         try:
             if not last_update or date.fromisoformat(last_update) < date.today():
                 days = 3 if date.today().weekday() == 0 else 1  # On monday take sunday and saturday into account
+                # Excluding ЕПГУ, РПГУ, ФИС ДВ 1ГА
                 if self.use_rx:
                     recs = self.rx.search(
                         'ДПУ',
-                        'СпособДост<>5652824 and СпособДост<>6953048 and СпособДост<>5652821 and Дата3>=%s and Дата3<%s'
+                        'СпособДост<>23 and СпособДост<>25 and СпособДост<>18 and Дата3>=%s and Дата3<%s'
                         ' and Дата5 is null and LongString56 is null' %
                         (date.today() - timedelta(days=days), date.today() + timedelta(days=1)), raw=False)
                     logging.info("************* Проверка начальных статусов для %s дел DirectumRX" % len(recs))
@@ -461,9 +462,10 @@ class Integration:
             if not last_update or date.fromisoformat(last_update) < date.today():
                 days = 3 if date.today().weekday() == 0 else 1
                 applied_docs = []
+                # Excluding ЕПГУ, РПГУ, ФИС ДВ 1ГА
                 if self.use_rx:
                     recs = self.rx.search(
-                        'ДПУ', "СпособДост<>5652824 and СпособДост<>6953048 and СпособДост<>5652821"
+                        'ДПУ', "СпособДост<>23 and СпособДост<>25 and СпособДост<>18"
                                " and Дата5>=%s and Дата5<%s" %
                         (date.today() - timedelta(days=days), date.today() + timedelta(days=1)), raw=False)
                     logging.info("************** Проверка конечных статусов для %s дел DirectumRX" % len(recs))
@@ -537,8 +539,10 @@ class Integration:
                 if applied_docs:
                     logging.info('Прикреплены документы:')
                 for doc in applied_docs:
-                    logging.info('%s от %s № %s' %
-                                 (doc.title, doc.date[:19], doc.number if doc.number else 'б/н'))
+                    logging.info('%s от %s № %s' % (
+                        doc.title,
+                        doc.date if isinstance(doc.date, datetime.datetime) else doc.date[:19],
+                        doc.number if doc.number else 'б/н'))
         except:
             logging.error('Error send final status to ELK', exc_info=True)
 
