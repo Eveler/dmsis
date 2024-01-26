@@ -166,6 +166,7 @@ class DirectumRX:
                         apps_p.append(self.add_individual(person))
                 res = self.search("ICounterparties", "Id eq %s" % apps_p[0].Id, raw=False)
                 data.Correspondent = res[0]  # Required "Заявитель"
+                data.AppCategory = "PhPerson"
             # LegalEntity
             apps_le = []
             if len(declar.legal_entity):
@@ -184,6 +185,7 @@ class DirectumRX:
                         apps_le.append(self.add_legal_entity(entity))
                 res = self.search("ICounterparties", "Id eq %s" % apps_le[0].Id, raw=False)
                 data.Correspondent = res[0]  # Required "Заявитель"
+                data.AppCategory = "LegPers"
             res = self.search('IMunicipalServicesServiceKinds',
                               "Code eq '%(cod)s'" % {"cod": declar.service}, raw=False)
             if not res:
