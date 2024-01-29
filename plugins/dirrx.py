@@ -249,12 +249,7 @@ class DirectumRX:
         doc_ids = []
         if hasattr(declar, "AppliedDocument") and declar.AppliedDocument:
             for doc in declar.AppliedDocument:
-                if doc.number:
-                    s_str = "contains(Name,'%s') and RegistrationNumber eq '%s' and RegistrationDate eq %s" % \
-                            (doc.title, doc.number, doc.date.strftime('%Y-%m-%d'))
-                else:
-                    s_str = ("contains(Name,'%s') and (RegistrationNumber eq '' or RegistrationNumber eq null)"
-                             " and RegistrationDate eq %s") % (doc.title, doc.date.strftime('%Y-%m-%d'))
+                s_str = "contains(Name,'%s') and LeadingDocument/Id eq %s" % (doc.title, data.Id)
                 res = self.search('IAddendums', s_str)
                 if not res:
                     res = self.__upload_doc(None, doc, files, declar, lead_doc=data)

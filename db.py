@@ -659,6 +659,7 @@ class Db:
                 found = files.get(fn + ext.upper())
             if not found:
                 found = files.get(fn + '.zip')
+                ext = '.zip'
             if not found:
                 found = files.get(fn + '..zip')
                 ext = '.zip'
