@@ -249,7 +249,7 @@ class DirectumRX:
         doc_ids = []
         if hasattr(declar, "AppliedDocument") and declar.AppliedDocument:
             for doc in declar.AppliedDocument:
-                s_str = "contains(Name,'%s') and LeadingDocument/Id eq %s" % (doc.title, data.Id)
+                s_str = "contains(Name,'%s') and LeadingDocument/Id eq %s" % (doc.title[:249], data.Id)
                 res = self.search('IAddendums', s_str)
                 if not res:
                     res = self.__upload_doc(None, doc, files, declar, lead_doc=data)
@@ -630,8 +630,11 @@ class DirectumRX:
         doc = self._service.entities['IAddendums']()
         doc_date = datetime.datetime(requisites.date.year, requisites.date.month, requisites.date.day) \
             if isinstance(requisites.date, (XSDDate, xsd.Date)) else requisites.date
-        doc.Name = "%s%s%s" % (requisites.title, " № %s" % requisites.number if requisites.number else '',
-                               " от %s" % doc_date if doc_date else '')
+        doc.Name = "%s%s%s" % (
+            requisites.title if len(requisites.title) < 250 else
+            "%s..." % requisites.title[:246 - (len(" № %s" % requisites.number) if requisites.number else 0) -
+                                        (len(" от %s" % doc_date) if doc_date else 0)],
+            " № %s" % requisites.number if requisites.number else '', " от %s" % doc_date if doc_date else '')
         doc.HasRelations = False
         doc.HasVersions = True  # Required
         doc.VersionsLocked = False  # Required
@@ -639,7 +642,7 @@ class DirectumRX:
         doc.Created = datetime.datetime.now()
         # doc.RegistrationNumber = requisites.number
         # doc.RegistrationDate = doc_date
-        doc.Subject = requisites.title
+        doc.Subject = requisites.title[:249]
         # res = self.search('IDocumentRegisters', "Name eq 'Дела по оказанию муниципальных услуг'", raw=False)
         # doc.DocumentRegister = res[0]  # Required "Журнал регистрации"
         doc.LeadingDocument = lead_doc
@@ -656,7 +659,7 @@ class DirectumRX:
             self._service.default_context.connection.execute_post(
                 "%s/Versions(%s)/Body" % (doc.__odata__.instance_url, doc.Versions[0].Id),
                 {"Value": base64.b64encode(data).decode()})
-            logging.info('Добавлен документ: %s № %s от %s Id = %s' % (requisites.title, requisites.number,
+            logging.info('Добавлен документ: %s № %s от %s Id = %s' % (doc.Name, requisites.number,
                                                                     requisites.date.strftime('%d.%m.%Y'), doc.Id))
         except ODataError:
             logging.warning("Ошибка сохранения документа %s № %s от %s" % (requisites.title, requisites.number,
