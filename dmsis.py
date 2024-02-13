@@ -494,11 +494,18 @@ class Integration:
                                 try:
                                     self.rx.update_reference(
                                         "ДПУ", rec.Id, [{'Name': 'NumELK', 'Value': "%s (3)" % elk_num}])
+                                    logging.info(
+                                        "Отправлен конечный статус для дела Id=%s, num=%s %s. ELK = %s" %
+                                        (rec.Id, rec.RegistrationNumber, rec.Name, elk_num))
+                                    if applied_docs:
+                                        logging.info('Прикреплены документы:')
+                                        for doc in applied_docs:
+                                            logging.info('%s от %s № %s' % (
+                                                doc.title,
+                                                doc.date if isinstance(doc.date, datetime.datetime) else doc.date[:19],
+                                                doc.number if doc.number else 'б/н'))
                                 except:
                                     logging.warning("Ошибка обновления кода ELK", exc_info=True)
-                                logging.info(
-                                    "Отправлен конечный статус для дела Id=%s, num=%s %s. ELK = %s" %
-                                    (rec.Id, rec.RegistrationNumber, rec.Name, elk_num))
                 if self.use_dir:
                     xml = self.directum.search(
                         'ДПУ', "СпособДост<>5652824 and СпособДост<>6953048 and СпособДост<>5652821"
@@ -538,13 +545,13 @@ class Integration:
                                         "Отправлен конечный статус для дела Id=%s, num=%s %s. ELK = %s" %
                                         (declar_id, rec.findtext('.//Section[@Index="0"]/Requisite[@Name="Дополнение3"]'),
                                          rec.findtext('.//Section[@Index="0"]/Requisite[@Name="Наименование"]'), elk_num))
-                if applied_docs:
-                    logging.info('Прикреплены документы:')
-                for doc in applied_docs:
-                    logging.info('%s от %s № %s' % (
-                        doc.title,
-                        doc.date if isinstance(doc.date, datetime.datetime) else doc.date[:19],
-                        doc.number if doc.number else 'б/н'))
+                                    if applied_docs:
+                                        logging.info('Прикреплены документы:')
+                                        for doc in applied_docs:
+                                            logging.info('%s от %s № %s' % (
+                                                doc.title,
+                                                doc.date if isinstance(doc.date, datetime.datetime) else doc.date[:19],
+                                                doc.number if doc.number else 'б/н'))
         except:
             logging.error('Error send final status to ELK', exc_info=True)
 
