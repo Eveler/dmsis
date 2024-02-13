@@ -223,7 +223,6 @@ class DirectumRX:
             data.Created = datetime.datetime.now()  # Required "Создано"
             data.ServiceEndPlanData = now  # Required
             data.SMEVNumber = declar.declar_number
-            # rx.update_reference('IMunicipalServicesServiceCases', data=data)
             # return self._service.save(data)
             url = data.__odata_url__()
             if url is None:
@@ -232,8 +231,10 @@ class DirectumRX:
             es = data.__odata__
             insert_data = es.data_for_insert()
 
-            insert_data["ApplicantsLE"] = [{"Id": a.Id} for a in apps_le if a != data.Correspondent]
-            insert_data["ApplicantsPP"] = [{"Id": a.Id} for a in apps_p if a != data.Correspondent]
+            if len(apps_le) > 1:
+                insert_data["ApplicantsLE"] = [{"Id": a.Id} for a in apps_le if a != data.Correspondent]
+            if len(apps_p) > 1:
+                insert_data["ApplicantsPP"] = [{"Id": a.Id} for a in apps_p if a != data.Correspondent]
             # # insert_data["Addressees"] = [{"Id": data.Addressee.Id, "Number": 1}]
 
             saved_data = self._service.default_context.connection.execute_post(url, insert_data)
