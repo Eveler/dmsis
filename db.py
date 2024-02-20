@@ -667,6 +667,7 @@ class Db:
                 raise Exception("Cannot find file '%s' in %s" % (file_name, files))
             fn, ext1 = path.splitext(found)
             mime_type = guess_type(found + ext if not ext1 else '')[0]
+            file_name = found + ext
             doc_data = None
             file_path = None
             if path.getsize(found) > 1000000 - 2048:

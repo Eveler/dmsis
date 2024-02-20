@@ -643,7 +643,7 @@ class DirectumRX:
         doc.Created = datetime.datetime.now()
         # doc.RegistrationNumber = requisites.number
         # doc.RegistrationDate = doc_date
-        doc.Subject = requisites.title[:249]
+        doc.Subject = requisites.title[:240]
         # res = self.search('IDocumentRegisters', "Name eq 'Дела по оказанию муниципальных услуг'", raw=False)
         # doc.DocumentRegister = res[0]  # Required "Журнал регистрации"
         doc.LeadingDocument = lead_doc
