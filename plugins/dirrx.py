@@ -66,36 +66,44 @@ class DirectumRX:
         my_auth = HTTPBasicAuth(username, password) if username else None
         self._service = ODataService(url, auth=my_auth, reflect_entities=True)
 
+    def adopt_str(self, in_str):
+        return (in_str.replace('"', '\\"').replace('«', '\\«').replace('»', '\\»').replace('/', '_').
+                replace('\\', '_').replace('?', '_').replace('+', '_'))
+
     def add_individual(self, person):
         pers = self._service.entities['IPersons']()
         pers.FirstName = person.first_name
         pers.LastName = person.surname
         pers.MiddleName = person.patronymic
-        pers.LegalAddress = str(person.address) if person.address else None
-        pers.PostalAddress = str(person.fact_address) if person.fact_address else None
+        pers.LegalAddress = self.adopt_str(str(person.address)[:498] if person.address else None)
+        pers.PostalAddress = self.adopt_str(str(person.fact_address)[:498] if person.fact_address else None)
         pers.DateOfBirth = person.birthdate
         pers.TIN = person.inn
         # pers.Note = 'Паспорт серия %s № %s выдан %s %s' % (
         #     person.passport_serial, person.passport_number, person.passport_date.strftime("%d.%m.%Y"),
         #     person.passport_agency)
         try:
-            pers.Phones = ', '.join(phone.phone for phone in person.phone)
+            phones = ', '.join(phone.phone for phone in person.phone)
+            pers.Phones = phones[:248]
         except:
             try:
-                pers.Phones = ', '.join(person.phone)
+                phones = ', '.join(person.phone)
+                pers.Phones = phones[:248]
             except:
                 try:
-                    pers.Phones = str(person.phone)
+                    pers.Phones = str(person.phone)[:248]
                 except:
                     pass
         try:
-            pers.Email = ', '.join(email.email for email in person.email)
+            email = ', '.join(email.email for email in person.email)
+            pers.Email = email[:248]
         except:
             try:
-                pers.Email = ', '.join(person.email)
+                email = ', '.join(person.email)
+                pers.Email = email[:248]
             except:
                 try:
-                    pers.Email = str(person.email)
+                    pers.Email = str(person.email)[:248]
                 except:
                     pass
         pers.Sex = "Male" if person.sex == 'Муж' else 'Female'
@@ -122,13 +130,13 @@ class DirectumRX:
 
     def add_legal_entity(self, entity):
         corr = self._service.entities['ICompanies']()
-        corr.Name = entity.name if entity.name else entity.full_name
+        corr.Name = self.adopt_str(entity.name[:248] if entity.name else entity.full_name[:248])
         if not corr.Name:
             raise DirectumRXException("Company name must be filled")
-        corr.LegalName = entity.full_name
+        corr.LegalName = self.adopt_str(entity.full_name[:498])
         corr.TIN = entity.inn
         corr.TRRC = entity.kpp
-        corr.LegalAddress = str(entity.address) if entity.address else None
+        corr.LegalAddress = self.adopt_str(str(entity.address)[:499] if entity.address else None)
         corr.Note = 'By integration'
         corr.Status = 'Active'
         self._service.save(corr)
@@ -204,25 +212,41 @@ class DirectumRX:
             if now in holidays or now.weekday() > 5:
                 now = busday_offset(now.date(), 1, roll='forward',
                                     holidays=[day[0] for day in holidays.items()]).astype(datetime.datetime)
+            now = datetime.datetime(now.year, now.month, now.day)
+
+            # if res[0].RegistrationGroup:
+            #     data.Department = self.search("IDepartments", "Id eq %s" % res[0].RegistrationGroup.Id, raw=False)[0]
+            # res = self.search("IEmployees", "Id eq %s" % res[0].ServPerformer.Id, raw=False)[0]
+            # data.Addressee = res
+            # res = self.search("IDepartments", "Id eq %s" % res.Department.Id, raw=False)
+            # if res:
+            #     data.AddresseeDep = res[0]
+            #     if res[0].BusinessUnit:
+            #         res = self.search("IBusinessUnits", "Id eq %s" % res[0].BusinessUnit.Id, raw=False)
+            #         if res:
+            #             data.BusinessUnit = res[0]
+
             res = self.search('IMailDeliveryMethods', "Name eq 'СМЭВ'", raw=False)
             data.DeliveryMethod = res[0]  # Required "Способ доставки"
             res = self.search('IDocumentRegisters', "Name eq 'Дела по оказанию муниципальных услуг'", raw=False)
             data.DocumentRegister = res[0]  # Required "Журнал регистрации"
-            data.RegistrationNumber = declar.declar_number
-            data.Subject = str(declar.object_address) if declar.object_address else "Приморский край, г. Уссурийск"
+            data.RegistrationNumber = self.adopt_str(declar.declar_number[:49])
+            data.Subject = self.adopt_str(
+                str(declar.object_address)[:249] if declar.object_address else "Приморский край, г. Уссурийск")
             data.HasRelations = False
             data.HasVersions = False  # Required
             data.VersionsLocked = False  # Required
             data.HasPublicBody = False  # Required
-            data.Name = ("Дело по оказанию услуг №%s от %s" %
-                         (declar.declar_number, declar.register_date.strftime("%d.%m.%Y")))  # Required
+            data.Name = self.adopt_str(
+                "Дело по оказанию услуг №%s от %s" %
+                (declar.declar_number, declar.register_date.strftime("%d.%m.%Y")))  # Required
             data.MFCRegDate = datetime.datetime(
                 declar.register_date.year, declar.register_date.month, declar.register_date.day) \
                 if isinstance(declar.register_date, (XSDDate, xsd.Date)) else declar.register_date  # Required
             data.RegistrationDate = datetime.datetime.now()  # Required "Дата регистрации в органе"
             data.Created = datetime.datetime.now()  # Required "Создано"
             data.ServiceEndPlanData = now  # Required
-            data.SMEVNumber = declar.declar_number
+            data.SMEVNumber = self.adopt_str(declar.declar_number)
             # return self._service.save(data)
             url = data.__odata_url__()
             if url is None:
@@ -595,6 +619,8 @@ class DirectumRX:
             for req in data:
                 key = req["Name"]
                 val = req.get("Value")
+                if isinstance(val, str):
+                    val = self.adopt_str(val)
                 ref.__setattr__(key, val)
         res = self._service.save(ref)
         logging.debug("Save result: %s" % res)
@@ -631,21 +657,17 @@ class DirectumRX:
         doc = self._service.entities['IAddendums']()
         doc_date = datetime.datetime(requisites.date.year, requisites.date.month, requisites.date.day) \
             if isinstance(requisites.date, (XSDDate, xsd.Date)) else requisites.date
-        doc.Name = "%s%s%s" % (
+        doc.Name = self.adopt_str("%s%s%s" % (
             requisites.title if len(requisites.title) < 250 else
             "%s..." % requisites.title[:246 - (len(" № %s" % requisites.number) if requisites.number else 0) -
                                         (len(" от %s" % doc_date) if doc_date else 0)],
-            " № %s" % requisites.number if requisites.number else '', " от %s" % doc_date if doc_date else '')
+            " № %s" % requisites.number if requisites.number else '', " от %s" % doc_date if doc_date else ''))
         doc.HasRelations = False
         doc.HasVersions = True  # Required
         doc.VersionsLocked = False  # Required
         doc.HasPublicBody = False  # Required
         doc.Created = datetime.datetime.now()
-        # doc.RegistrationNumber = requisites.number
-        # doc.RegistrationDate = doc_date
         doc.Subject = requisites.title[:240]
-        # res = self.search('IDocumentRegisters', "Name eq 'Дела по оказанию муниципальных услуг'", raw=False)
-        # doc.DocumentRegister = res[0]  # Required "Журнал регистрации"
         doc.LeadingDocument = lead_doc
         res = self.search("IDocumentKinds", "Id eq 3", raw=False)
         doc.DocumentKind = res[0]
