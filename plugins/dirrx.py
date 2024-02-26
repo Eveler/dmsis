@@ -67,16 +67,20 @@ class DirectumRX:
         self._service = ODataService(url, auth=my_auth, reflect_entities=True)
 
     def adopt_str(self, in_str):
-        return (in_str.replace('"', '\\"').replace('«', '\\«').replace('»', '\\»').replace('/', '_').
-                replace('\\', '_').replace('?', '_').replace('+', '_'))
+        if in_str and isinstance(in_str, str):
+            return (in_str.replace('"', '\\"').replace('«', '\\«').
+                    replace('»', '\\»').replace('/', '_').replace('\\', '_').
+                    replace('?', '_').replace('+', '_'))
+        else:
+            return in_str
 
     def add_individual(self, person):
         pers = self._service.entities['IPersons']()
         pers.FirstName = person.first_name
         pers.LastName = person.surname
         pers.MiddleName = person.patronymic
-        pers.LegalAddress = self.adopt_str(str(person.address)[:498] if person.address else None)
-        pers.PostalAddress = self.adopt_str(str(person.fact_address)[:498] if person.fact_address else None)
+        pers.LegalAddress = self.adopt_str(str(person.address)[:498]) if person.address else None
+        pers.PostalAddress = self.adopt_str(str(person.fact_address)[:498]) if person.fact_address else None
         pers.DateOfBirth = person.birthdate
         pers.TIN = person.inn
         # pers.Note = 'Паспорт серия %s № %s выдан %s %s' % (
@@ -136,7 +140,7 @@ class DirectumRX:
         corr.LegalName = self.adopt_str(entity.full_name[:498])
         corr.TIN = entity.inn
         corr.TRRC = entity.kpp
-        corr.LegalAddress = self.adopt_str(str(entity.address)[:499] if entity.address else None)
+        corr.LegalAddress = self.adopt_str(str(entity.address)[:499]) if entity.address else None
         corr.Note = 'By integration'
         corr.Status = 'Active'
         self._service.save(corr)
@@ -230,7 +234,7 @@ class DirectumRX:
             data.DeliveryMethod = res[0]  # Required "Способ доставки"
             res = self.search('IDocumentRegisters', "Name eq 'Дела по оказанию муниципальных услуг'", raw=False)
             data.DocumentRegister = res[0]  # Required "Журнал регистрации"
-            data.RegistrationNumber = self.adopt_str(declar.declar_number[:49])
+            data.RegistrationNumber = declar.declar_number[:49]
             data.Subject = self.adopt_str(
                 str(declar.object_address)[:249] if declar.object_address else "Приморский край, г. Уссурийск")
             data.HasRelations = False
@@ -246,7 +250,7 @@ class DirectumRX:
             data.RegistrationDate = datetime.datetime.now()  # Required "Дата регистрации в органе"
             data.Created = datetime.datetime.now()  # Required "Создано"
             data.ServiceEndPlanData = now  # Required
-            data.SMEVNumber = self.adopt_str(declar.declar_number)
+            data.SMEVNumber = declar.declar_number
             # return self._service.save(data)
             url = data.__odata_url__()
             if url is None:
@@ -676,8 +680,15 @@ class DirectumRX:
             res = self.search("IAssociatedApplications", "Extension eq '%s'" % data_format, raw=False)
             if not res:
                 self.search("IAssociatedApplications", "Extension eq 'txt'", raw=False)
-            doc.Versions = [{"Number": 1, "AssociatedApplication": {"Id": res[0].Id}}]
-            self._service.save(doc)
+            ver_num = 0
+            while ver_num < 3:
+                ver_num += 1
+                doc.Versions = [{"Number": ver_num, "AssociatedApplication": {"Id": res[0].Id}}]
+                try:
+                    self._service.save(doc)
+                    ver_num = 3
+                except ODataError:
+                    pass
             doc = self.search("IAddendums", "Id eq %s" % doc.Id, raw=False)[0]
             self._service.default_context.connection.execute_post(
                 "%s/Versions(%s)/Body" % (doc.__odata__.instance_url, doc.Versions[0].Id),
