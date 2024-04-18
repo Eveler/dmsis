@@ -68,54 +68,55 @@ class DirectumRX:
 
     def adopt_str(self, in_str):
         if in_str and isinstance(in_str, str):
-            return (in_str.replace('"', '\\"').replace('«', '\\«').
-                    replace('»', '\\»').replace('/', '_').replace('\\', '_').
-                    replace('?', '_').replace('+', '_'))
+            return (in_str.replace('\0', '').replace('\a', '').replace('\b', '').
+                    replace('\t', ' ' * 4).replace('\n', ' ').replace('\v', ' ').
+                    replace('\f', ' ').replace('\r', ' ').
+                    replace('"', r'\"').replace('\\', r'\\'))
         else:
             return in_str
 
     def add_individual(self, person):
         pers = self._service.entities['IPersons']()
-        pers.FirstName = person.first_name
-        pers.LastName = person.surname
-        pers.MiddleName = person.patronymic
+        pers.FirstName = self.adopt_str(person.first_name)
+        pers.LastName = self.adopt_str(person.surname)
+        pers.MiddleName = self.adopt_str(person.patronymic)
         pers.LegalAddress = self.adopt_str(str(person.address)[:498]) if person.address else None
         pers.PostalAddress = self.adopt_str(str(person.fact_address)[:498]) if person.fact_address else None
         pers.DateOfBirth = person.birthdate
-        pers.TIN = person.inn
+        pers.TIN = self.adopt_str(person.inn)
         # pers.Note = 'Паспорт серия %s № %s выдан %s %s' % (
         #     person.passport_serial, person.passport_number, person.passport_date.strftime("%d.%m.%Y"),
         #     person.passport_agency)
         try:
             phones = ', '.join(phone.phone for phone in person.phone)
-            pers.Phones = phones[:248]
+            pers.Phones = self.adopt_str(phones[:248])
         except:
             try:
                 phones = ', '.join(person.phone)
-                pers.Phones = phones[:248]
+                pers.Phones = self.adopt_str(phones[:248])
             except:
                 try:
-                    pers.Phones = str(person.phone)[:248]
+                    pers.Phones = self.adopt_str(str(person.phone)[:248])
                 except:
                     pass
         try:
             email = ', '.join(email.email for email in person.email)
-            pers.Email = email[:248]
+            pers.Email = self.adopt_str(email[:248])
         except:
             try:
                 email = ', '.join(person.email)
-                pers.Email = email[:248]
+                pers.Email = self.adopt_str(email[:248])
             except:
                 try:
-                    pers.Email = str(person.email)[:248]
+                    pers.Email = self.adopt_str(str(person.email)[:248])
                 except:
                     pass
         pers.Sex = "Male" if person.sex == 'Муж' else 'Female'
-        pers.INILA = person.snils
+        pers.INILA = self.adopt_str(person.snils)
         pers.Status = "Active"
-        pers.Name = '%s %s %s' % (person.surname, person.first_name, person.patronymic)
-        pers.ShortName = '%s %s.%s.' % (person.surname, person.first_name[0].upper(),
-                                        person.patronymic[0].upper() if person.patronymic else '')
+        pers.Name = self.adopt_str('%s %s %s' % (person.surname, person.first_name, person.patronymic))
+        pers.ShortName = self.adopt_str('%s %s.%s.' % (person.surname, person.first_name[0].upper(),
+                                        person.patronymic[0].upper() if person.patronymic else ''))
         pers.CanExchange = False
         pers.Nonresident = False
         self._service.save(pers)
@@ -138,8 +139,8 @@ class DirectumRX:
         if not corr.Name:
             raise DirectumRXException("Company name must be filled")
         corr.LegalName = self.adopt_str(entity.full_name[:498])
-        corr.TIN = entity.inn
-        corr.TRRC = entity.kpp
+        corr.TIN = self.adopt_str(entity.inn)
+        corr.TRRC = self.adopt_str(entity.kpp)
         corr.LegalAddress = self.adopt_str(str(entity.address)[:499]) if entity.address else None
         corr.Note = 'By integration'
         corr.Status = 'Active'
@@ -234,7 +235,7 @@ class DirectumRX:
             data.DeliveryMethod = res[0]  # Required "Способ доставки"
             res = self.search('IDocumentRegisters', "Name eq 'Дела по оказанию муниципальных услуг'", raw=False)
             data.DocumentRegister = res[0]  # Required "Журнал регистрации"
-            data.RegistrationNumber = declar.declar_number[:49]
+            data.RegistrationNumber = self.adopt_str(declar.declar_number[:49])
             data.Subject = self.adopt_str(
                 str(declar.object_address)[:249] if declar.object_address else "Приморский край, г. Уссурийск")
             data.HasRelations = False
@@ -250,7 +251,7 @@ class DirectumRX:
             data.RegistrationDate = datetime.datetime.now()  # Required "Дата регистрации в органе"
             data.Created = datetime.datetime.now()  # Required "Создано"
             data.ServiceEndPlanData = now  # Required
-            data.SMEVNumber = declar.declar_number
+            data.SMEVNumber = data.RegistrationNumber
             # return self._service.save(data)
             url = data.__odata_url__()
             if url is None:
