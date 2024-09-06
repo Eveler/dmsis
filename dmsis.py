@@ -741,7 +741,7 @@ class Integration:
 
             try:
                 s = smtplib.SMTP(self.mail_server)
-                s.sendmail(from_addr, [self.mail_addr], message.as_string())
+                s.sendmail(from_addr, self.mail_addr.split(','), message.as_string())
                 s.quit()
             except smtplib.SMTPException:
                 etype, value, tb = exc_info()
