@@ -70,6 +70,17 @@ class Addresses(Base):
     Apartment = Column(String)
     Reference_point = Column(String)
 
+    def __str__(self):
+        return ("%s%s%s%s%s%s%s%s%s%s%s%s%s" %
+                (self.Postal_Code + ', ' if self.Postal_Code else '', self.Region + ', ' if self.Region else '',
+                 self.District + ', ' if self.District else '', self.City if self.City else '',
+                 ', ' + self.Urban_District if self.Urban_District else '',
+                 ', ' + self.Soviet_Village if self.Soviet_Village else '',
+                 ', ' + self.Locality if self.Locality else '', ', ' + self.Street if self.Street else '',
+                 ', ' + self.House if self.House else '', ', ' + self.Housing if self.Housing else '',
+                 ', ' + self.Building if self.Building else '', ', ' + self.Apartment if self.Apartment else '',
+                 ', ' + self.Reference_point if self.Reference_point else ''))
+
 
 class Documents(Base):
     __tablename__ = 'documents'
@@ -159,6 +170,9 @@ class Individuals(Base):
     declar = relationship(
         'Declars', back_populates='person', foreign_keys=declar_id)
     entity = relationship('LegalEntity', back_populates='person')
+
+    def __repr__(self):
+        return "%s %s %s addr = %s" % (self.surname, self.first_name, self.patronymic, self.address)
 
 
 class Phones(Base):
@@ -965,7 +979,7 @@ class Db:
 
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.WARN)
     db = Db()
     # with open('logo-ussuriisk.png', 'rb') as f:
     #     data = f.read()
@@ -991,5 +1005,9 @@ if __name__ == '__main__':
     # request.done = False
     # print('***********************', request.done)
     # db.commit()
-    res = db.get_config_value('last_ELK_STATUS_update')
-    print(res)
+    res = db.all_declars()
+    print([("declar_number=%s" % d.declar_number, "service=%s" % d.service, "register_date=%s" % d.register_date,
+            "end_date=%s" % d.end_date, "object_address=%s" % d.object_address,
+            "object_address_id=%s" % d.object_address_id, "documents=%s" % d.documents,
+            "legal_entity=%s" % d.legal_entity, "person=%s" % d.person, "param=%s" % d.param, "uuid=%s" % d.uuid,
+            "reply_to=%s" % d.reply_to, "confidant_id=%s" % d.confidant_id, "confidant=%s" % d.confidant) for d in res])

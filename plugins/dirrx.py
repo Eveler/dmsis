@@ -70,8 +70,8 @@ class DirectumRX:
         if in_str and isinstance(in_str, str):
             return (in_str.replace('\0', '').replace('\a', '').replace('\b', '').
                     replace('\t', ' ' * 4).replace('\n', ' ').replace('\v', ' ').
-                    replace('\f', ' ').replace('\r', ' ').
-                    replace('"', r'\"').replace('\\', r'\\'))
+                    replace('\f', ' ').replace('\r', ' ').replace('\\', r'\\').
+                    replace('"', r''))
         else:
             return in_str
 
@@ -162,14 +162,12 @@ class DirectumRX:
             apps_p = []
             if len(declar.person) > 0:
                 for person in declar.person:
-                    persons = self.search(
-                        'IPersons',
-                        "LastName eq '%s' and FirstName eq '%s'%s%s" %
-                        (person.surname, person.first_name,
-                         " and MiddleName eq '%s'" % person.patronymic if person.patronymic else '',
-                         " and ((PostalAddress eq '%(addr)s' or PostalAddress eq null) "
-                         "or (LegalAddress eq '%(addr)s' or LegalAddress eq null))" % {"addr": person.address}),
-                        raw=False)
+                    search_str = "LastName eq '%s' and FirstName eq '%s'%s%s" % (
+                        person.surname, person.first_name,
+                        " and MiddleName eq '%s'" % person.patronymic if person.patronymic else '',
+                        " and ((PostalAddress eq '%(addr)s' or PostalAddress eq null) or "
+                        "(LegalAddress eq '%(addr)s' or LegalAddress eq null))" % {"addr": person.address})
+                    persons = self.search('IPersons', search_str, raw=False)
                     if persons:
                         if persons[0].Status != "Active":
                             persons[0].Status = "Active"
