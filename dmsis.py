@@ -199,8 +199,8 @@ class Integration:
                             self.db.delete_declar(uuid)
                         else:
                             logging.warning('Failed to send saved data to DIRECTUM.', exc_info=True)
-                    except:
-                        logging.warning('Failed to send saved data to DIRECTUM.', exc_info=True)
+                    # except:
+                    #     logging.warning('Failed to send saved data to DIRECTUM.', exc_info=True)
                 if sent:
                     try:
                         if self.use_dir:
