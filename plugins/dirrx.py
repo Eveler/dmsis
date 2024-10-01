@@ -579,7 +579,9 @@ class DirectumRX:
                 order = {'user': user, 'senderKpp': '251101001', 'senderInn': '2511004094',
                          'serviceTargetCode': service_kind.Code, 'userSelectedRegion': '00000000',
                          'orderNumber': declar.RegistrationNumber,
-                         'requestDate': declar.RegistrationDate.strftime('%Y-%m-%dT%H:%M:%S'),
+                         'requestDate': declar.RegistrationDate.strftime('%Y-%m-%dT%H:%M:%S')
+                         if declar.RegistrationDate else declar.MFCRegDate.strftime('%Y-%m-%dT%H:%M:%S')
+                         if declar.MFCRegDate else declar.Created.strftime('%Y-%m-%dT%H:%M:%S'),
                          'OfficeInfo': {'ApplicationAcceptance': '4'
                                         # ЕЛК. Канал приема - Подразделение ведомства (https://esnsi.gosuslugi.ru/classifiers/7213/view/8)
                                         },

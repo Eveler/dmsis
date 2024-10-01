@@ -354,7 +354,13 @@ class Integration:
                                             doc.date if isinstance(doc.date, datetime.datetime) else doc.date[:19],
                                             doc.number if doc.number else 'б/н'))
                     except:
-                        self.report_error()
+                        if self.use_dir:
+                            logging.warning("Error send final response from DIRECTUM 5. Declar id %s N %s date %s" %
+                                            (request.directum_id, request.declar_num, request.declar_date), exc_info=True)
+                            request.done = True
+                            self.db.commit()
+                        else:
+                            self.report_error()
                     finally:
                         for ad in applied_docs:
                             try:
