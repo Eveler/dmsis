@@ -67,6 +67,7 @@ class Integration:
         logging.basicConfig(
             format='%(asctime)s %(name)s:%(module)s(%(lineno)d): '
                    '%(levelname)s: %(message)s', level=logging.INFO)
+        self.db = Db()
         if use_config:
             self.parse_config(config_path)
         else:
@@ -100,8 +101,6 @@ class Integration:
         #     self.__directum = IntegrationServices(self.directum_wsdl)
         # except Exception:
         #     self.report_error()
-
-        self.db = Db()
 
     @property
     def use_dir(self):
@@ -607,6 +606,14 @@ class Integration:
                 '%(asctime)s %(name)s:%(module)s(%(lineno)d): %(levelname)s: '
                 '%(message)s'))
             logging.root.addHandler(handler)
+            if not self.__dir_with_rx:
+                try:
+                    last_update = self.db.get_config_value('last_ELK_STATUS_update')
+                except:
+                    last_update = None
+                # Once a day
+                if not last_update or date.fromisoformat(last_update) < date.today():
+                    handler.doRollover()
             if "loglevel" not in cfg.options("main"):
                 do_write = True
                 cfg.set("main", "loglevel", "warning")
