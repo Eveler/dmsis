@@ -12,6 +12,7 @@ from datetime import date, timedelta
 from sys import version_info, platform, exc_info
 
 from dateutil.utils import today
+from holidays import country_holidays
 
 from smev_cnsi import Cnsi
 
@@ -210,8 +211,10 @@ class Integration:
                 self.report_error()
                 self.db.rollback()
 
-            check_requests = requests.get('https://isdayoff.ru/' + today().strftime('%Y%m%d')).text == '0' \
-                if self.check_workdays else True
+            holidays = country_holidays("RU", years=datetime.datetime.now().year)
+            # check_requests = requests.get('https://isdayoff.ru/' + today().strftime('%Y%m%d')).text == '0' \
+            #     if self.check_workdays else True
+            check_requests = today().weekday() < 5 and not today() in holidays if self.check_workdays else True
             if check_requests:
                 declar = 1
                 received = False

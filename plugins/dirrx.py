@@ -207,14 +207,12 @@ class DirectumRX:
                 raise DirectumRXException("Услуга не найдена")
             data.ServiceKind = res[0]  # Required "Услуга"
             now = datetime.datetime.now()
-            holidays = country_holidays("RU", years=datetime.datetime.now().year)
-            now = busday_offset(now.date(), res[0].ProvisionTerm, roll='forward',
-                                holidays=[day[0] for day in holidays.items()]).astype(datetime.datetime) \
+            holidays = [day[0] for day in country_holidays("RU", years=[now.year, now.year + 1]).items()]
+            now = busday_offset(now.date(), res[0].ProvisionTerm, roll='forward', holidays=holidays).astype(datetime.datetime) \
                 if res[0].TermType == 'WorkDays' \
                 else (now + timedelta(days=res[0].ProvisionTerm))
             if now in holidays or now.weekday() > 5:
-                now = busday_offset(now.date(), 1, roll='forward',
-                                    holidays=[day[0] for day in holidays.items()]).astype(datetime.datetime)
+                now = busday_offset(now.date(), 1, roll='forward', holidays=holidays).astype(datetime.datetime)
             now = datetime.datetime(now.year, now.month, now.day)
 
             # if res[0].RegistrationGroup:
