@@ -219,48 +219,49 @@ class Integration:
                 declar = 1
                 received = False
                 try:
-                    declar, uuid, reply_to, files = self.smev.get_request(
-                        uri='urn://augo/smev/uslugi/1.0.0', local_name='declar')
-                    if declar:
-                        try:
-                            if self.use_rx:
-                                res = self.rx.add_declar(declar, files)
-                                self.db.add_update(uuid, declar.declar_number, reply_to, directum_id=res)
-                            if self.use_dir:
-                                res1 = self.directum.add_declar(declar, files=files)
-                                self.db.add_update(uuid, declar.declar_number, reply_to, directum_id=res1)
-                                res = '%s, rx id = %s' % (res1, res) if self.__use_rx else res1
-                                received = True
-                            logging.info('Добавлено/обновлено дело с ID = %s' % res)
+                    while declar:
+                        declar, uuid, reply_to, files = self.smev.get_request(
+                            uri='urn://augo/smev/uslugi/1.0.0', local_name='declar')
+                        if declar:
                             try:
-                                self.smev.send_ack(uuid)
-                            except:
-                                logging.warning('Failed to send AckRequest.', exc_info=True)
-                            if self.use_dir:
+                                if self.use_rx:
+                                    res = self.rx.add_declar(declar, files)
+                                    self.db.add_update(uuid, declar.declar_number, reply_to, directum_id=res)
+                                if self.use_dir:
+                                    res1 = self.directum.add_declar(declar, files=files)
+                                    self.db.add_update(uuid, declar.declar_number, reply_to, directum_id=res1)
+                                    res = '%s, rx id = %s' % (res1, res) if self.__use_rx else res1
+                                    received = True
+                                logging.info('Добавлено/обновлено дело с ID = %s' % res)
                                 try:
-                                    params = [('ID', res)]
-                                    self.directum.run_script('СтартЗадачПоМУ', params)
+                                    self.smev.send_ack(uuid)
                                 except:
-                                    logging.warning('Error while run directum`s script "СтартЗадачПоМУ"', exc_info=True)
-                        except (IntegrationServicesException, DirectumRXException) as e:
-                            if "Услуга не найдена" in e.message:
-                                logging.warning(
-                                    "Услуга '%s' не найдена. Дело № %s от %s" %
-                                    (declar.service, declar.declar_number, declar.register_date.strftime('%d.%m.%Y')))
+                                    logging.warning('Failed to send AckRequest.', exc_info=True)
+                                if self.use_dir:
+                                    try:
+                                        params = [('ID', res)]
+                                        self.directum.run_script('СтартЗадачПоМУ', params)
+                                    except:
+                                        logging.warning('Error while run directum`s script "СтартЗадачПоМУ"', exc_info=True)
+                            except (IntegrationServicesException, DirectumRXException) as e:
+                                if "Услуга не найдена" in e.message:
+                                    logging.warning(
+                                        "Услуга '%s' не найдена. Дело № %s от %s" %
+                                        (declar.service, declar.declar_number, declar.register_date.strftime('%d.%m.%Y')))
+                                    self.smev.send_ack(uuid)
+                                    self.smev.send_response(reply_to, declar.declar_number,
+                                                            declar.register_date.strftime('%d.%m.%Y'), 'ERROR',
+                                                            "Услуга '%s' не найдена" % declar.service)
+                                else:
+                                    logging.warning('Failed to send saved data to DIRECTUM.', exc_info=True)
+                            except Exception:
+                                logging.warning('Failed to send data to DIRECTUM. Saving locally.', exc_info=True)
+                                self.db.save_declar(declar, uuid, reply_to, files)
                                 self.smev.send_ack(uuid)
-                                self.smev.send_response(reply_to, declar.declar_number,
-                                                        declar.register_date.strftime('%d.%m.%Y'), 'ERROR',
-                                                        "Услуга '%s' не найдена" % declar.service)
-                            else:
-                                logging.warning('Failed to send saved data to DIRECTUM.', exc_info=True)
-                        except Exception:
-                            logging.warning('Failed to send data to DIRECTUM. Saving locally.', exc_info=True)
-                            self.db.save_declar(declar, uuid, reply_to, files)
-                            self.smev.send_ack(uuid)
-                    else:
-                        # logging.warning("Получен пустой ответ")
-                        # self.smev.send_ack(uuid, 'false')
-                        pass
+                        else:
+                            # logging.warning("Получен пустой ответ")
+                            # self.smev.send_ack(uuid, 'false')
+                            pass
                 except Exception:
                     self.report_error()
                     self.db.rollback()
