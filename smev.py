@@ -960,7 +960,6 @@ class Adapter:
         rahl = etree.SubElement(res, '{%s}RefAttachmentHeaderList' % ns)
         uploaded = []
         for item in file_names:
-            rah = etree.SubElement(rahl, '{%s}RefAttachmentHeader' % ns)
             if isinstance(item, dict):
                 uuid = item.get('uuid')
                 f = item.get('path')
@@ -969,17 +968,19 @@ class Adapter:
                 uuid = item.uuid
                 f = item.file
                 file_name = item.file_name
-            if not uuid:
-                uuid = self.__upload_file(f, translate(basename(file_name)), ftp_user, ftp_pass)
-            etree.SubElement(rah, '{%s}uuid' % ns).text = uuid
-            f_hash = self.crypto.get_file_hash(f)
-            etree.SubElement(rah, '{%s}Hash' % ns).text = f_hash
-            mime_type = guess_type(f)[0]
-            if not mime_type:
-                mime_type = 'application/octet-stream'
-            etree.SubElement(
-                rah, '{%s}MimeType' % ns).text = mime_type
-            uploaded.append({'uuid': uuid, 'Hash': f_hash, 'MimeType': mime_type})
+            if f:
+                if not uuid:
+                    uuid = self.__upload_file(f, translate(basename(file_name)), ftp_user, ftp_pass)
+                rah = etree.SubElement(rahl, '{%s}RefAttachmentHeader' % ns)
+                etree.SubElement(rah, '{%s}uuid' % ns).text = uuid
+                f_hash = self.crypto.get_file_hash(f)
+                etree.SubElement(rah, '{%s}Hash' % ns).text = f_hash
+                mime_type = guess_type(f)[0]
+                if not mime_type:
+                    mime_type = 'application/octet-stream'
+                etree.SubElement(
+                    rah, '{%s}MimeType' % ns).text = mime_type
+                uploaded.append({'uuid': uuid, 'Hash': f_hash, 'MimeType': mime_type})
         return uploaded
 
     def get_response(self, resp_name: str, uri: str, node_id=None):
