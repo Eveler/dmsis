@@ -434,6 +434,16 @@ class Adapter:
                                      if hasattr(doc, 'certs') and doc.certs else None}})
         return files
 
+    @staticmethod
+    def adopt_str(in_str):
+        if in_str and isinstance(in_str, str):
+            return (in_str.replace('\0', '').replace('\a', '').replace('\b', '').
+                    replace('\t', ' ' * 4).replace('\n', ' ').replace('\v', ' ').
+                    replace('\f', ' ').replace('\r', ' ').replace('\\', r'\\').
+                    replace('"', r''))
+        else:
+            return in_str
+
     def send_response(self, reply_to, declar_number, register_date, result='FINAL', text='', applied_documents=(),
                       ftp_user='anonymous', ftp_pass='anonymous'):
         files = self.upload_docs(applied_documents, ftp_user, ftp_pass)
@@ -463,7 +473,7 @@ class Adapter:
                     rr, '{urn://augo/smev/uslugi/1.0.0}AppliedDocument')
                 etree.SubElement(
                     ad, '{urn://augo/smev/uslugi/1.0.0}title').text = \
-                    doc.title if doc.title else ' '
+                    self.adopt_str(doc.title) if doc.title else ' '
                 etree.SubElement(
                     ad, '{urn://augo/smev/uslugi/1.0.0}number'
                 ).text = doc.number if doc.number else 'б/н'
@@ -508,8 +518,10 @@ class Adapter:
                 etree.SubElement(
                     rah, '{%s}Hash' % ns).text = self.crypto.get_file_hash(
                     file['full_name'])
-                etree.SubElement(rah, '{%s}MimeType' % ns).text = \
-                    file['type'] if file['type'] else guess_type(file['name'])[0]
+                mime_type = file['type'] if file['type'] else guess_type(file['name'])[0]
+                if not mime_type:
+                    mime_type = "application/octet-stream"
+                etree.SubElement(rah, '{%s}MimeType' % ns).text = mime_type
                 if file['certs']:
                     etree.SubElement(
                         rah,
@@ -810,6 +822,8 @@ class Adapter:
         kw = {'_soapheaders': self.proxy.service._client._default_soapheaders,
               'Content-Type': 'text/xml;charset=UTF-8', 'SOAPAction': 'urn:' + operation,
               'Host': 's' + host}
+        with open('request.pkl', 'wb') as f:
+            f.write(msg.encode(errors="replace") if isinstance(msg, str) else msg)
         response = self.proxy.transport.post(
             self.proxy.service._binding_options['address'], msg, kw)
         try:

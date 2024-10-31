@@ -66,7 +66,8 @@ class DirectumRX:
         my_auth = HTTPBasicAuth(username, password) if username else None
         self._service = ODataService(url, auth=my_auth, reflect_entities=True)
 
-    def adopt_str(self, in_str):
+    @staticmethod
+    def adopt_str(in_str):
         if in_str and isinstance(in_str, str):
             return (in_str.replace('\0', '').replace('\a', '').replace('\b', '').
                     replace('\t', ' ' * 4).replace('\n', ' ').replace('\v', ' ').
