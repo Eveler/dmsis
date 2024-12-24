@@ -7,6 +7,7 @@ import os
 import sys
 import tempfile
 from datetime import datetime, date
+from html import unescape
 # from logging.handlers import TimedRotatingFileHandler
 from mimetypes import guess_type, guess_extension
 from os import close, write, path, remove
@@ -905,7 +906,7 @@ class Adapter:
                 ok = val.findtext('.//{*}message')
                 if ok.lower() != 'ok':
                     ok += ": " + ', '.join([elem.findtext('.//{*}message') for elem in val.findall('.//{*}order')])
-                    logging.warning(ok + "\n" + str(res) + "\n" + etree.tostring(val).decode(errors='replace'))
+                    logging.warning(ok + "\n" + str(res) + "\n" + unescape(etree.tostring(val).decode(errors='replace')))
                 return val.findtext('.//{*}elkOrderNumber')
             else:
                 logging.warning(res)

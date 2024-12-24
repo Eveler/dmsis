@@ -322,11 +322,15 @@ class Integration:
                                 uuid, ad = item.popitem()
                                 # files.append({'path': ad.get('full_name'), "name": ad.get('name'), 'uuid': uuid})
                                 files.append({'path': ad.get('full_name'), "name": ad.get('name')})
-                            if 'user' in status['order'] or 'organization' in status['order']:
-                                self.smev.create_orders_request(status, files)
-                            else:
-                                self.smev.update_orders_request(status, files)
-                            elk_num = self.smev.get_orders_response()
+                            elk_num = None
+                            try:
+                                if 'user' in status['order'] or 'organization' in status['order']:
+                                    self.smev.create_orders_request(status, files)
+                                else:
+                                    self.smev.update_orders_request(status, files)
+                                elk_num = self.smev.get_orders_response()
+                            except:
+                                logging.error('Error send final status to ELK', exc_info=True)
                             if elk_num and elk_num != '0':
                                 if self.use_rx:
                                     try:
@@ -447,11 +451,15 @@ class Integration:
                         declar_id = rec.findtext('.//Section[@Index="0"]/Requisite[@Name="ИД"]')
                         st_list = self.directum.get_declar_status_data(declar_id)
                         for status in st_list:
-                            if 'user' in status['order'] or 'organization' in status['order']:
-                                self.smev.create_orders_request(status)
-                            else:
-                                self.smev.update_orders_request(status)
-                            elk_num = self.smev.get_orders_response()
+                            elk_num = None
+                            try:
+                                if 'user' in status['order'] or 'organization' in status['order']:
+                                    self.smev.create_orders_request(status)
+                                else:
+                                    self.smev.update_orders_request(status)
+                                elk_num = self.smev.get_orders_response()
+                            except:
+                                logging.error('Error send initial status to ELK', exc_info=True)
                             if elk_num and elk_num != '0':
                                 res = self.directum.update_reference(
                                     "ДПУ", declar_id,
@@ -472,7 +480,6 @@ class Integration:
         try:
             if not last_update or date.fromisoformat(last_update) < date.today():
                 days = 3 if date.today().weekday() == 0 else 1
-                applied_docs = []
                 # Excluding ЕПГУ, РПГУ, ФИС ДВ 1ГА
                 if self.use_rx:
                     recs = self.rx.search(
@@ -489,16 +496,21 @@ class Integration:
                             files = []
                             for ad in applied_docs:
                                 files.append({'path': ad.file, 'name': ad.file_name})
-                            if 'user' in status['order'] or 'organization' in status['order']:
-                                self.smev.create_orders_request(status, files)
-                            else:
-                                self.smev.update_orders_request(status, files)
-                            for item in files:
-                                try:
-                                    os.remove(item.get('path'))
-                                except:
-                                    pass
-                            elk_num = self.smev.get_orders_response()
+                            elk_num = None
+                            try:
+                                if 'user' in status['order'] or 'organization' in status['order']:
+                                    self.smev.create_orders_request(status, files)
+                                else:
+                                    self.smev.update_orders_request(status, files)
+                                elk_num = self.smev.get_orders_response()
+                            except:
+                                logging.error('Error send final status to ELK', exc_info=True)
+                            finally:
+                                for item in files:
+                                    try:
+                                        os.remove(item.get('path'))
+                                    except:
+                                        pass
                             if elk_num and elk_num != '0':
                                 try:
                                     self.rx.update_reference(
@@ -533,16 +545,21 @@ class Integration:
                             files = []
                             for ad in applied_docs:
                                 files.append({'path': ad.file, 'name': ad.file_name})
-                            if 'user' in status['order'] or 'organization' in status['order']:
-                                self.smev.create_orders_request(status, files)
-                            else:
-                                self.smev.update_orders_request(status, files)
-                            for item in files:
-                                try:
-                                    os.remove(item.get('path'))
-                                except:
-                                    pass
-                            elk_num = self.smev.get_orders_response()
+                            elk_num = None
+                            try:
+                                if 'user' in status['order'] or 'organization' in status['order']:
+                                    self.smev.create_orders_request(status, files)
+                                else:
+                                    self.smev.update_orders_request(status, files)
+                                elk_num = self.smev.get_orders_response()
+                            except:
+                                logging.error('Error send final status to ELK', exc_info=True)
+                            finally:
+                                for item in files:
+                                    try:
+                                        os.remove(item.get('path'))
+                                    except:
+                                        pass
                             if elk_num and elk_num != '0':
                                 res = self.directum.update_reference(
                                     "ДПУ", declar_id,
