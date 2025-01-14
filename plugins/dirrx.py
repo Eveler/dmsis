@@ -505,7 +505,7 @@ class DirectumRX:
 
         res = []
         if declar.NumELK:
-            order = {'orderNumber': declar.RegistrationNumber, 'senderKpp': '251101001',
+            order = {'orderNumber': declar.RegistrationNumber[:36], 'senderKpp': '251101001',
                      'senderInn': '2511004094',
                      'statusHistoryList':
                          {'statusHistory': {'status': status,
@@ -517,43 +517,61 @@ class DirectumRX:
             res.append({'order': order})
             return res
 
+        service_kind = self.search("IMunicipalServicesServiceKinds",
+                                   "Id eq %s" % declar.ServiceKind.Id, raw=False)[0]
+        while (service_kind.LeadServiceKind and hasattr(service_kind.LeadServiceKind, "Id")
+               and service_kind.LeadServiceKind.Id):
+            srv = self.search('IMunicipalServicesServiceKinds',
+                              "Id eq %s" % service_kind.LeadServiceKind.Id, raw=False)
+            if srv:
+                service_kind = srv[0]
+        if len(service_kind.Code) < 12: # Skip non federal services
+            return res
+
         # Get persons
         users = []
         for fl in declar.ApplicantsPP:
             applicant = self._service.default_context.connection.execute_get(
                 "%s/ApplicantsPP(%s)?$expand=*" % (declar.__odata__.instance_url, fl.Id))
             if applicant['Applicant']:
+                series = num = None
                 add_info = self.search(
                     "IAUGOPartiesPersonAddInfos", "Person/Id eq %s" % applicant['Applicant']['Id'], raw=False)
                 if add_info:
                     add_info = add_info[0]
                     series = add_info.Series
                     num = add_info.Number
-                    if applicant['Applicant']['TIN'] or (series and num) or applicant['Applicant']['INILA']:
-                        if applicant['Applicant']['INILA']:
-                            if applicant['Applicant']['DateOfBirth']:
-                                user = {'userDocSnilsBirthDate': {
-                                    'citizenship': '643', 'snils': applicant['Applicant']['INILA'].strip(),
-                                    'birthDate': applicant['Applicant']['DateOfBirth'][:10]}}
-                            else:
-                                user = {'userDocSnils': {
-                                    'snils': applicant['Applicant']['INILA'].strip(),
-                                    'lastName': applicant['Applicant']['LastName'],
-                                    'firstName': applicant['Applicant']['FirstName'],
-                                    'middleName': applicant['Applicant']['MiddleName'], 'citizenship': '643'}}
-                        elif applicant['Applicant']['TIN']:
-                            user = {'userDocInn': {
-                                'INN': applicant['Applicant']['TIN'].strip(),
-                                'lastName': applicant['Applicant']['LastName'],
-                                'firstName': applicant['Applicant']['FirstName'],
-                                'middleName': applicant['Applicant']['MiddleName'], 'citizenship': '643'}}
+                if applicant['Applicant']['TIN'] or (series and num) or applicant['Applicant']['INILA']:
+                    if series and num:
+                        user = {'userPersonalDoc': {
+                            'PersonalDocType': '1', 'series': series, 'number': num,
+                            'lastName': applicant['Applicant']['LastName'],
+                            'firstName': applicant['Applicant']['FirstName'],
+                            'middleName': applicant['Applicant']['MiddleName'], 'citizenship': '643'}}
+                    elif applicant['Applicant']['INILA']: # SNILS
+                        if applicant['Applicant']['DateOfBirth']:
+                            user = {'userDocSnilsBirthDate': {
+                                'citizenship': '643', 'snils': applicant['Applicant']['INILA'].strip(),
+                                'birthDate': applicant['Applicant']['DateOfBirth'][:10]}}
                         else:
-                            user = {'userPersonalDoc': {
-                                'PersonalDocType': '1', 'series': series, 'number': num,
+                            user = {'userDocSnils': {
+                                'snils': applicant['Applicant']['INILA'].strip(),
                                 'lastName': applicant['Applicant']['LastName'],
                                 'firstName': applicant['Applicant']['FirstName'],
                                 'middleName': applicant['Applicant']['MiddleName'], 'citizenship': '643'}}
-                        users.append(user)
+                    elif applicant['Applicant']['TIN']: # INN
+                        user = {'userDocInn': {
+                            'INN': applicant['Applicant']['TIN'].strip(),
+                            'lastName': applicant['Applicant']['LastName'],
+                            'firstName': applicant['Applicant']['FirstName'],
+                            'middleName': applicant['Applicant']['MiddleName'], 'citizenship': '643'}}
+                    else:
+                        raise DirectumRXException("User %s %s %s (%s) has no passport nor INN nor SNILS" % (
+                            applicant['Applicant']['LastName'],
+                            applicant['Applicant']['FirstName'],
+                            applicant['Applicant']['MiddleName'],
+                            applicant['Applicant']['Id']))
+                    users.append(user)
         # Get organisations
         orgs = []
         for ul in declar.ApplicantsLE:
@@ -566,18 +584,10 @@ class DirectumRX:
                     orgs.append({'ogrn_inn_UL': {'ogrn': applicant['Applicant']['PSRN'].strip()}})
 
         if users or orgs:
-            service_kind = self.search("IMunicipalServicesServiceKinds",
-                                       "Id eq %s" % declar.ServiceKind.Id, raw=False)[0]
-            while (service_kind.LeadServiceKind and hasattr(service_kind.LeadServiceKind, "Id")
-                   and service_kind.LeadServiceKind.Id):
-                srv = self.search('IMunicipalServicesServiceKinds',
-                                  "Id eq %s" % service_kind.LeadServiceKind.Id, raw=False)
-                if srv:
-                    service_kind = srv[0]
             for user in users:
                 order = {'user': user, 'senderKpp': '251101001', 'senderInn': '2511004094',
                          'serviceTargetCode': service_kind.Code, 'userSelectedRegion': '00000000',
-                         'orderNumber': declar.RegistrationNumber,
+                         'orderNumber': declar.RegistrationNumber[:36],
                          'requestDate': declar.RegistrationDate.strftime('%Y-%m-%dT%H:%M:%S')
                          if declar.RegistrationDate else declar.MFCRegDate.strftime('%Y-%m-%dT%H:%M:%S')
                          if declar.MFCRegDate else declar.Created.strftime('%Y-%m-%dT%H:%M:%S'),

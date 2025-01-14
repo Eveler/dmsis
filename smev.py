@@ -886,12 +886,7 @@ class Adapter:
         return elem
 
     def get_orders_response(self, resp_name='ElkOrderResponse', uri='http://epgu.gosuslugi.ru/elk/status/1.0.2'):
-        import time
-        time.sleep(10)  # TODO: Avoid time.sleep
         res = self.get_response(resp_name, uri, None)
-        while not res:
-            time.sleep(10)
-            res = self.get_response(resp_name, uri, None)
         logging.debug(res)
         if isinstance(res, bytes):
             res = res.decode(errors='replace')
@@ -903,14 +898,18 @@ class Adapter:
             if hasattr(res.Response.SenderProvidedResponseData, 'MessagePrimaryContent') \
                     and res.Response.SenderProvidedResponseData.MessagePrimaryContent:
                 val = res.Response.SenderProvidedResponseData.MessagePrimaryContent._value_1
-                ok = val.findtext('.//{*}message')
-                if ok.lower() != 'ok':
-                    ok += ": " + ', '.join([elem.findtext('.//{*}message') for elem in val.findall('.//{*}order')])
-                    logging.warning(ok + "\n" + str(res) + "\n" + unescape(etree.tostring(val).decode(errors='replace')))
-                return val.findtext('.//{*}elkOrderNumber')
+                # ok = val.findtext('.//{*}message')
+                # if ok.lower() != 'ok':
+                #     ok += ": " + ', '.join([elem.findtext('.//{*}message') for elem in val.findall('.//{*}order')])
+                #     logging.warning(ok + "\n" + str(res) + "\n" + unescape(etree.tostring(val).decode(errors='replace')))
+                new = True if val.find('.//{*}CreateOrdersResponse') is not None else False
+                return [{'num': elem.findtext('.//{*}orderNumber'),
+                         'elk_num': elem.findtext('.//{*}elkOrderNumber'),
+                         'status': elem.findtext('.//{*}status'),
+                         'msg': elem.findtext('.//{*}message'), 'new': new} for elem in val.findall('.//{*}order')]
             else:
                 logging.warning(res)
-        return None
+        return []
 
     def create_orders_request(self, orders: dict = (), files: list = None,
                               uri='http://epgu.gosuslugi.ru/elk/status/1.0.2'):

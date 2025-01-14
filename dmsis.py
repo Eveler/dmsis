@@ -322,44 +322,22 @@ class Integration:
                                 uuid, ad = item.popitem()
                                 # files.append({'path': ad.get('full_name'), "name": ad.get('name'), 'uuid': uuid})
                                 files.append({'path': ad.get('full_name'), "name": ad.get('name')})
-                            elk_num = None
                             try:
                                 if 'user' in status['order'] or 'organization' in status['order']:
                                     self.smev.create_orders_request(status, files)
                                 else:
                                     self.smev.update_orders_request(status, files)
-                                elk_num = self.smev.get_orders_response()
                             except:
                                 logging.error('Error send final status to ELK', exc_info=True)
-                            if elk_num and elk_num != '0':
-                                if self.use_rx:
-                                    try:
-                                        self.rx.update_reference("ДПУ", request.directum_id,
-                                                                 [{'Name': 'NumELK', 'Value': "%s (3)" % elk_num}])
-                                        logging.info(
-                                            "Отправлен конечный статус для дела Id=%s, num=%s от %s. ELK = %s" %
-                                            (request.directum_id, request.declar_num, request.declar_date, elk_num))
-                                    except:
-                                        logging.warning("Ошибка обновления кода ELK", exc_info=True)
-                                if self.use_dir:
-                                    res = self.directum.update_reference(
-                                        "ДПУ", request.directum_id,
-                                        [{'Name': 'LongString56', 'Type': 'String', 'Value': "%s (3)" % elk_num}])
-                                    if res[0]:
-                                        logging.warning(str(res) + " when " + str(status))
-                                    else:
-                                        logging.info(
-                                            "Отправлен конечный статус для дела Id=%s, num=%s %s. ELK = %s" %
-                                            (request.directum_id, request.declar_num,
-                                             declar[0].get('Наименование'), elk_num))
-                                if applied_docs:
-                                    logging.info('Прикреплены документы:')
-                                for doc in applied_docs:
-                                    logging.info(
-                                        '%s от %s № %s' % (
-                                            doc.title,
-                                            doc.date if isinstance(doc.date, datetime.datetime) else doc.date[:19],
-                                            doc.number if doc.number else 'б/н'))
+                            logging.info("Отправлен конечный статус для дела Id=%s, num=%s от %s." %
+                                         (request.directum_id, request.declar_num, request.declar_date))
+                            if applied_docs:
+                                logging.info('Прикреплены документы:')
+                            for doc in applied_docs:
+                                logging.info('%s от %s № %s' % (
+                                    doc.title,
+                                    doc.date if isinstance(doc.date, datetime.datetime) else doc.date[:19],
+                                    doc.number if doc.number else 'б/н'))
                     except:
                         if self.use_dir:
                             logging.warning("Error send final response from DIRECTUM 5. Declar id %s N %s date %s" %
@@ -412,80 +390,69 @@ class Integration:
 
         # Send initial status to ELK
         try:
+            if self.use_rx:
+                self.get_elks()
             if not last_update or date.fromisoformat(last_update) < date.today():
                 days = 3 if date.today().weekday() == 0 else 1  # On monday take sunday and saturday into account
                 # Excluding ЕПГУ, РПГУ, ФИС ДВ 1ГА
                 if self.use_rx:
                     recs = self.rx.search(
                         'ДПУ',
-                        'СпособДост<>23 and СпособДост<>25 and СпособДост<>18 and Дата3>=%s and Дата3<%s'
+                        'СпособДост<>23 and СпособДост<>25 and СпособДост<>18 and Дата3>=%s and Дата3<=%s'
                         ' and Дата5 is null and LongString56 is null' %
-                        (date.today() - timedelta(days=days), date.today() + timedelta(days=1)), raw=False)
+                        (date.today() - timedelta(days=days), date.today()), raw=False)
                     logging.info("************* Проверка начальных статусов для %s дел DirectumRX" % len(recs))
                     for rec in recs:
                         st_list = self.rx.get_declar_status_data(rec.Id)
                         for status in st_list:
-                            if 'user' in status['order'] or 'organization' in status['order']:
-                                self.smev.create_orders_request(status)
-                            else:
-                                self.smev.update_orders_request(status)
-                            elk_num = self.smev.get_orders_response()
-                            if elk_num and elk_num != '0':
-                                try:
-                                    self.rx.update_reference(
-                                        "ДПУ", rec.Id, [{'Name': 'NumELK', 'Value': elk_num}])
-                                except:
-                                    logging.warning("Ошибка обновления кода ELK", exc_info=True)
-                                logging.info(
-                                    "Отправлен начальный статус для дела Id=%s, num=%s %s. ELK = %s" %
-                                    (rec.Id, rec.RegistrationNumber, rec.Name, elk_num))
+                            try:
+                                if 'user' in status['order'] or 'organization' in status['order']:
+                                    self.smev.create_orders_request(status)
+                                else:
+                                    self.smev.update_orders_request(status)
+                            except:
+                                logging.error('Error send initial status to ELK', exc_info=True)
+                            logging.info("Отправлен начальный статус для дела Id=%s, num=%s %s." %
+                                         (rec.Id, rec.RegistrationNumber, rec.Name))
                 if self.use_dir:
                     xml = self.directum.search(
                         'ДПУ',
-                        'СпособДост<>5652824 and СпособДост<>6953048 and СпособДост<>5652821 and Дата3>=%s and Дата3<%s'
+                        'СпособДост<>5652824 and СпособДост<>6953048 and СпособДост<>5652821 and Дата3>=%s and Дата3<=%s'
                         ' and Дата5 is null and LongString56 is null' %
-                        (date.today() - timedelta(days=days), date.today() + timedelta(days=1)), raw=True)
+                        (date.today() - timedelta(days=days), date.today()), raw=True)
                     recs = xml.findall('.//Object/Record')
                     logging.info("************* Проверка начальных статусов для %s дел" % len(recs))
                     for rec in recs:
                         declar_id = rec.findtext('.//Section[@Index="0"]/Requisite[@Name="ИД"]')
                         st_list = self.directum.get_declar_status_data(declar_id)
                         for status in st_list:
-                            elk_num = None
                             try:
                                 if 'user' in status['order'] or 'organization' in status['order']:
                                     self.smev.create_orders_request(status)
                                 else:
                                     self.smev.update_orders_request(status)
-                                elk_num = self.smev.get_orders_response()
                             except:
                                 logging.error('Error send initial status to ELK', exc_info=True)
-                            if elk_num and elk_num != '0':
-                                res = self.directum.update_reference(
-                                    "ДПУ", declar_id,
-                                    [{'Name': 'LongString56', 'Type': 'String', 'Value': elk_num}])
-                                if res[0]:
-                                    logging.warning(str(res) + " when " + str(status))
-                                else:
-                                    logging.info(
-                                        "Отправлен начальный статус для дела Id=%s, num=%s %s. ELK = %s" %
-                                        (declar_id,
+                            logging.info("Отправлен начальный статус для дела Id=%s, num=%s %s." %
+                                         (declar_id,
                                          rec.findtext('.//Section[@Index="0"]/Requisite[@Name="Дополнение3"]'),
-                                         rec.findtext('.//Section[@Index="0"]/Requisite[@Name="Наименование"]'),
-                                         elk_num))
+                                         rec.findtext('.//Section[@Index="0"]/Requisite[@Name="Наименование"]')))
+                self.get_elks()
         except:
             logging.error('Error send initial status to ELK', exc_info=True)
 
         # Send final status to ELK
         try:
+            if self.use_rx:
+                self.get_elks()
             if not last_update or date.fromisoformat(last_update) < date.today():
                 days = 3 if date.today().weekday() == 0 else 1
                 # Excluding ЕПГУ, РПГУ, ФИС ДВ 1ГА
                 if self.use_rx:
                     recs = self.rx.search(
                         'ДПУ', "СпособДост<>23 and СпособДост<>25 and СпособДост<>18"
-                               " and Дата5>=%s and Дата5<%s" %
-                        (date.today() - timedelta(days=days), date.today() + timedelta(days=1)), raw=False)
+                               " and Дата5>=%s and Дата5<=%s" %
+                        (date.today() - timedelta(days=days), date.today()), raw=False)
                     logging.info("************** Проверка конечных статусов для %s дел DirectumRX" % len(recs))
                     for rec in recs:
                         if rec.NumELK and '(3)' in rec.NumELK:
@@ -496,13 +463,11 @@ class Integration:
                             files = []
                             for ad in applied_docs:
                                 files.append({'path': ad.file, 'name': ad.file_name})
-                            elk_num = None
                             try:
                                 if 'user' in status['order'] or 'organization' in status['order']:
                                     self.smev.create_orders_request(status, files)
                                 else:
                                     self.smev.update_orders_request(status, files)
-                                elk_num = self.smev.get_orders_response()
                             except:
                                 logging.error('Error send final status to ELK', exc_info=True)
                             finally:
@@ -511,32 +476,25 @@ class Integration:
                                         os.remove(item.get('path'))
                                     except:
                                         pass
-                            if elk_num and elk_num != '0':
-                                try:
-                                    self.rx.update_reference(
-                                        "ДПУ", rec.Id, [{'Name': 'NumELK', 'Value': "%s (3)" % elk_num}])
-                                    logging.info(
-                                        "Отправлен конечный статус для дела Id=%s, num=%s %s. ELK = %s" %
-                                        (rec.Id, rec.RegistrationNumber, rec.Name, elk_num))
-                                    if applied_docs:
-                                        logging.info('Прикреплены документы:')
-                                        for doc in applied_docs:
-                                            logging.info('%s от %s № %s' % (
-                                                doc.title,
-                                                doc.date if isinstance(doc.date, datetime.datetime) else doc.date[:19],
-                                                doc.number if doc.number else 'б/н'))
-                                except:
-                                    logging.warning("Ошибка обновления кода ELK", exc_info=True)
+                            logging.info("Отправлен конечный статус для дела Id=%s, num=%s %s." %
+                                         (rec.Id, rec.RegistrationNumber, rec.Name))
+                            if applied_docs:
+                                logging.info('Прикреплены документы:')
+                                for doc in applied_docs:
+                                    logging.info('%s от %s № %s' % (
+                                        doc.title,
+                                        doc.date if isinstance(doc.date, datetime.datetime) else doc.date[:19],
+                                        doc.number if doc.number else 'б/н'))
                 if self.use_dir:
                     xml = self.directum.search(
                         'ДПУ', "СпособДост<>5652824 and СпособДост<>6953048 and СпособДост<>5652821"
-                               " and Дата5>=%s and Дата5<%s" %
-                        (date.today() - timedelta(days=days), date.today() + timedelta(days=1)), raw=True)
+                               " and Дата5>=%s and Дата5<=%s" %
+                        (date.today() - timedelta(days=days), date.today()), raw=True)
                     recs = xml.findall('.//Object/Record')
                     logging.info("************** Проверка конечных статусов для %s дел" % len(recs))
                     for rec in recs:
                         elk_num = rec.findtext('.//Section[@Index="0"]/Requisite[@Name="LongString56"]')
-                        if '(3)' in elk_num:
+                        if elk_num and '(3)' in elk_num:
                             continue
                         declar_id = rec.findtext('.//Section[@Index="0"]/Requisite[@Name="ИД"]')
                         st_list = self.directum.get_declar_status_data(declar_id, permanent_status='3')
@@ -545,13 +503,11 @@ class Integration:
                             files = []
                             for ad in applied_docs:
                                 files.append({'path': ad.file, 'name': ad.file_name})
-                            elk_num = None
                             try:
                                 if 'user' in status['order'] or 'organization' in status['order']:
                                     self.smev.create_orders_request(status, files)
                                 else:
                                     self.smev.update_orders_request(status, files)
-                                elk_num = self.smev.get_orders_response()
                             except:
                                 logging.error('Error send final status to ELK', exc_info=True)
                             finally:
@@ -560,28 +516,53 @@ class Integration:
                                         os.remove(item.get('path'))
                                     except:
                                         pass
-                            if elk_num and elk_num != '0':
-                                res = self.directum.update_reference(
-                                    "ДПУ", declar_id,
-                                    [{'Name': 'LongString56', 'Type': 'String', 'Value': "%s (3)" % elk_num}])
-                                if res[0]:
-                                    logging.warning(str(res) + " when " + str(status))
-                                else:
-                                    logging.info(
-                                        "Отправлен конечный статус для дела Id=%s, num=%s %s. ELK = %s" %
-                                        (declar_id, rec.findtext('.//Section[@Index="0"]/Requisite[@Name="Дополнение3"]'),
-                                         rec.findtext('.//Section[@Index="0"]/Requisite[@Name="Наименование"]'), elk_num))
-                                    if applied_docs:
-                                        logging.info('Прикреплены документы:')
-                                        for doc in applied_docs:
-                                            logging.info('%s от %s № %s' % (
-                                                doc.title,
-                                                doc.date if isinstance(doc.date, datetime.datetime) else doc.date[:19],
-                                                doc.number if doc.number else 'б/н'))
+                            logging.info("Отправлен конечный статус для дела Id=%s, num=%s %s." %
+                                         (declar_id,
+                                          rec.findtext('.//Section[@Index="0"]/Requisite[@Name="Дополнение3"]'),
+                                          rec.findtext('.//Section[@Index="0"]/Requisite[@Name="Наименование"]')))
+                            if applied_docs:
+                                logging.info('Прикреплены документы:')
+                                for doc in applied_docs:
+                                    logging.info('%s от %s № %s' % (
+                                        doc.title,
+                                        doc.date if isinstance(doc.date, datetime.datetime) else doc.date[:19],
+                                        doc.number if doc.number else 'б/н'))
+                self.get_elks()
         except:
             logging.error('Error send final status to ELK', exc_info=True)
 
         self.db.vacuum()
+
+    def get_elks(self):
+        elks = self.smev.get_orders_response()
+        while elks:
+            for elk in elks:
+                if elk['num'] and elk['msg'].lower() == 'ok':
+                    logging.info("%s статус для дела num=%s успешно установлен в ЕЛК." %
+                                 ("Начальный" if elk['new'] else "Конечный", elk['num']))
+                    elk_num = elk['num'] if elk['new'] else '%s (3)' % elk['num']
+                    if self.use_rx:
+                        recs = self.rx.search('ДПУ', "RegistrationNumber='%s' and Дата3>=%s and Дата3<=%s" % (
+                            elk['num'], date.today() - timedelta(days=360), date.today()), raw=False)
+                        for rec in recs:
+                            try:
+                                self.rx.update_reference("ДПУ", rec.Id,
+                                                         [{'Name': 'NumELK', 'Value': elk_num}])
+                            except:
+                                logging.warning("Ошибка обновления кода ELK", exc_info=True)
+                    if self.use_dir:
+                        xml = self.directum.search('ДПУ', "Дополнение3='%s' and Дата5>=%s and Дата5<=%s" % (
+                            elk['num'], date.today() - timedelta(days=360), date.today()), raw=True)
+                        recs = xml.findall('.//Object/Record')
+                        for rec in recs:
+                            declar_id = rec.findtext('.//Section[@Index="0"]/Requisite[@Name="ИД"]')
+                            res = self.directum.update_reference("ДПУ", declar_id,
+                                [{'Name': 'LongString56', 'Type': 'String', 'Value': elk_num}])
+                            if res[0]:
+                                logging.warning(str(res))
+                else:
+                    logging.warning("Error ELK: request num=%s: %s" % (elk['num'], elk['msg']))
+            elks = self.smev.get_orders_response()
 
     def parse_config(self, config_path):
         """

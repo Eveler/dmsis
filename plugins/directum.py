@@ -1197,6 +1197,9 @@ class IntegrationServices:
         """
         res = []
         card = fromstring(self.proxy.service.GetEntity('ДПУ', declar_id))
+        if len(card.findtext('.//Requisite[@Name="ServiceCode"]')) < 12: # Skip non federal services
+            return res
+        order_number = card.findtext('.//Requisite[@Name="Дополнение3"]')
         # Get declar status
         if not permanent_status:
             ent = fromstring(self.proxy.service.GetEntity(
@@ -1219,7 +1222,7 @@ class IntegrationServices:
         elk_num = card.findtext('.//Requisite[@Name="LongString56"]')
         from datetime import datetime, timedelta
         if elk_num:
-            order = {'orderNumber': card.findtext('.//Requisite[@Name="Дополнение3"]'),'senderKpp': '251101001',
+            order = {'orderNumber': order_number,'senderKpp': '251101001',
                      'senderInn': '2511004094',
                      'statusHistoryList':
                          {'statusHistory': {'status': status,
@@ -1286,7 +1289,7 @@ class IntegrationServices:
             for user in users:
                 order = {'user': user, 'senderKpp': '251101001', 'senderInn': '2511004094',
                          'serviceTargetCode': service, 'userSelectedRegion': '00000000',
-                         'orderNumber': card.findtext('.//Requisite[@Name="Дополнение3"]'),
+                         'orderNumber': order_number,
                          'requestDate': card.findtext('.//Requisite[@Name="Дата6"]'),
                          'OfficeInfo': {'ApplicationAcceptance': '4'
                                         # ЕЛК. Канал приема - Подразделение ведомства (https://esnsi.gosuslugi.ru/classifiers/7213/view/8)
@@ -1301,7 +1304,7 @@ class IntegrationServices:
             for org in orgs:
                 order = {'organization': org, 'senderKpp': '251101001', 'senderInn': '2511004094',
                          'serviceTargetCode': service, 'userSelectedRegion': '00000000',
-                         'orderNumber': card.findtext('.//Requisite[@Name="Дополнение3"]'),
+                         'orderNumber': order_number,
                          'requestDate': card.findtext('.//Requisite[@Name="Дата6"]'),
                          'OfficeInfo': {'ApplicationAcceptance': '4'
                                         # ЕЛК. Канал приема - Подразделение ведомства (https://esnsi.gosuslugi.ru/classifiers/7213/view/8)
