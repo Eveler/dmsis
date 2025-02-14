@@ -313,7 +313,11 @@ class Integration:
 
                         # Send final status to ELK
                         if self.use_rx:
-                            st_list = self.rx.get_declar_status_data(request.directum_id, permanent_status='3')
+                            try:
+                                st_list = self.rx.get_declar_status_data(request.directum_id, permanent_status='3')
+                            except:
+                                logging.error("Ошибка отправки конечного статуса для дела № %s ID=%s" % (
+                                    request.declar_num, request.directum_id), exc_info=True)
                         if self.use_dir:
                             st_list = self.directum.get_declar_status_data(request.directum_id, permanent_status='3')
                         for status in st_list:
