@@ -452,8 +452,10 @@ class DirectumRX:
             ad.title = data.Subject
             # Get only last version
             i = len(data.Versions) - 1
+            v_num = 0
             while i >= 0:
-                if not data.Versions[i].IsHidden:
+                if not data.Versions[i].IsHidden and v_num < data.Versions[i].Number:
+                    v_num = data.Versions[i].Number
                     file, file_n = mkstemp()
                     try:
                         version = self._service.default_context.connection.execute_get(
