@@ -587,9 +587,11 @@ class DirectumRX:
 
         if users or orgs:
             for user in users:
+                number = declar.RegistrationNumber if declar.RegistrationNumber else declar.SMEVNumber
+                number = number[len(number) - 36 if len(number) > 36 else 0:]
                 order = {'user': user, 'senderKpp': '251101001', 'senderInn': '2511004094',
                          'serviceTargetCode': service_kind.Code, 'userSelectedRegion': '00000000',
-                         'orderNumber': declar.RegistrationNumber[:36],
+                         'orderNumber': number,
                          'requestDate': declar.RegistrationDate.strftime('%Y-%m-%dT%H:%M:%S')
                          if declar.RegistrationDate else declar.MFCRegDate.strftime('%Y-%m-%dT%H:%M:%S')
                          if declar.MFCRegDate else declar.Created.strftime('%Y-%m-%dT%H:%M:%S'),
