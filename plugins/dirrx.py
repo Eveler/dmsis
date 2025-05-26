@@ -284,6 +284,7 @@ class DirectumRX:
         elif files:
             class D:
                 pass
+            was_error = False
             for file_name, file_path in files.items():
                 fn, ext = os.path.splitext(file_name)
                 with open(file_path, 'rb') as f:
@@ -293,8 +294,13 @@ class DirectumRX:
                 doc.number = ''
                 doc.date = datetime.date.today()
                 doc.title = fn
-                res = self.add_doc(doc, doc_data[1], doc_data[0], data)
+                try:
+                    res = self.add_doc(doc, doc_data[1], doc_data[0], data)
+                except:
+                    was_error = True
                 # doc_ids.append(str(res))
+            if was_error:
+                raise DirectumRXException("Не все документы загружены")
 
         # TODO: Send notification about new docs
         if doc_ids:
@@ -695,13 +701,15 @@ class DirectumRX:
             if not res:
                 self.search("IAssociatedApplications", "Extension eq 'txt'", raw=False)
             ver_num = 0
-            while ver_num < 3:
+            while ver_num < 5:
                 ver_num += 1
-                doc.Versions = [{"Number": ver_num, "AssociatedApplication": {"Id": res[0].Id}}]
+                doc.Versions = [{"Number": 1, "AssociatedApplication": {"Id": res[0].Id}}]
                 try:
                     self._service.save(doc)
-                    ver_num = 3
+                    ver_num = 5
                 except ODataError:
+                    if ver_num == 5:
+                        raise
                     pass
             doc = self.search("IAddendums", "Id eq %s" % doc.Id, raw=False)[0]
             self._service.default_context.connection.execute_post(
@@ -710,10 +718,11 @@ class DirectumRX:
             logging.info('Добавлен документ: %s № %s от %s Id = %s' % (doc.Name, requisites.number,
                                                                     requisites.date.strftime('%d.%m.%Y'), doc.Id))
         except ODataError:
-            logging.warning("Ошибка сохранения документа %s № %s от %s" % (requisites.title, requisites.number,
+            logging.error("Ошибка сохранения документа %s № %s от %s" % (requisites.title, requisites.number,
                                                                            requisites.date.strftime('%d.%m.%Y')),
                             exc_info=True)
             self._service.delete(doc)
+            raise
         return doc.Id
 
 
