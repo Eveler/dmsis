@@ -198,20 +198,20 @@ class DirectumRX:
                 res = self.search("ICounterparties", "Id eq %s" % apps_le[0].Id, raw=False)
                 data.Correspondent = res[0]  # Required "Заявитель"
                 data.AppCategory = "LegPers"
-            res = self.search('IMunicipalServicesServiceKinds',
+            service_kind = self.search('IMunicipalServicesServiceKinds',
                               "Code eq '%(cod)s'" % {"cod": declar.service}, raw=False)
-            if not res:
-                res = self.search('IMunicipalServicesServiceKinds',
+            if not service_kind:
+                service_kind = self.search('IMunicipalServicesServiceKinds',
                                   "contains(ShortName,'%(cod)s') or contains(FullName,'%(cod)s')" %
                                   {"cod": declar.service}, raw=False)
-            if not res:
+            if not service_kind:
                 raise DirectumRXException("Услуга не найдена")
-            data.ServiceKind = res[0]  # Required "Услуга"
+            data.ServiceKind = service_kind[0]  # Required "Услуга"
             now = datetime.datetime.now()
             holidays = [day[0] for day in country_holidays("RU", years=[now.year, now.year + 1]).items()]
-            now = busday_offset(now.date(), res[0].ProvisionTerm, roll='forward', holidays=holidays).astype(datetime.datetime) \
-                if res[0].TermType == 'WorkDays' \
-                else (now + timedelta(days=res[0].ProvisionTerm))
+            now = busday_offset(now.date(), service_kind[0].ProvisionTerm, roll='forward', holidays=holidays).astype(datetime.datetime) \
+                if service_kind[0].TermType == 'WorkDays' \
+                else (now + timedelta(days=service_kind[0].ProvisionTerm))
             if now in holidays or now.weekday() > 5:
                 now = busday_offset(now.date(), 1, roll='forward', holidays=holidays).astype(datetime.datetime)
             now = datetime.datetime(now.year, now.month, now.day)
@@ -269,8 +269,8 @@ class DirectumRX:
             es.persisted = True
             if saved_data is not None:
                 es.update(saved_data)
-                logging.info('Добавлено дело № %s от %s ID = %s' %
-                             (declar.declar_number, declar.register_date.strftime('%d.%m.%Y'), data.Id))
+                logging.info('Добавлено дело № %s от %s ID = %s ID услуги = %s' %
+                             (declar.declar_number, declar.register_date.strftime('%d.%m.%Y'), data.Id, service_kind[0].Id))
             else:
                 return False
         doc_ids = []
