@@ -53,6 +53,8 @@ class Adapter:
         else:
             self.proxy = Client(wsdl)
         self.__calls = 0
+        parsed = urlparse(wsdl)
+        self._url = f"{parsed.scheme}://{parsed.netloc}"
 
     def dump(self):
         res = "Prefixes:\n"
@@ -360,7 +362,8 @@ class Adapter:
             else:
                 se.text = data
 
-    def send_request(self, declar):
+    def send_request(self, declar, ftp_user='anonymous', ftp_pass='anonymous',
+                      s3_user='anonymous', s3_pass='anonymous'):
         operation = 'SendRequest'
         file_names = []
 
@@ -393,7 +396,7 @@ class Adapter:
                 rah = etree.SubElement(rahl, '{%s}RefAttachmentHeader' % ns)
                 etree.SubElement(
                     rah, '{%s}uuid' % ns).text = self.__upload_file(
-                    file_name, translate(basename(file_name)))
+                    file_name, translate(basename(file_name)), ftp_user, ftp_pass, s3_user, s3_pass)
                 f_hash = self.crypto.get_file_hash(file_name)
                 etree.SubElement(rah, '{%s}Hash' % ns).text = f_hash
                 etree.SubElement(
@@ -419,15 +422,16 @@ class Adapter:
         self.log.debug(res)
         return res
 
-    def upload_docs(self, applied_documents, ftp_user='anonymous', ftp_pass='anonymous'):
+    def upload_docs(self, applied_documents, ftp_user='anonymous', ftp_pass='anonymous',
+                    s3_user='anonymous', s3_pass='anonymous'):
         files = []
         for doc in applied_documents:
             if isinstance(doc, (bytes, str)):
                 file_name = os.path.split(doc)[1]
-                uuid = self.__upload_file(doc, file_name, ftp_user, ftp_pass)
+                uuid = self.__upload_file(doc, file_name, ftp_user, ftp_pass, s3_user, s3_pass)
                 files.append({uuid: {'name': file_name, 'type': guess_type(doc)[0], 'full_name': doc}})
             if doc.file:
-                uuid = self.__upload_file(doc.file, doc.file_name, ftp_user, ftp_pass)
+                uuid = self.__upload_file(doc.file, doc.file_name, ftp_user, ftp_pass, s3_user, s3_pass)
                 files.append({uuid: {'name': doc.file_name,
                                      'type': guess_type(doc.file)[0],
                                      'full_name': doc.file,
@@ -446,8 +450,9 @@ class Adapter:
             return in_str
 
     def send_response(self, reply_to, declar_number, register_date, result='FINAL', text='', applied_documents=(),
-                      ftp_user='anonymous', ftp_pass='anonymous'):
-        files = self.upload_docs(applied_documents, ftp_user, ftp_pass)
+                      ftp_user='anonymous', ftp_pass='anonymous',
+                      s3_user='anonymous', s3_pass='anonymous'):
+        files = self.upload_docs(applied_documents, ftp_user, ftp_pass, s3_user, s3_pass)
 
         operation = 'SendResponse'
         element = self.proxy.get_element('ns1:MessagePrimaryContent')
@@ -549,7 +554,32 @@ class Adapter:
         method = getattr(self.crypto, method_name)
         return method(xml)
 
-    def __upload_file(self, file, file_name, ftp_user='anonymous', ftp_pass='anonymous'):
+    def __upload_file(self, file, file_name, ftp_user='anonymous', ftp_pass='anonymous',
+                      s3_user='anonymous', s3_pass='anonymous'):
+        name, ext = os.path.splitext(translate(basename(file_name)))
+        file_name = f"{name[:108]}.{ext}"  # SMEV restriction
+        try:
+            uuid = self.__upload_s3(file, s3_user, s3_pass)
+        except Exception as ex:
+            logging.warning(ex, exc_info=True)
+            uuid = self.__upload_ftp(file, file_name, ftp_user, ftp_pass)
+        return uuid
+
+    def __upload_s3(self, file, file_name, s3_user='anonymous', s3_pass='anonymous'):
+        import boto3
+        from boto3.s3.transfer import TransferConfig, MB
+        logging.debug(f"SMEV S3 base url = {self._url}/attachment/")
+        s3 = boto3.client(service_name='s3', endpoint_url=self._url, aws_access_key_id=s3_user,
+                          aws_secret_access_key=s3_pass)
+        uuid = str(uuid1())
+        if file_name[0] == '/':
+            file_name = file_name[1:]
+        config = TransferConfig(multipart_threshold=100*MB)
+        with open(file, "rb") as in_f:
+            s3.upload_fileobj(in_f, "attachment", f"{uuid}/{file_name}", Config=config)
+        return uuid
+
+    def __upload_ftp(self, file, file_name, ftp_user='anonymous', ftp_pass='anonymous'):
         self.log.debug(file_name)
         addr = urlparse(self.ftp_addr).netloc
         max_try = 12
@@ -658,99 +688,43 @@ class Adapter:
                 file_name = file_name[:-4] + '.zip'
             files[file_name] = rs
 
-    # def __load_files(self, attach_files, res, files):
-    #     if reactor.running:
-    #         reactor.stop()
-    #     defereds = {}
-    #     for uuid, file in attach_files.items():
-    #         file_name = file['FileName']
-    #         rs = self.__load_file_ic(uuid, file_name, file['UserName'],
-    #                                  file['Password'])
-    #         defereds[file_name] = rs
-    #     reactor.run()
-    #     for uuid, file in attach_files.items():
-    #         file_name = file['FileName']
-    #         fn, ext = path.splitext(file_name)
-    #         if fn[0] == '/':
-    #             fn = fn[1:]
-    #         rs = defereds[file_name].result
-    #         if isinstance(rs, (str, bytes)):
-    #             new_ext = guess_extension(file['MimeType'])
-    #             ext = ext.lower()
-    #             if new_ext and not ext:
-    #                 file_name = fn + new_ext.lower()
-    #             else:
-    #                 file_name = fn + ext
-    #         else:
-    #             rs, e = rs
-    #             self.log.error(
-    #                 'Error loading file %s: %s\n%s\n\n%s\n\n' %
-    #                 (file_name, str(e),
-    #                  etree.tostring(res.Request.SenderProvidedRequestData.
-    #                                 MessagePrimaryContent._value_1),
-    #                  str(res)))
-    #             raise Exception(
-    #                 'Error loading file %s\n\n%s\n%s\n\n' %
-    #                 (file_name,
-    #                  etree.tostring(res.Request.SenderProvidedRequestData.
-    #                                 MessagePrimaryContent._value_1),
-    #                  str(res))) from e
-    #             file_name = fn + '.txt'
-    #             with open(rs, 'a') as f:
-    #                 f.write('\n\r\n\r')
-    #                 try:
-    #                     f.write(str(e, errors='ignore'))
-    #                     f.write('\n\r\n\r')
-    #                     f.write(str(res))
-    #                     f.write('\n\r\n\r')
-    #                     f.write(etree.tostring(
-    #                         res.Request.SenderProvidedRequestData.
-    #                             MessagePrimaryContent._value_1))
-    #                 except:
-    #                     from sys import exc_info
-    #                     from traceback import format_exception
-    #                     etype, value, tb = exc_info()
-    #                     trace = ''.join(
-    #                         format_exception(etype, value, tb))
-    #                     msg = ("%s\n" + "*" * 70 + "\n%s\n" +
-    #                            "*" * 70) % (value, trace)
-    #                     f.write(msg)
-    #                     f.write('\n\r\n\r')
-    #                     try:
-    #                         f.write(str(res.Request))
-    #                         f.write('\n\r\n\r')
-    #                         f.write(etree.tostring(
-    #                             res.Request.SenderProvidedRequestData.
-    #                                 MessagePrimaryContent._value_1))
-    #                     except:
-    #                         etype, value, tb = exc_info()
-    #                         trace = ''.join(
-    #                             format_exception(etype, value, tb))
-    #                         msg = ("%s\n" + "*" * 70 + "\n%s\n" +
-    #                                "*" * 70) % (value, trace)
-    #                         f.write(msg)
-    #                         f.write('\n\r\n\r')
-    #                         f.write(str(res))
-    #         sig = file.get('SignaturePKCS7')
-    #         if sig:
-    #             rs = self.__make_zip(file_name, rs, sig)
-    #             file_name = file_name[:-4] + '.zip'
-    #         files[file_name] = rs
-    #
-    # @inlineCallbacks
-    # def __load_file_ic(self, uuid, file_name, user='anonymous',
-    #                   passwd='anonymous'):
-    #     self.__calls += 1
-    #     try:
-    #         r = yield threads.deferToThread(
-    #             self.__load_file, uuid, file_name, user, passwd)
-    #     finally:
-    #         self.__calls -= 1
-    #         if not self.__calls:
-    #             reactor.stop()
-    #     returnValue(r)
-
     def __load_file(self, uuid, file_name, user='anonymous',
+                    passwd='anonymous'):
+        res = None
+        try:
+            res = self.__load_s3(uuid, file_name, user, passwd)
+        except Exception as ex:
+            logging.error(f"Error: {ex}")
+        if not res:
+            res = self.__load_ftp(uuid, file_name, user, passwd)
+        return res
+
+    def __load_s3(self, uuid, file_name, user='anonymous',
+                    passwd='anonymous'):
+        import boto3
+        logging.debug(f"SMEV S3 base url = {self._url}/attachment/")
+        s3 = boto3.client(service_name='s3', endpoint_url=self._url, aws_access_key_id=user, aws_secret_access_key=passwd)
+        try:
+            if file_name[0] == '/':
+                file_name = file_name[1:]
+            response = s3.get_object(Bucket="attachment", Key=f"{uuid}/{file_name}")
+            content = response['Body'].read().decode('utf-8')
+            logging.debug(f"content = {content}")
+            f, file_path = tempfile.mkstemp()
+            write(f, content)
+            close(f)
+            return file_path
+        except s3.exceptions.NoSuchKey:
+            logging.warning(f"Object '{uuid}/{file_name}' not found in bucket '{self._url}/attachment/'.")
+            response = s3.list_objects_v2(Bucket="attachment")
+            if 'Contents' in response:
+                logging.info(f"Objects in bucket 'attachment':")
+                for obj in response['Contents']:
+                    logging.info(f"  - {obj['Key']} (Last Modified: {obj['LastModified']}, Size: {obj['Size']} bytes)")
+        except Exception as ex:
+            logging.warning(f"{ex}")
+
+    def __load_ftp(self, uuid, file_name, user='anonymous',
                     passwd='anonymous'):
         addr = urlparse(self.ftp_addr).netloc
         f, file_path = tempfile.mkstemp()
@@ -912,7 +886,8 @@ class Adapter:
         return []
 
     def create_orders_request(self, orders: dict = (), files: list = None,
-                              uri='http://epgu.gosuslugi.ru/elk/status/1.0.2'):
+                              uri='http://epgu.gosuslugi.ru/elk/status/1.0.2',
+                              ftp_user='anonymous', ftp_pass='anonymous', s3_user='anonymous', s3_pass='anonymous'):
         operation = 'SendRequest'
         element = self.proxy.get_element('ns1:MessagePrimaryContent')
         eor = etree.Element('{%s}ElkOrderRequest' % uri, nsmap={'ns1': uri})
@@ -925,7 +900,8 @@ class Adapter:
             {'MessageID': uuid1(), 'MessagePrimaryContent': mpc},
             CallerInformationSystemSignature=etree.Element('Signature'))
         if files:
-            uploaded = self.__upload_files(node, files, 'SenderProvidedRequestData')
+            uploaded = self.__upload_files(node, files, 'SenderProvidedRequestData',
+                                           ftp_user, ftp_pass, s3_user, s3_pass)
             if uploaded:
                 sh = node.find('.//{*}statusHistory')
                 atts = etree.SubElement(sh, '{%s}attachments' % uri)
@@ -939,7 +915,9 @@ class Adapter:
         self.log.debug(res)
 
     def update_orders_request(self, orders: dict = (), files: list = None,
-                              uri='http://epgu.gosuslugi.ru/elk/status/1.0.2', test=False):
+                              uri='http://epgu.gosuslugi.ru/elk/status/1.0.2', test=False,
+                              ftp_user='anonymous', ftp_pass='anonymous',
+                              s3_user='anonymous', s3_pass='anonymous'):
         operation = 'SendRequest'
         element = self.proxy.get_element('ns1:MessagePrimaryContent')
         eor = etree.Element('{%s}ElkOrderRequest' % uri, nsmap={'ns1': uri})
@@ -953,7 +931,8 @@ class Adapter:
             {'MessageID': uuid1(), 'MessagePrimaryContent': mpc},
             CallerInformationSystemSignature=etree.Element('Signature'))
         if files:
-            uploaded = self.__upload_files(node, files, 'SenderProvidedRequestData')
+            uploaded = self.__upload_files(node, files, 'SenderProvidedRequestData',
+                                           ftp_user, ftp_pass, s3_user, s3_pass)
             if uploaded:
                 sh = node.find('.//{*}statusHistory')
                 atts = etree.SubElement(sh, '{%s}attachments' % uri)
@@ -968,7 +947,7 @@ class Adapter:
         return res
 
     def __upload_files(self, node, file_names, signed_tag='SenderProvidedRequestData', ftp_user='anonymous',
-                       ftp_pass='anonymous'):
+                       ftp_pass='anonymous', s3_user='anonymous', s3_pass='anonymous'):
         ns = etree.QName(node.find('.//{*}MessagePrimaryContent')).namespace
         res = node.find('.//{*}%s' % signed_tag)
         rahl = etree.SubElement(res, '{%s}RefAttachmentHeaderList' % ns)
@@ -984,7 +963,7 @@ class Adapter:
                 file_name = item.file_name
             if f:
                 if not uuid:
-                    uuid = self.__upload_file(f, translate(basename(file_name)), ftp_user, ftp_pass)
+                    uuid = self.__upload_file(f, translate(basename(file_name)), ftp_user, ftp_pass, s3_user, s3_pass)
                 rah = etree.SubElement(rahl, '{%s}RefAttachmentHeader' % ns)
                 etree.SubElement(rah, '{%s}uuid' % ns).text = uuid
                 f_hash = self.crypto.get_file_hash(f)

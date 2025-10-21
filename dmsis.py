@@ -86,6 +86,7 @@ class Integration:
             self.crt_name = 'Администрация Уссурийского городского округа'
             self.mail_server = None
             self.ftp_user, self.ftp_pass = 'anonymous', 'anonymous'
+            self.s3_user, self.s3_pass = self.ftp_user, self.ftp_pass
             self.zip_signed_doc = False
             self.check_workdays = False
 
@@ -298,7 +299,8 @@ class Integration:
                     try:
                         res, uuids = self.smev.send_response(
                             request.reply_to, request.declar_num, request.declar_date, text=text,
-                            applied_documents=applied_docs, ftp_user=self.ftp_user, ftp_pass=self.ftp_pass)
+                            applied_documents=applied_docs, ftp_user=self.ftp_user, ftp_pass=self.ftp_pass,
+                            s3_user=self.s3_user, s3_pass=self.s3_pass)
                         logging.info(
                             'Результат услуги отправлен. Дело № %s от %s' % (request.declar_num, request.declar_date))
                         if applied_docs:
@@ -329,9 +331,13 @@ class Integration:
                                 files.append({'path': ad.get('full_name'), "name": ad.get('name')})
                             try:
                                 if 'user' in status['order'] or 'organization' in status['order']:
-                                    self.smev.create_orders_request(status, files)
+                                    self.smev.create_orders_request(
+                                        status, files, ftp_user=self.ftp_user, ftp_pass=self.ftp_pass,
+                                        s3_user=self.s3_user, s3_pass=self.s3_pass)
                                 else:
-                                    self.smev.update_orders_request(status, files)
+                                    self.smev.update_orders_request(
+                                        status, files, ftp_user=self.ftp_user, ftp_pass=self.ftp_pass,
+                                        s3_user=self.s3_user, s3_pass=self.s3_pass)
                             except:
                                 logging.error('Error send final status to ELK', exc_info=True)
                             logging.info("Отправлен конечный статус для дела Id=%s, num=%s от %s." %
@@ -470,9 +476,13 @@ class Integration:
                                 files.append({'path': ad.file, 'name': ad.file_name})
                             try:
                                 if 'user' in status['order'] or 'organization' in status['order']:
-                                    self.smev.create_orders_request(status, files)
+                                    self.smev.create_orders_request(
+                                        status, files, ftp_user=self.ftp_user, ftp_pass=self.ftp_pass,
+                                        s3_user=self.s3_user, s3_pass=self.s3_pass)
                                 else:
-                                    self.smev.update_orders_request(status, files)
+                                    self.smev.update_orders_request(
+                                        status, files, ftp_user=self.ftp_user, ftp_pass=self.ftp_pass,
+                                        s3_user=self.s3_user, s3_pass=self.s3_pass)
                             except:
                                 logging.error('Error send final status to ELK', exc_info=True)
                             finally:
@@ -510,9 +520,13 @@ class Integration:
                                 files.append({'path': ad.file, 'name': ad.file_name})
                             try:
                                 if 'user' in status['order'] or 'organization' in status['order']:
-                                    self.smev.create_orders_request(status, files)
+                                    self.smev.create_orders_request(
+                                        status, files, ftp_user=self.ftp_user, ftp_pass=self.ftp_pass,
+                                        s3_user=self.s3_user, s3_pass=self.s3_pass)
                                 else:
-                                    self.smev.update_orders_request(status, files)
+                                    self.smev.update_orders_request(
+                                        status, files, ftp_user=self.ftp_user, ftp_pass=self.ftp_pass,
+                                        s3_user=self.s3_user, s3_pass=self.s3_pass)
                             except:
                                 logging.error('Error send final status to ELK', exc_info=True)
                             finally:
@@ -690,10 +704,27 @@ class Integration:
                 self.ftp_user = cfg.get('smev', 'ftp_user')
             else:
                 self.ftp_user = 'anonymous'
+                do_write = True
+                cfg.set('smev', 'ftp_user', self.ftp_user)
             if 'ftp_pass' in cfg.options('smev'):
                 self.ftp_pass = cfg.get('smev', 'ftp_pass')
             else:
                 self.ftp_pass = 'anonymous'
+                do_write = True
+                cfg.set('smev', 'ftp_pass', self.ftp_pass)
+            if 's3_user' in cfg.options('smev'):
+                self.s3_user = cfg.get('smev', 's3_user')
+            else:
+                do_write = True
+                self.s3_user = 'anonymous'
+                cfg.set('smev', 's3_user', self.s3_user)
+            if 's3_pass' in cfg.options('smev'):
+                self.s3_pass = cfg.get('smev', 's3_pass')
+            else:
+                do_write = True
+                self.s3_pass = 'anonymous'
+                cfg.set('smev', 's3_pass', self.s3_pass)
+
             if 'zip_signed_doc' not in cfg.options('smev'):
                 do_write = True
                 cfg.set('smev', 'zip_signed_doc', "False")
