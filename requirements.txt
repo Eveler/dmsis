@@ -14,3 +14,4 @@ pyOpenSSL~=22.0.0
 cryptography~=37.0.4
 service-identity~=21.1.0
 boto3~=1.37.38
+psutil~=7.1.1

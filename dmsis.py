@@ -9,7 +9,7 @@ import datetime
 import logging
 import os
 from datetime import date, timedelta
-from sys import version_info, platform, exc_info
+from sys import version_info, platform, exc_info, argv
 
 from dateutil.utils import today
 from holidays import country_holidays
@@ -858,6 +858,19 @@ def main():
     else:
         HandleCommandLine(Service)
 
+def is_script_running(cmd_line):
+    cur_pid = os.getpid()
+    import psutil
+    for proc in psutil.process_iter(['pid', 'cmdline']):
+        if proc.info['pid'] == cur_pid:
+            continue
+        cmdline = ' '.join(proc.info['cmdline'])
+        if cmdline and cmd_line in cmdline:
+            print(f"Another instance of '{cmd_line}' is already running: '{cmdline}'.")
+            return True
+    return False
 
 if __name__ == '__main__':
+    if is_script_running(' '.join(argv)):
+        exit(1)
     main()
