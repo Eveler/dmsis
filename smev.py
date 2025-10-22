@@ -707,8 +707,11 @@ class Adapter:
         try:
             if file_name[0] == '/':
                 file_name = file_name[1:]
-            response = s3.get_object(Bucket="attachment", Key=f"{uuid}/{file_name}")
-            content = response['Body'].read().decode('utf-8')
+            try:
+                response = s3.get_object(Bucket="attachment", Key=f"{uuid}/{file_name}")
+            except s3.exceptions.NoSuchKey:
+                response = s3.get_object(Bucket="attachment", Key=file_name)
+            content = response['Body'].read()
             logging.debug(f"content = {content}")
             f, file_path = tempfile.mkstemp()
             write(f, content)
@@ -722,7 +725,7 @@ class Adapter:
                 for obj in response['Contents']:
                     logging.info(f"  - {obj['Key']} (Last Modified: {obj['LastModified']}, Size: {obj['Size']} bytes)")
         except Exception as ex:
-            logging.warning(f"{ex}")
+            logging.warning(f"{ex}", exc_info=True)
 
     def __load_ftp(self, uuid, file_name, user='anonymous',
                     passwd='anonymous'):

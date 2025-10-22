@@ -150,12 +150,14 @@ class DirectumRX:
         return corr
 
     def add_declar(self, declar, files):
+        oper_name = "Добавлено"
         data = self.search(
             "IMunicipalServicesServiceCases",
             "(RegistrationNumber eq '%s' or SMEVNumber eq '%s') and MFCRegDate eq %s" %
             (declar.declar_number, declar.declar_number,
-             declar.register_date.strftime("%Y-%m-%dT00:00:00Z")), raw=False)
+             declar.register_date.strftime("%Y-%m-%d")), raw=False)
         if data:
+            oper_name = "Обновлено"
             data = data[0]
         else:
             data = self._service.entities['IMunicipalServicesServiceCases']()
@@ -269,8 +271,8 @@ class DirectumRX:
             es.persisted = True
             if saved_data is not None:
                 es.update(saved_data)
-                logging.info('Добавлено дело № %s от %s ID = %s ID услуги = %s' %
-                             (declar.declar_number, declar.register_date.strftime('%d.%m.%Y'), data.Id, service_kind[0].Id))
+                logging.info('%s дело № %s от %s ID = %s ID услуги = %s' %
+                             (oper_name, declar.declar_number, declar.register_date.strftime('%d.%m.%Y'), data.Id, service_kind[0].Id))
             else:
                 return False
         doc_ids = []
