@@ -557,26 +557,32 @@ class Adapter:
     def __upload_file(self, file, file_name, ftp_user='anonymous', ftp_pass='anonymous',
                       s3_user='anonymous', s3_pass='anonymous'):
         name, ext = os.path.splitext(translate(basename(file_name)))
-        file_name = f"{name[:108]}.{ext}"  # SMEV restriction
+        file_name = f"{name[:108]}.{ext}" if ext else name[:108]  # SMEV restriction
         try:
-            uuid = self.__upload_s3(file, s3_user, s3_pass)
+            uuid = self.__upload_s3(file, file_name, s3_user, s3_pass)
         except Exception as ex:
             logging.warning(ex, exc_info=True)
             uuid = self.__upload_ftp(file, file_name, ftp_user, ftp_pass)
         return uuid
 
-    def __upload_s3(self, file, file_name, s3_user='anonymous', s3_pass='anonymous'):
+    def __upload_s3(self, file, file_name, user='anonymous', passwd='anonymous'):
         import boto3
+        #from botocore.client import Config
         from boto3.s3.transfer import TransferConfig, MB
-        logging.debug(f"SMEV S3 base url = {self._url}/attachment/")
-        s3 = boto3.client(service_name='s3', endpoint_url=self._url, aws_access_key_id=s3_user,
-                          aws_secret_access_key=s3_pass)
+        bucket_name = "attachment"
+        logging.debug(f"SMEV S3 base url = {self._url}/{bucket_name}/")
+        # Common signature_version values:
+        # v4: The default and recommended signature version for most AWS services.
+        # s3v4: Specifically for Amazon S3, using Signature Version 4. This is often used for S3-specific operations and can sometimes be required for certain S3 features or regions.
+        # v2: An older signature version. This might be used in specific legacy scenarios, such as generating presigned URLs with an expiry greater than 7 days for S3.
+        # UNSIGNED: Allows for unsigned requests, typically used when interacting with public resources or in specific testing scenarios where authentication is not required.
+        s3 = boto3.client(service_name='s3', endpoint_url=self._url, aws_access_key_id=user,
+                          aws_secret_access_key=passwd) #, config=Config(signature_version='s3v4'))
         uuid = str(uuid1())
         if file_name[0] == '/':
             file_name = file_name[1:]
-        config = TransferConfig(multipart_threshold=100*MB)
         with open(file, "rb") as in_f:
-            s3.upload_fileobj(in_f, "attachment", f"{uuid}/{file_name}", Config=config)
+            s3.upload_fileobj(in_f, bucket_name, f"{uuid}/{file_name}", Config=TransferConfig(multipart_threshold=100*MB))
         return uuid
 
     def __upload_ftp(self, file, file_name, ftp_user='anonymous', ftp_pass='anonymous'):
@@ -1075,182 +1081,8 @@ if __name__ == '__main__':
     #             wsdl="http://smev3-n0.test.gosuslugi.ru:7500/smev/v1.2/ws?wsdl",
     #             ftp_addr="ftp://smev3-n0.test.gosuslugi.ru/",
     #             crt_name='АДМИНИСТРАЦИЯ УССУРИЙСКОГО ГОРОДСКОГО ОКРУГА')
-    a = Adapter(serial='00AB 63BB BD9B 3728 C624 1DC9 C482 6264 F4',
-                container='ep_ov-2023',
+    a = Adapter(serial='00D9 F55F FB34 86AD 657E 494B D9A6 75D1 D7',
+                container='ep_ov-2025',
                 wsdl="http://172.20.3.12:7500/smev/v1.2/ws?wsdl",
                 ftp_addr="ftp://172.20.3.12/",
                 crt_name='АДМИНИСТРАЦИЯ УССУРИЙСКОГО ГОРОДСКОГО ОКРУГА')
-
-    orders = {
-        'order': {
-            # 'user': {
-            #     # 'userPersonalDoc': {
-            #     #     'PersonalDocType': '1',  # ЕЛК. Тип документа удостоверяющего личность - Паспорт гражданина РФ (https://esnsi.gosuslugi.ru/classifiers/7211/view/10)
-            #     #     'series': '0502',
-            #     #     'number': '918150',
-            #     #     'lastName': 'Савенко',
-            #     #     'firstName': 'Михаил',
-            #     #     'middleName': 'Юрьевич',
-            #     #     'citizenship': '643'  # ЕЛК. Гражданство - РОССИЯ (https://esnsi.gosuslugi.ru/classifiers/7210/view/27)
-            #     # }
-            #     'userPersonalDoc': {
-            #         'PersonalDocType': '1',
-            #         # ЕЛК. Тип документа удостоверяющего личность - Паспорт гражданина РФ (https://esnsi.gosuslugi.ru/classifiers/7211/view/10)
-            #         'series': '0507',
-            #         'number': '380602',
-            #         'lastName': 'Эйснер',
-            #         'firstName': 'Ольга',
-            #         'middleName': 'Владимировна',
-            #         'citizenship': '643'
-            #         # ЕЛК. Гражданство - РОССИЯ (https://esnsi.gosuslugi.ru/classifiers/7210/view/27)
-            #     }
-            #
-            #     # 'userDocSnils': {
-            #     #     'snils': '060-908-001-34',
-            #     #     'lastName': 'Савенко',
-            #     #     'firstName': 'Михаил',
-            #     #     'middleName': 'Юрьевич',
-            #     #     'citizenship': '643'
-            #     # }
-            #
-            #     # 'userDocSnilsBirthDate': {
-            #     #     'citizenship': '643',
-            #     #     'snils': '060-908-001-34',
-            #     #     'birthDate': '1980-09-21'
-            #     # }
-            #
-            #     # 'userDocInn': {
-            #     #     'INN': '253602023181',
-            #     #     'lastName': 'Савенко',
-            #     #     'firstName': 'Михаил',
-            #     #     'middleName': 'Юрьевич',
-            #     #     'citizenship': '643'
-            #     # }
-            # },
-            'organization': {
-                'ogrn_inn_UL': {
-                    'inn_kpp': {
-                        'inn': '2511004094'
-                    }#,
-                    #'UlTitle': 'Администрация Уссурийского городского округа'
-                }
-            },
-            'senderKpp': '251101001',
-            'senderInn': '2511004094',
-            # 'serviceTargetCode': '2540100010000664823',
-            'serviceTargetCode': '2540100010000664885',
-            'userSelectedRegion': '00000000',
-            'orderNumber': 'test_num02',
-            'requestDate': datetime.now().strftime('%Y-%m-%dT%H:%M:%S+10:00'),
-            'OfficeInfo': {
-                'ApplicationAcceptance': '4'  # ЕЛК. Канал приема - Подразделение ведомства (https://esnsi.gosuslugi.ru/classifiers/7213/view/8)
-            },
-            'statusHistoryList': {
-                'statusHistory': {
-                    'status': '6',  # ЕЛК. Статусы - Заявление принято (https://esnsi.gosuslugi.ru/classifiers/7212/view/86)
-                    'IsInformed': 'true',
-                    # 'statusDate': datetime.now().strftime('%Y-%m-%dT%H:%M:%S+10:00')
-                    'statusDate': datetime.now().strftime('%Y-%m-%dT%H:%M:%S+10:00')
-                }
-            }
-        }
-    }
-    # a.create_orders_request(orders)
-
-    orders = {
-        'order': {
-            'orderNumber': 'test_num',
-            'senderKpp': '251101001',
-            'senderInn': '2511004094',
-            'statusHistoryList': {
-                'statusHistory': {
-                    'status': '223',
-                    # 'IsInformed': 'true',
-                    'statusDate': datetime.now().strftime('%Y-%m-%dT%H:%M:%S+10:00')
-                }
-            }
-        }
-    }
-    a.update_orders_request(orders, [{'path': 'D:\\dmsis\\smev.py', 'name': "smev.txt"}])
-
-    import time
-    time.sleep(10)
-    res = a.get_response('ElkOrderResponse', 'http://epgu.gosuslugi.ru/elk/status/1.0.2', None)
-    while not res:
-        time.sleep(10)
-        res = a.get_response('ElkOrderResponse', 'http://epgu.gosuslugi.ru/elk/status/1.0.2', None)
-    if isinstance(res, bytes):
-        res = res.decode(errors='replace')
-    if res and 'MessagePrimaryContent' in res:
-        res = etree.fromstring(res)
-    if hasattr(res, 'Response') \
-            and hasattr(res.Response, 'SenderProvidedResponseData'):
-        if hasattr(res.Response.SenderProvidedResponseData, "MessageID"):
-            a.send_ack(res.Response.SenderProvidedResponseData.MessageID)
-        if hasattr(res.Response.SenderProvidedResponseData, 'MessagePrimaryContent') \
-                and res.Response.SenderProvidedResponseData.MessagePrimaryContent:
-            val: etree._Element = res.Response.SenderProvidedResponseData.MessagePrimaryContent._value_1
-            try:
-                print(val, type(val))
-                print(val.findtext('.//{*}message'),
-                      ', '.join([elem.findtext('.//{*}message') for elem in val.findall('.//{*}order')]))
-                print('elkOrderNumber', val.findtext('.//{*}elkOrderNumber'))
-                print(len(val[0]), val[0][1], [elem for elem in val[0][2]])
-            except Exception as e:
-                print("ERROR:", e)
-            res = etree.tostring(res.Response.SenderProvidedResponseData.MessagePrimaryContent._value_1)
-    print(res)
-
-    orders = {
-        'order': {
-            'user': {
-                'userDocPassport': {
-                    'passportRF': {
-                        'series': '0502',
-                        'number': '918150',
-                        'issueDate': '2002-07-03'
-                    },
-                    'lastName': 'Савенко',
-                    'firstName': 'Михаил',
-                    'middleName': 'Юрьевич'
-                }
-
-                # 'userDocSnils': {
-                #     'snils': '060-908-001-34',
-                #     'lastName': 'Савенко',
-                #     'firstName': 'Михаил',
-                #     'middleName': 'Юрьевич',
-                # }
-            },
-            # 'serviceTargetCode': '2540100010000664823',
-            'serviceTargetCode': '2540100010000664885',
-            'userSelectedRegion': '00000000',
-            'orderNumber': 'a',
-            'requestDate': datetime.now().strftime('%Y-%m-%dT%H:%M:%S'),
-            'statusHistoryList': {
-                'statusHistory': {
-                    'status': '6',
-                    # ЕЛК. Статусы - Заявление принято (https://esnsi.gosuslugi.ru/classifiers/7212/view/86)
-                    'statusDate': '2022-12-17T09:30:47Z'
-                }
-            }
-        }
-    }
-    # a.create_orders_request(orders, 'http://epgu.gosuslugi.ru/elk/order/3.3.0')
-    # time.sleep(10)
-    # res = a.get_response('ElkOrderRequest', 'http://epgu.gosuslugi.ru/elk/order/3.3.0', None)
-    # while not res:
-    #     time.sleep(10)
-    #     res = a.get_response('ElkOrderRequest', 'http://epgu.gosuslugi.ru/elk/order/3.3.0', None)
-    # if isinstance(res, bytes):
-    #     res = res.decode(errors='replace')
-    # if res and 'MessagePrimaryContent' in res:
-    #     res = etree.fromstring(res)
-    # if hasattr(res, 'Response') \
-    #         and hasattr(res.Response, 'SenderProvidedResponseData'):
-    #     if hasattr(res.Response.SenderProvidedResponseData, "MessageID"):
-    #         a.send_ack(res.Response.SenderProvidedResponseData.MessageID)
-    #     if hasattr(res.Response.SenderProvidedResponseData, 'MessagePrimaryContent') \
-    #             and res.Response.SenderProvidedResponseData.MessagePrimaryContent:
-    #         res = etree.tostring(res.Response.SenderProvidedResponseData.MessagePrimaryContent._value_1)
-    # print(res)
