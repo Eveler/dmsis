@@ -588,7 +588,7 @@ class DirectumRX:
             applicant = self._service.default_context.connection.execute_get(
                 "%s/ApplicantsLE(%s)?$expand=*" % (declar.__odata__.instance_url, ul.Id))
             if applicant['Applicant']:
-                if applicant['Applicant']['TIN']:
+                if applicant['Applicant']['TIN'] and len(applicant['Applicant']['TIN']) == 10:
                     orgs.append({'ogrn_inn_UL': {'inn_kpp': {'inn': applicant['Applicant']['TIN'].strip()}}})
                 elif applicant['Applicant']['PSRN']:
                     orgs.append({'ogrn_inn_UL': {'ogrn': applicant['Applicant']['PSRN'].strip()}})
