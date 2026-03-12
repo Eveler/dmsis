@@ -540,96 +540,149 @@ class DirectumRX:
 
         # Get persons
         users = []
-        for fl in declar.ApplicantsPP:
-            applicant = self._service.default_context.connection.execute_get(
-                "%s/ApplicantsPP(%s)?$expand=*" % (declar.__odata__.instance_url, fl.Id))
-            if applicant['Applicant']:
+        # for fl in declar.ApplicantsPP:
+        #     applicant = self._service.default_context.connection.execute_get(
+        #         "%s/ApplicantsPP(%s)?$expand=*" % (declar.__odata__.instance_url, fl.Id))
+        #     if applicant['Applicant']:
+        #         series = num = None
+        #         add_info = self.search(
+        #             "IAUGOPartiesPersonAddInfos", "Person/Id eq %s" % applicant['Applicant']['Id'], raw=False)
+        #         if add_info:
+        #             add_info = add_info[0]
+        #             series = add_info.Series
+        #             num = add_info.Number
+        #         if applicant['Applicant']['TIN'] or (series and num) or applicant['Applicant']['INILA']:
+        #             if series and num:
+        #                 user = {'userPersonalDoc': {
+        #                     'PersonalDocType': '1', 'series': series, 'number': num,
+        #                     'lastName': applicant['Applicant']['LastName'],
+        #                     'firstName': applicant['Applicant']['FirstName'],
+        #                     'middleName': applicant['Applicant']['MiddleName'], 'citizenship': '643'}}
+        #             elif applicant['Applicant']['INILA']: # SNILS
+        #                 if applicant['Applicant']['DateOfBirth']:
+        #                     user = {'userDocSnilsBirthDate': {
+        #                         'citizenship': '643', 'snils': applicant['Applicant']['INILA'].strip(),
+        #                         'birthDate': applicant['Applicant']['DateOfBirth'][:10]}}
+        #                 else:
+        #                     user = {'userDocSnils': {
+        #                         'snils': applicant['Applicant']['INILA'].strip(),
+        #                         'lastName': applicant['Applicant']['LastName'],
+        #                         'firstName': applicant['Applicant']['FirstName'],
+        #                         'middleName': applicant['Applicant']['MiddleName'], 'citizenship': '643'}}
+        #             elif applicant['Applicant']['TIN']: # INN
+        #                 user = {'userDocInn': {
+        #                     'INN': applicant['Applicant']['TIN'].strip(),
+        #                     'lastName': applicant['Applicant']['LastName'],
+        #                     'firstName': applicant['Applicant']['FirstName'],
+        #                     'middleName': applicant['Applicant']['MiddleName'], 'citizenship': '643'}}
+        #             else:
+        #                 raise DirectumRXException("User %s %s %s (%s) has no passport nor INN nor SNILS" % (
+        #                     applicant['Applicant']['LastName'],
+        #                     applicant['Applicant']['FirstName'],
+        #                     applicant['Applicant']['MiddleName'],
+        #                     applicant['Applicant']['Id']))
+        #             users.append(user)
+        # Get organisations
+        orgs = []
+        # for ul in declar.ApplicantsLE:
+        #     applicant = self._service.default_context.connection.execute_get(
+        #         "%s/ApplicantsLE(%s)?$expand=*" % (declar.__odata__.instance_url, ul.Id))
+        #     if applicant['Applicant']:
+        #         if applicant['Applicant']['TIN'] and len(applicant['Applicant']['TIN']) == 10:
+        #             orgs.append({'ogrn_inn_UL': {'inn_kpp': {'inn': applicant['Applicant']['TIN'].strip()}}})
+        #         elif applicant['Applicant']['PSRN']:
+        #             orgs.append({'ogrn_inn_UL': {'ogrn': applicant['Applicant']['PSRN'].strip()}})
+
+        corr = self.search("ICompanies", "Id eq %s" % declar.Correspondent.Id, raw=False)
+        if corr and corr[0]:
+            corr = corr[0]
+            # Get organization
+            if corr.TIN and len(corr.TIN) == 10:
+                orgs.append({'ogrn_inn_UL': {'inn_kpp': {'inn': corr.TIN.strip()}}})
+            elif corr.PSRN:
+                orgs.append({'ogrn_inn_UL': {'ogrn': corr.PSRN.strip()}})
+            else:
+                raise DirectumRXException("Company %s (%s) has no OGRN nor INN" % (corr.Name, corr.Id))
+        else:
+            corr = self.search("IPersons", "Id eq %s" % declar.Correspondent.Id, raw=False)
+            if corr and corr[0]:
+                corr = corr[0]
+                # Get person
                 series = num = None
                 add_info = self.search(
-                    "IAUGOPartiesPersonAddInfos", "Person/Id eq %s" % applicant['Applicant']['Id'], raw=False)
+                    "IAUGOPartiesPersonAddInfos", "Person/Id eq %s" % corr.Id, raw=False)
                 if add_info:
                     add_info = add_info[0]
                     series = add_info.Series
                     num = add_info.Number
-                if applicant['Applicant']['TIN'] or (series and num) or applicant['Applicant']['INILA']:
+                if corr.TIN or (series and num) or corr.INILA:
                     if series and num:
                         user = {'userPersonalDoc': {
                             'PersonalDocType': '1', 'series': series, 'number': num,
-                            'lastName': applicant['Applicant']['LastName'],
-                            'firstName': applicant['Applicant']['FirstName'],
-                            'middleName': applicant['Applicant']['MiddleName'], 'citizenship': '643'}}
-                    elif applicant['Applicant']['INILA']: # SNILS
-                        if applicant['Applicant']['DateOfBirth']:
+                            'lastName': corr.LastName,
+                            'firstName': corr.FirstName,
+                            'middleName': corr.MiddleName, 'citizenship': '643'}}
+                    elif corr.INILA:  # SNILS
+                        if corr.DateOfBirth:
                             user = {'userDocSnilsBirthDate': {
-                                'citizenship': '643', 'snils': applicant['Applicant']['INILA'].strip(),
-                                'birthDate': applicant['Applicant']['DateOfBirth'][:10]}}
+                                'citizenship': '643', 'snils': corr.INILA.strip(),
+                                'birthDate': corr.DateOfBirth[:10]}}
                         else:
                             user = {'userDocSnils': {
-                                'snils': applicant['Applicant']['INILA'].strip(),
-                                'lastName': applicant['Applicant']['LastName'],
-                                'firstName': applicant['Applicant']['FirstName'],
-                                'middleName': applicant['Applicant']['MiddleName'], 'citizenship': '643'}}
-                    elif applicant['Applicant']['TIN']: # INN
+                                'snils': corr.INILA.strip(),
+                                'lastName': corr.LastName,
+                                'firstName': corr.FirstName,
+                                'middleName': corr.MiddleName, 'citizenship': '643'}}
+                    elif corr.TIN:  # INN
                         user = {'userDocInn': {
-                            'INN': applicant['Applicant']['TIN'].strip(),
-                            'lastName': applicant['Applicant']['LastName'],
-                            'firstName': applicant['Applicant']['FirstName'],
-                            'middleName': applicant['Applicant']['MiddleName'], 'citizenship': '643'}}
+                            'INN': corr.TIN.strip(),
+                            'lastName': corr.LastName,
+                            'firstName': corr.FirstName,
+                            'middleName': corr.MiddleName, 'citizenship': '643'}}
                     else:
                         raise DirectumRXException("User %s %s %s (%s) has no passport nor INN nor SNILS" % (
-                            applicant['Applicant']['LastName'],
-                            applicant['Applicant']['FirstName'],
-                            applicant['Applicant']['MiddleName'],
-                            applicant['Applicant']['Id']))
+                            corr.LastName,
+                            corr.FirstName,
+                            corr.MiddleName,
+                            corr.Id))
                     users.append(user)
-        # Get organisations
-        orgs = []
-        for ul in declar.ApplicantsLE:
-            applicant = self._service.default_context.connection.execute_get(
-                "%s/ApplicantsLE(%s)?$expand=*" % (declar.__odata__.instance_url, ul.Id))
-            if applicant['Applicant']:
-                if applicant['Applicant']['TIN'] and len(applicant['Applicant']['TIN']) == 10:
-                    orgs.append({'ogrn_inn_UL': {'inn_kpp': {'inn': applicant['Applicant']['TIN'].strip()}}})
-                elif applicant['Applicant']['PSRN']:
-                    orgs.append({'ogrn_inn_UL': {'ogrn': applicant['Applicant']['PSRN'].strip()}})
 
-        if users or orgs:
-            for user in users:
-                number = declar.RegistrationNumber if declar.RegistrationNumber else declar.SMEVNumber
-                number = number[len(number) - 36 if len(number) > 36 else 0:]
-                order = {'user': user, 'senderKpp': '251101001', 'senderInn': '2511004094',
-                         'serviceTargetCode': service_kind.Code, 'userSelectedRegion': '00000000',
-                         'orderNumber': number,
-                         'requestDate': declar.RegistrationDate.strftime('%Y-%m-%dT%H:%M:%S')
-                         if declar.RegistrationDate else declar.MFCRegDate.strftime('%Y-%m-%dT%H:%M:%S')
-                         if declar.MFCRegDate else declar.Created.strftime('%Y-%m-%dT%H:%M:%S'),
-                         'OfficeInfo': {'ApplicationAcceptance': '4'
-                                        # ЕЛК. Канал приема - Подразделение ведомства (https://esnsi.gosuslugi.ru/classifiers/7213/view/8)
-                                        },
-                         'statusHistoryList': {'statusHistory': {
-                             'status': status,
-                             # 'statusDate': datetime.now().strftime('%Y-%m-%dT%H:%M:%S+10:00')}}}
-                             'statusDate': (datetime.datetime.now() + timedelta(hours=-10)).strftime(
-                                 '%Y-%m-%dT%H:%M:%S')}}}
-                if attachments:
-                    order['attachments'] = attachments
-                res.append({'order': order})
-            for org in orgs:
-                order = {'organization': org, 'senderKpp': '251101001', 'senderInn': '2511004094',
-                         'serviceTargetCode': service_kind.Code, 'userSelectedRegion': '00000000',
-                         'orderNumber': declar.RegistrationNumber,
-                         'requestDate': declar.RegistrationDate.strftime('%Y-%m-%dT%H:%M:%S'),
-                         'OfficeInfo': {'ApplicationAcceptance': '4'
-                                        # ЕЛК. Канал приема - Подразделение ведомства (https://esnsi.gosuslugi.ru/classifiers/7213/view/8)
-                                        },
-                         'statusHistoryList': {'statusHistory': {
-                             'status': status,
-                             # 'statusDate': datetime.now().strftime('%Y-%m-%dT%H:%M:%S+10:00')}}}
-                             'statusDate': (datetime.datetime.now() + timedelta(hours=-10)).strftime(
-                                 '%Y-%m-%dT%H:%M:%S')}}}
-                if attachments:
-                    order['attachments'] = attachments
-                res.append({'order': order})
+        for user in users:
+            number = declar.RegistrationNumber if declar.RegistrationNumber else declar.SMEVNumber
+            number = number[len(number) - 36 if len(number) > 36 else 0:]
+            order = {'user': user, 'senderKpp': '251101001', 'senderInn': '2511004094',
+                     'serviceTargetCode': service_kind.Code, 'userSelectedRegion': '00000000',
+                     'orderNumber': number,
+                     'requestDate': declar.RegistrationDate.strftime('%Y-%m-%dT%H:%M:%S')
+                     if declar.RegistrationDate else declar.MFCRegDate.strftime('%Y-%m-%dT%H:%M:%S')
+                     if declar.MFCRegDate else declar.Created.strftime('%Y-%m-%dT%H:%M:%S'),
+                     'OfficeInfo': {'ApplicationAcceptance': '4'
+                                    # ЕЛК. Канал приема - Подразделение ведомства (https://esnsi.gosuslugi.ru/classifiers/7213/view/8)
+                                    },
+                     'statusHistoryList': {'statusHistory': {
+                         'status': status,
+                         # 'statusDate': datetime.now().strftime('%Y-%m-%dT%H:%M:%S+10:00')}}}
+                         'statusDate': (datetime.datetime.now() + timedelta(hours=-10)).strftime(
+                             '%Y-%m-%dT%H:%M:%S')}}}
+            if attachments:
+                order['attachments'] = attachments
+            res.append({'order': order})
+        for org in orgs:
+            order = {'organization': org, 'senderKpp': '251101001', 'senderInn': '2511004094',
+                     'serviceTargetCode': service_kind.Code, 'userSelectedRegion': '00000000',
+                     'orderNumber': declar.RegistrationNumber,
+                     'requestDate': declar.RegistrationDate.strftime('%Y-%m-%dT%H:%M:%S'),
+                     'OfficeInfo': {'ApplicationAcceptance': '4'
+                                    # ЕЛК. Канал приема - Подразделение ведомства (https://esnsi.gosuslugi.ru/classifiers/7213/view/8)
+                                    },
+                     'statusHistoryList': {'statusHistory': {
+                         'status': status,
+                         # 'statusDate': datetime.now().strftime('%Y-%m-%dT%H:%M:%S+10:00')}}}
+                         'statusDate': (datetime.datetime.now() + timedelta(hours=-10)).strftime(
+                             '%Y-%m-%dT%H:%M:%S')}}}
+            if attachments:
+                order['attachments'] = attachments
+            res.append({'order': order})
         return res
 
     def update_reference(self, ref_name, rec_id=None, data: list = None):
