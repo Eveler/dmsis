@@ -593,21 +593,22 @@ class DirectumRX:
         #         elif applicant['Applicant']['PSRN']:
         #             orgs.append({'ogrn_inn_UL': {'ogrn': applicant['Applicant']['PSRN'].strip()}})
 
-        corr = self.search("ICompanies", "Id eq %s" % declar.Correspondent.Id, raw=False)
-        if corr and corr[0]:
-            corr = corr[0]
+        if declar.AppCategory == "LegPerson":
             # Get organization
-            if corr.TIN and len(corr.TIN) == 10:
-                orgs.append({'ogrn_inn_UL': {'inn_kpp': {'inn': corr.TIN.strip()}}})
-            elif corr.PSRN:
-                orgs.append({'ogrn_inn_UL': {'ogrn': corr.PSRN.strip()}})
-            else:
-                raise DirectumRXException("Company %s (%s) has no OGRN nor INN" % (corr.Name, corr.Id))
+            corr = self.search("ICompanies", "Id eq %s" % declar.Correspondent.Id, raw=False)
+            if corr and corr[0]:
+                corr = corr[0]
+                if corr.TIN and len(corr.TIN) == 10:
+                    orgs.append({'ogrn_inn_UL': {'inn_kpp': {'inn': corr.TIN.strip()}}})
+                elif corr.PSRN:
+                    orgs.append({'ogrn_inn_UL': {'ogrn': corr.PSRN.strip()}})
+                else:
+                    raise DirectumRXException("Company %s (%s) has no OGRN nor INN" % (corr.Name, corr.Id))
         else:
+            # Get person
             corr = self.search("IPersons", "Id eq %s" % declar.Correspondent.Id, raw=False)
             if corr and corr[0]:
                 corr = corr[0]
-                # Get person
                 series = num = None
                 add_info = self.search(
                     "IAUGOPartiesPersonAddInfos", "Person/Id eq %s" % corr.Id, raw=False)
