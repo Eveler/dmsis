@@ -225,6 +225,7 @@ class Integration:
                             uri='urn://augo/smev/uslugi/1.0.0', local_name='declar')
                         if declar:
                             try:
+                                # TODO: declar.Param parsing
                                 if self.use_rx:
                                     res = self.rx.add_declar(declar, files)
                                     self.db.add_update(uuid, declar.declar_number, reply_to, directum_id=res)
@@ -277,6 +278,8 @@ class Integration:
             for request in self.db.all_not_done():
                 text = 'Услуга предоставлена'
                 do_send = False
+                applied_docs = []
+                result = 'FINAL'
 
                 if self.use_rx:
                     declars = self.rx.search('ДПУ', 'ИД=%s' % request.directum_id, raw=False)
@@ -285,6 +288,7 @@ class Integration:
                             applied_docs = self.rx.get_result_docs(
                                 request.directum_id, self.crt_name, self.zip_signed_doc)
                             do_send = True
+                            text = declar.UPAStatus.Name
 
                 if self.use_dir:
                     declar = self.directum.search('ДПУ', 'ИД=%s' % request.directum_id)
@@ -298,11 +302,11 @@ class Integration:
                 if do_send:
                     try:
                         res, uuids = self.smev.send_response(
-                            request.reply_to, request.declar_num, request.declar_date, text=text,
-                            applied_documents=applied_docs, ftp_user=self.ftp_user, ftp_pass=self.ftp_pass,
-                            s3_user=self.s3_user, s3_pass=self.s3_pass)
+                            request.reply_to, request.declar_num, request.declar_date, result, text,
+                            applied_docs, self.ftp_user, self.ftp_pass, self.s3_user, self.s3_pass)
                         logging.info(
-                            'Результат услуги отправлен. Дело № %s от %s' % (request.declar_num, request.declar_date))
+                            'Результат услуги "%s" отправлен. Дело № %s от %s' % (
+                                text, request.declar_num, request.declar_date))
                         if applied_docs:
                             logging.info('Прикреплены документы:')
                         for doc in applied_docs:
