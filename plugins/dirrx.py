@@ -149,6 +149,34 @@ class DirectumRX:
         logging.info('Добавлен заявитель ЮЛ: %s' % (entity.name if entity.name else entity.full_name))
         return corr
 
+    def _format_declar_params(self, declar) -> str:
+        results = []
+        params = getattr(declar, 'Param', None) or []
+
+        for p in params:
+            label = getattr(p, 'label', 'Безымянный параметр')
+            p_id = getattr(p, 'id', 'UnknownId')
+            raw_value = getattr(p, 'value', '') or getattr(p, '__text__', '') or str(p) or ''
+            raw_value = str(raw_value).strip()
+            if not raw_value: # Пустые пропускаем
+                continue
+
+            # Проверяем наличие атрибутов массива
+            has_array_attrs = all(
+                getattr(p, attr, None) is not None
+                for attr in ('rowNumber', 'colNumber', 'colDelimiter')
+            )
+
+            if has_array_attrs:
+                delimiter = getattr(p, 'colDelimiter', ';')
+                values = [v.strip() for v in raw_value.split(delimiter) if v.strip()]
+                lines = [f"  - {v}" for v in values]
+                results.append(f"{label}({p_id}):\n" + "\n".join(lines))
+            else:
+                results.append(f"{label}({p_id}): {raw_value}")
+
+        return "\n".join(results)
+
     def add_declar(self, declar, files):
         oper_name = "Добавлено"
         data = self.search(
@@ -218,18 +246,6 @@ class DirectumRX:
                 now = busday_offset(now.date(), 1, roll='forward', holidays=holidays).astype(datetime.datetime)
             now = datetime.datetime(now.year, now.month, now.day)
 
-            # if res[0].RegistrationGroup:
-            #     data.Department = self.search("IDepartments", "Id eq %s" % res[0].RegistrationGroup.Id, raw=False)[0]
-            # res = self.search("IEmployees", "Id eq %s" % res[0].ServPerformer.Id, raw=False)[0]
-            # data.Addressee = res
-            # res = self.search("IDepartments", "Id eq %s" % res.Department.Id, raw=False)
-            # if res:
-            #     data.AddresseeDep = res[0]
-            #     if res[0].BusinessUnit:
-            #         res = self.search("IBusinessUnits", "Id eq %s" % res[0].BusinessUnit.Id, raw=False)
-            #         if res:
-            #             data.BusinessUnit = res[0]
-
             res = self.search('IMailDeliveryMethods', "Name eq 'СМЭВ'", raw=False)
             data.DeliveryMethod = res[0]  # Required "Способ доставки"
             res = self.search('IDocumentRegisters', "Name eq 'Дела по оказанию муниципальных услуг'", raw=False)
@@ -251,6 +267,8 @@ class DirectumRX:
             data.Created = datetime.datetime.now()  # Required "Создано"
             data.ServiceEndPlanData = now  # Required
             data.SMEVNumber = data.RegistrationNumber
+            param = self._format_declar_params(declar)
+            data.Note = f"{data.Note}\n{param}" if data.Note else param
             # return self._service.save(data)
             url = data.__odata_url__()
             if url is None:

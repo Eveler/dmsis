@@ -225,7 +225,6 @@ class Integration:
                             uri='urn://augo/smev/uslugi/1.0.0', local_name='declar')
                         if declar:
                             try:
-                                # TODO: declar.Param parsing
                                 if self.use_rx:
                                     res = self.rx.add_declar(declar, files)
                                     self.db.add_update(uuid, declar.declar_number, reply_to, directum_id=res)

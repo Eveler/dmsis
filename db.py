@@ -727,14 +727,16 @@ class Db:
             remove(found)
         for param in declar.Param:
             if not isinstance(param, (str, bytes, bytearray)):
-                p = Params(type=param.attr('type'), param_id=param.attr('id'),
-                           label=param.attr('label'),
-                           row_number=param.attr('rowNumber'),
-                           col_number=param.attr('colNumber'),
-                           row_delimiter=param.attr('rowDelimiter'),
-                           col_delimiter=param.attr('colDelimiter'),
-                           value=param, declar_id=d.id, declar=d)
-            self.session.add(p)
+                p = Params(type=getattr(param, 'type', ''), param_id=getattr(param, 'id', ''),
+                           label=getattr(param, 'label', ''),
+                           row_number=getattr(param, 'rowNumber', ''),
+                           col_number=getattr(param, 'colNumber', ''),
+                           row_delimiter=getattr(param, 'rowDelimiter', ''),
+                           col_delimiter=getattr(param, 'colDelimiter', ''),
+                           value=getattr(param, 'value', ''), declar_id=d.id, declar=d)
+                self.session.add(p)
+            else:
+                self.session.add(param)
         self.session.commit()
 
     def load_declar(self, uuid):

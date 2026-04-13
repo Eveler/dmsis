@@ -192,6 +192,17 @@ class RequestResponse(xsd.ComplexType):
         return instance
 
 
+class ParamType(xsd.ComplexType):
+    type = xsd.Attribute(xsd.String)
+    id = xsd.Attribute(xsd.String)
+    label = xsd.Attribute(xsd.String)
+    rowNumber = xsd.Attribute(xsd.Integer, xsd.Use.OPTIONAL)
+    colNumber = xsd.Attribute(xsd.Integer, xsd.Use.OPTIONAL)
+    colDelimiter = xsd.Attribute(xsd.String, xsd.Use.OPTIONAL)
+    # Текст внутри тега:
+    value = xsd.Content(xsd.String)
+
+
 class Declar(xsd.ComplexType):
     INHERITANCE = None
     INDICATOR = xsd.Sequence
@@ -204,7 +215,8 @@ class Declar(xsd.ComplexType):
     legal_entity = xsd.ListElement(LegalEntity, minOccurs=0, tagname='legal_entity', maxOccurs=xsd.UNBOUNDED)
     person = xsd.ListElement(Individual, minOccurs=0, tagname='person', maxOccurs=xsd.UNBOUNDED)
     confidant = xsd.Element(Individual, minOccurs=0)
-    Param = xsd.ListElement(xsd.String, tagname='Param', minOccurs=0, maxOccurs=xsd.UNBOUNDED)
+    #Param = xsd.ListElement(xsd.String, tagname='Param', minOccurs=0, maxOccurs=xsd.UNBOUNDED)
+    Param = xsd.ListElement(ParamType, tagname='Param', minOccurs=0, maxOccurs=xsd.UNBOUNDED)
 
     @classmethod
     def create(cls, declar_number, service, register_date, end_date, applied_document):
