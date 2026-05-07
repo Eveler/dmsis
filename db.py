@@ -1,11 +1,11 @@
 # -*- encoding: utf-8 -*-
 import logging
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from os import path, remove
 from sys import version_info
 
 from sqlalchemy import Column, Integer, String, Boolean, Date, ForeignKey, func, \
-    or_
+    or_, and_
 from sqlalchemy.engine import create_engine, Row
 
 if version_info.major == 3 and version_info.minor <= 5:
@@ -970,7 +970,14 @@ class Db:
         self.session.commit()
         self.session.execute('VACUUM FULL')
 
+    def _clear_old(self):
+        dt = date.today() - timedelta(days=30)
+        for request in self.session.query(Requests).filter(and_(Requests.done == True, Requests.declar_date < dt)).all():
+            self.session.delete(request)
+        self.session.commit()
+
     def vacuum(self):
+        self._clear_old()
         self.session.execute('VACUUM')
 
     def __del__(self):

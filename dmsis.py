@@ -398,7 +398,7 @@ class Integration:
                         logging.info("Обновлён справочник ЕЛК.Статусы")
                     except:
                         logging.warning("Ошибка при обновлении статуса", exc_info=True)
-                    self.db.set_config_value('last_ELK_STATUS_update', date.today())
+                self.db.set_config_value('last_ELK_STATUS_update', date.today())
         except:
             logging.error('Error update ELK_STATUS', exc_info=True)
 
