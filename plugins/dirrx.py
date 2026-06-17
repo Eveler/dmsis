@@ -83,7 +83,7 @@ class DirectumRX:
         pers.MiddleName = self.adopt_str(person.patronymic)
         pers.LegalAddress = self.adopt_str(str(person.address)[:498]) if person.address else None
         pers.PostalAddress = self.adopt_str(str(person.fact_address)[:498]) if person.fact_address else None
-        pers.DateOfBirth = person.birthdate
+        pers.DateOfBirth = datetime.datetime.strptime(person.birthdate.strftime("%Y-%m-%d"), "%Y-%m-%d") if person.birthdate else None
         pers.TIN = self.adopt_str(person.inn)
         # pers.Note = 'Паспорт серия %s № %s выдан %s %s' % (
         #     person.passport_serial, person.passport_number, person.passport_date.strftime("%d.%m.%Y"),
@@ -131,7 +131,9 @@ class DirectumRX:
         pers_info.Issued = person.passport_agency
         self._service.save(pers_info)
 
-        logging.info('Добавлен заявитель ФЛ: %s, регистрация: %s, Id: %s' % (pers.Name, pers.LegalAddress, pers.Id))
+        logging.info('Добавлен заявитель ФЛ: %s, %s д.р., регистрация: %s%s, Id: %s' % (
+            pers.Name, pers.DateOfBirth if pers.DateOfBirth else 'без', pers.LegalAddress,
+            f" (проживает: {pers.PostalAddress})" if pers.PostalAddress else "", pers.Id))
         return pers
 
     def add_legal_entity(self, entity):
@@ -193,11 +195,14 @@ class DirectumRX:
             apps_p = []
             if len(declar.person) > 0:
                 for person in declar.person:
-                    search_str = "LastName eq '%s' and FirstName eq '%s'%s%s" % (
+                    search_str = "LastName eq '%s' and FirstName eq '%s'%s%s%s" % (
                         person.surname, person.first_name,
                         " and MiddleName eq '%s'" % person.patronymic if person.patronymic else '',
                         " and ((PostalAddress eq '%(addr)s' or PostalAddress eq null) or "
-                        "(LegalAddress eq '%(addr)s' or LegalAddress eq null))" % {"addr": person.address})
+                        "(LegalAddress eq '%(addr)s' or LegalAddress eq null))" % {"addr": person.address},
+                        " and DateOfBirth eq %s" %
+                          datetime.datetime.strptime(person.birthdate.strftime("%Y-%m-%d"), "%Y-%m-%d")
+                          if person.birthdate else '')
                     persons = self.search('IPersons', search_str, raw=False)
                     if persons:
                         if persons[0].Status != "Active":
