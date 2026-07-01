@@ -342,6 +342,30 @@ class DirectumRX:
         return data.Id
 
     def __upload_doc(self, doc_getter, doc, files, declar, i=0, lead_doc=None):
+        def try_found(f_n, file_list, extension):
+            fnd = file_list.get(f_n)
+            if not fnd:
+                fnd = file_list.get(f_n + '.zip')
+                if fnd:
+                    extension = '.zip'
+            if not fnd:
+                fnd = file_list.get(f_n + '..zip')
+                if fnd:
+                    extension = '.zip'
+            if not fnd:
+                f_n_lower = f_n.casefold() # Case-insensitive search
+                # f_n, fnd = next(((k, v) for k, v in file_list.items() if f_n_lower in k.casefold()), (None, None))
+                best_len = 0
+                for k, v in file_list.items():
+                    k_lower = k.casefold()
+                    if f_n_lower in k_lower or k_lower in f_n_lower:
+                        if len(k) > best_len:
+                            f_n, fnd = k, v
+                            best_len = len(k)
+                e = os.path.splitext(f_n)[1]
+                if e:
+                    extension = e
+            return fnd, extension
         doc_data = ()
         if doc_getter:
             doc_data = doc_getter(doc.url, doc.file_name)
@@ -362,13 +386,20 @@ class DirectumRX:
         elif files:
             file_name = doc.file_name if doc.file_name else doc.url
             fn, ext = os.path.splitext(file_name)
-            found = files.get(file_name)
+            found, ext = try_found(fn, files, ext)
             if not found:
-                found = files.get(fn + '.zip')
-                ext = '.zip'
+                # Try search for transliterated file name
+                from translit import translate
+                found, ext = try_found(translate(fn), files, ext)
             if not found:
-                found = files.get(fn + '..zip')
-                ext = '.zip'
+                # Just pick first uploaded file
+                for key, val in files.items():
+                    if os.path.exists(val):
+                        found = val
+                        ex = os.path.splitext(key)
+                        if ex:
+                            ext = ex
+                        break
             if not found:
                 raise DirectumRXException("Cannot find file '%s' in %s" % (file_name, files))
             try:

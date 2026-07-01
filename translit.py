@@ -3,7 +3,8 @@
 
 def translate(name):
     # Заменяем пробелы и преобразуем строку к нижнему регистру
-    name = name.replace(' ', '-').lower()
+    #name = name.replace(' ', '-').lower()
+    name = name.replace(' ', '_')
 
     #
     transtable = (
@@ -95,3 +96,8 @@ def translate(name):
         name = name.replace(symb_in, symb_out)
     # возвращаем переменную
     return name
+
+if __name__ == "__main__":
+    trans = translate('Ефименко пасп_2026-06-26_13-27-00_1')
+    etalon = 'Efimenko_pasp_2026-06-26_13-27-00_1'
+    print(trans,'=', etalon, trans==etalon)
