@@ -837,7 +837,7 @@ def main():
 
     from optparse import OptionParser
 
-    parser = OptionParser(version="%prog ver. 1.17",
+    parser = OptionParser(version="%prog ver. 1.18",
                           conflict_handler="resolve")
     parser.print_version()
     parser.add_option("-r", "--run", action="store_true", dest="run",

@@ -1,32 +1,26 @@
 # -*- encoding: utf-8 -*-
 
 
-def translate(name):
+def translate(name, replase_space="_"):
     # Заменяем пробелы и преобразуем строку к нижнему регистру
     #name = name.replace(' ', '-').lower()
-    name = name.replace(' ', '_')
+    if replase_space:
+        name = name.replace(' ', replase_space) # Заменяем пробелы
 
     #
     transtable = (
         ## Большие буквы
-        (u"Щ", u"Sch"),
         (u"Щ", u"SCH"),
         # two-symbol
-        (u"Ё", u"Yo"),
         (u"Ё", u"YO"),
-        (u"Ж", u"Zh"),
         (u"Ж", u"ZH"),
-        (u"Ц", u"Ts"),
+        #(u"Ж", u"GH"),
         (u"Ц", u"TS"),
-        (u"Ч", u"Ch"),
         (u"Ч", u"CH"),
-        (u"Ш", u"Sh"),
         (u"Ш", u"SH"),
-        (u"Ы", u"Yi"),
         (u"Ы", u"YI"),
-        (u"Ю", u"Yu"),
+        #(u"Ы", u"Y"),
         (u"Ю", u"YU"),
-        (u"Я", u"Ya"),
         (u"Я", u"YA"),
         # one-symbol
         (u"А", u"A"),
@@ -59,10 +53,12 @@ def translate(name):
         # two-symbols
         (u"ё", u"yo"),
         (u"ж", u"zh"),
+        #(u"ж", u"gh"),
         (u"ц", u"ts"),
         (u"ч", u"ch"),
         (u"ш", u"sh"),
         (u"ы", u"yi"),
+        #(u"ы", u"y"),
         (u"ю", u"yu"),
         (u"я", u"ya"),
         # one-symbol
@@ -90,6 +86,8 @@ def translate(name):
         (u"э", u"e"),
         ## Символы
         (u'№', u'N'),
+        (u"ъ", u"`"),
+        (u"ь", u"'"),
     )
     # перебираем символы в таблице и заменяем
     for symb_in, symb_out in transtable:
@@ -97,7 +95,70 @@ def translate(name):
     # возвращаем переменную
     return name
 
+# Известные альтернативные написания транслитерации
+# Формат: {латинское_написание: [альтернативы]}
+translit_alternatives = {
+    'yi': ['y', 'i', 'ij', 'yi', 'j', 'iy'],
+    'iy': ['y', 'i', 'ij', 'yi', 'j', 'iy'],
+    'j': ['y', 'i', 'ij', 'yi', 'j', 'iy'],
+    'y': ['yi', 'i', 'ij', 'yy', 'y'],
+    'i': ['y', 'yi', 'i'],
+    'ii': ['y', 'yi', 'ii'],
+    'yy': ['y', 'yi', 'i', 'yy'],
+    'e': ['ye', 'eh', 'e'],
+    'yo': ['e', 'io', 'yo'],
+    'ye': ['yo', 'e', 'ie', 'ye'],
+    'zh': ['j', 'gh', 'zh'],
+    'gh': ['j', 'zh', 'gh'],
+    'kh': ['h', 'ch', 'kh'],
+    'ts': ['c', 'ts'],
+    'ch': ['tch', 'ch'],
+    'sh': ['sch', 'sh'],
+    'shch': ['sch', 'shch'],
+    'sch': ['sh', 'shch', 'sch'],
+    'yu': ['u', 'yu', 'iu', 'ju'],
+    'ya': ['a', 'ya', 'ia', 'ja'],
+    '`': ['', 'y', '`'],
+    "'": ['', 'y', "'"],
+}
+
+def generate_latin_variants(text):
+    """Генерирует варианты написания с учетом альтернативной транслитерации"""
+    if not text:
+        return ['']
+
+    variants = set()
+    text_lower = text.lower()
+
+    def backtrack(start, current):
+        if start == len(text_lower):
+            variants.add(current)
+            return
+
+        # Пробуем найти самое длинное совпадение с альтернативами
+        found = False
+        for length in range(min(4, len(text_lower) - start), 0, -1):
+            substr = text_lower[start:start + length]
+            if substr in translit_alternatives:
+                # Используем оригинальный регистр
+                original_substr = text[start:start + length]
+                for alt in translit_alternatives[substr]:
+                    # Сохраняем регистр первой буквы
+                    if original_substr[0].isupper() and len(alt) > 0:
+                        alt = alt[0].upper() + alt[1:]
+                    backtrack(start + length, current + alt)
+                found = True
+
+        # Если не нашли альтернативу, оставляем как есть
+        if not found:
+            backtrack(start + 1, current + text[start])
+
+    backtrack(0, '')
+    variants.add(text)
+    return list(variants)
+
+
 if __name__ == "__main__":
-    trans = translate('Ефименко пасп_2026-06-26_13-27-00_1')
-    etalon = 'Efimenko_pasp_2026-06-26_13-27-00_1'
-    print(trans,'=', etalon, trans==etalon)
+    trans = translate('белоусовы тех паспорт жил помещ_2026-03-03_11-19-39_1')
+    etalon = 'belousovy_teh_pasport_ghil_pomesch_2026-03-03_11-19-39_1'
+    print(etalon,'=', trans, generate_latin_variants(trans))

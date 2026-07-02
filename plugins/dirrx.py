@@ -2,8 +2,8 @@
 import base64
 import datetime
 import logging
-from datetime import timedelta
 import os
+from datetime import timedelta
 from tempfile import mkstemp
 
 from holidays import country_holidays
@@ -16,6 +16,7 @@ from requests.auth import HTTPBasicAuth
 
 from soapfish import xsd
 from soapfish.xsd_types import XSDDate
+from translit import translate, generate_latin_variants
 
 
 def add_weekdays(start_date, days: int):
@@ -117,7 +118,7 @@ class DirectumRX:
         pers.Status = "Active"
         pers.Name = self.adopt_str('%s %s %s' % (person.surname, person.first_name, person.patronymic))
         pers.ShortName = self.adopt_str('%s %s.%s.' % (person.surname, person.first_name[0].upper(),
-                                        person.patronymic[0].upper() if person.patronymic else ''))
+                                                       person.patronymic[0].upper() if person.patronymic else ''))
         pers.CanExchange = False
         pers.Nonresident = False
         self._service.save(pers)
@@ -201,8 +202,8 @@ class DirectumRX:
                         " and ((PostalAddress eq '%(addr)s' or PostalAddress eq null) or "
                         "(LegalAddress eq '%(addr)s' or LegalAddress eq null))" % {"addr": person.address},
                         " and DateOfBirth eq %s" %
-                          datetime.datetime.strptime(person.birthdate.strftime("%Y-%m-%d"), "%Y-%m-%d")
-                          if person.birthdate else '')
+                        datetime.datetime.strptime(person.birthdate.strftime("%Y-%m-%d"), "%Y-%m-%d")
+                        if person.birthdate else '')
                     persons = self.search('IPersons', search_str, raw=False)
                     if persons:
                         if persons[0].Status != "Active":
@@ -234,11 +235,11 @@ class DirectumRX:
                 data.Correspondent = res[0]  # Required "Заявитель"
                 data.AppCategory = "LegPers"
             service_kind = self.search('IMunicipalServicesServiceKinds',
-                              "Code eq '%(cod)s'" % {"cod": declar.service}, raw=False)
+                                       "Code eq '%(cod)s'" % {"cod": declar.service}, raw=False)
             if not service_kind:
                 service_kind = self.search('IMunicipalServicesServiceKinds',
-                                  "contains(ShortName,'%(cod)s') or contains(FullName,'%(cod)s')" %
-                                  {"cod": declar.service}, raw=False)
+                                           "contains(ShortName,'%(cod)s') or contains(FullName,'%(cod)s')" %
+                                           {"cod": declar.service}, raw=False)
             if not service_kind:
                 raise DirectumRXException("Услуга не найдена")
             data.ServiceKind = service_kind[0]  # Required "Услуга"
@@ -306,6 +307,12 @@ class DirectumRX:
                 if not res:
                     res = self.__upload_doc(None, doc, files, declar, lead_doc=data)
                     # doc_ids.append(str(res))
+                else:
+                    file_name = doc.file_name if doc.file_name else doc.url
+                    fn, ext = os.path.splitext(file_name)
+                    found, ext = self.__try_found_file(fn, files, ext)
+                    if found:
+                        os.remove(found)
         elif files:
             class D:
                 pass
@@ -341,31 +348,46 @@ class DirectumRX:
                     pass
         return data.Id
 
-    def __upload_doc(self, doc_getter, doc, files, declar, i=0, lead_doc=None):
-        def try_found(f_n, file_list, extension):
+    def __try_found_file(self, f_n, file_list, extension):
+        def search_file(f_n, extension):
             fnd = file_list.get(f_n)
-            if not fnd:
-                fnd = file_list.get(f_n + '.zip')
-                if fnd:
-                    extension = '.zip'
-            if not fnd:
-                fnd = file_list.get(f_n + '..zip')
-                if fnd:
-                    extension = '.zip'
-            if not fnd:
-                f_n_lower = f_n.casefold() # Case-insensitive search
-                # f_n, fnd = next(((k, v) for k, v in file_list.items() if f_n_lower in k.casefold()), (None, None))
-                best_len = 0
-                for k, v in file_list.items():
-                    k_lower = k.casefold()
-                    if f_n_lower in k_lower or k_lower in f_n_lower:
-                        if len(k) > best_len:
-                            f_n, fnd = k, v
-                            best_len = len(k)
-                e = os.path.splitext(f_n)[1]
-                if e:
-                    extension = e
+            if fnd:
+                return fnd, extension
+            fnd = file_list.get(f_n + '.zip')
+            if fnd:
+                extension = '.zip'
+            if fnd:
+                return fnd, extension
+            fnd = file_list.get(f_n + '..zip')
+            if fnd:
+                extension = '.zip'
+            if fnd:
+                return fnd, extension
+            f_n_lower = f_n.casefold() # Case-insensitive search
+            # f_n, fnd = next(((k, v) for k, v in file_list.items() if f_n_lower in k.casefold()), (None, None))
+            best_len = 0
+            for k, v in file_list.items():
+                k_lower = k.casefold()
+                if f_n_lower in k_lower or k_lower in f_n_lower:
+                    if len(k) > best_len:
+                        f_n, fnd = k, v
+                        best_len = len(k)
+            e = os.path.splitext(f_n)[1]
+            if e:
+                extension = e
             return fnd, extension
+        fnd, extension = search_file(f_n, extension)
+        if fnd:
+            return fnd, extension
+        # Try search for transliterated file name
+        latin_variants = generate_latin_variants(translate(f_n))
+        for variant in latin_variants:
+            fnd, extension = search_file(variant, extension)
+            if fnd:
+                return fnd, extension
+        return fnd, extension
+
+    def __upload_doc(self, doc_getter, doc, files, declar, i=0, lead_doc=None):
         doc_data = ()
         if doc_getter:
             doc_data = doc_getter(doc.url, doc.file_name)
@@ -386,17 +408,13 @@ class DirectumRX:
         elif files:
             file_name = doc.file_name if doc.file_name else doc.url
             fn, ext = os.path.splitext(file_name)
-            found, ext = try_found(fn, files, ext)
-            if not found:
-                # Try search for transliterated file name
-                from translit import translate
-                found, ext = try_found(translate(fn), files, ext)
+            found, ext = self.__try_found_file(fn, files, ext)
             if not found:
                 # Just pick first uploaded file
                 for key, val in files.items():
                     if os.path.exists(val):
                         found = val
-                        ex = os.path.splitext(key)
+                        ex = os.path.splitext(key)[1]
                         if ex:
                             ext = ex
                         break
@@ -826,11 +844,11 @@ class DirectumRX:
                 "%s/Versions(%s)/Body" % (doc.__odata__.instance_url, doc.Versions[0].Id),
                 {"Value": base64.b64encode(data).decode()})
             logging.info('Добавлен документ: %s № %s от %s Id = %s' % (doc.Name, requisites.number,
-                                                                    requisites.date.strftime('%d.%m.%Y'), doc.Id))
+                                                                       requisites.date.strftime('%d.%m.%Y'), doc.Id))
         except ODataError:
             logging.error("Ошибка сохранения документа %s № %s от %s" % (requisites.title, requisites.number,
-                                                                           requisites.date.strftime('%d.%m.%Y')),
-                            exc_info=True)
+                                                                         requisites.date.strftime('%d.%m.%Y')),
+                          exc_info=True)
             self._service.delete(doc)
             raise
         return doc.Id
