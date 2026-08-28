@@ -699,7 +699,7 @@ class DirectumRX:
                         if corr.DateOfBirth:
                             user = {'userDocSnilsBirthDate': {
                                 'citizenship': '643', 'snils': corr.INILA.strip(),
-                                'birthDate': corr.DateOfBirth[:10]}}
+                                'birthDate': corr.DateOfBirth.strftime('%Y-%m-%d')}}
                         else:
                             user = {'userDocSnils': {
                                 'snils': corr.INILA.strip(),
