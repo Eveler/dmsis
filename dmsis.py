@@ -597,9 +597,10 @@ class Integration:
         # If an exception, report it end exit
         try:
             from os.path import expanduser
+            encoding = 'utf8' if platform == 'linux' else 'windows-1251'
             lst = cfg.read(
                 ["c:/dmsis/dmsis.ini", expanduser("~/dmsis.ini"), "./dmsis.ini",
-                 config_path], encoding='windows-1251')
+                 config_path], encoding=encoding)
             if lst:
                 logging.info('Configuration loaded from: %s' % lst)
             else:
@@ -645,10 +646,10 @@ class Integration:
             logging.info("Set logging level to '%s'", loglevel)
             logging.root.setLevel(loglevel)
             logging.getLogger('urllib3.connectionpool').setLevel(logging.ERROR)
-            if 'mail_addr' not in cfg.options('main'):
-                do_write = True
-                cfg.set('main', 'mail_addr', 'ioib@adm-ussuriisk.ru')
-            self.mail_addr = cfg.get('main', 'mail_addr')
+            #if 'mail_addr' not in cfg.options('main'):
+            #    do_write = True
+            #    cfg.set('main', 'mail_addr', 'ioib@adm-ussuriisk.ru')
+            self.mail_addr = cfg.get('main', 'mail_addr') if 'mail_addr' in cfg.options('main') else None
             # if 'mail_server' not in cfg.options('main'):
             #     do_write = True
             #     cfg.set('main', 'mail_server', '192.168.1.6')
