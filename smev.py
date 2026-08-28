@@ -24,8 +24,7 @@ from zeep.exceptions import XMLParseError
 import six
 from declar import Declar
 
-if 'win32' in platform:
-    from plugins.cryptopro import Crypto
+from plugins.cryptopro import Crypto
 from translit import translate
 from zeep import Client
 from zeep.plugins import HistoryPlugin
@@ -40,11 +39,10 @@ class Adapter:
         self.log = logging.getLogger('smev.adapter')
         self.log.setLevel(logging.root.level)
         self.ftp_addr = ftp_addr
-        if 'win32' in platform:
-            self.crypto = Crypto()
-            self.crypto.serial = serial
-            self.crypto.crt_name = crt_name
-            self.crypto.container = container
+        self.crypto = Crypto()
+        self.crypto.serial = serial
+        self.crypto.crt_name = crt_name
+        self.crypto.container = container
         self.method = method
 
         if history:
@@ -479,10 +477,10 @@ class Adapter:
                     rr, '{urn://augo/smev/uslugi/1.0.0}AppliedDocument')
                 etree.SubElement(
                     ad, '{urn://augo/smev/uslugi/1.0.0}title').text = \
-                    self.adopt_str(doc.title) if doc.title else ' '
+                    self.adopt_str(doc.title)[:1023] if doc.title else ' '
                 etree.SubElement(
                     ad, '{urn://augo/smev/uslugi/1.0.0}number'
-                ).text = doc.number if doc.number else 'б/н'
+                ).text = doc.number[:49] if doc.number else 'б/н'
                 etree.SubElement(
                     ad, '{urn://augo/smev/uslugi/1.0.0}date'
                 ).text = doc.date.strftime('%Y-%m-%d') if isinstance(
@@ -496,9 +494,8 @@ class Adapter:
                     etree.SubElement(
                         ad, '{urn://augo/smev/uslugi/1.0.0}file_name'
                     ).text = doc.file_name
-                if hasattr(doc, 'url') and doc.url:
-                    etree.SubElement(
-                        ad, '{urn://augo/smev/uslugi/1.0.0}url').text = doc.url
+                etree.SubElement(
+                    ad, '{urn://augo/smev/uslugi/1.0.0}url').text = doc.url if hasattr(doc, 'url') else ''
                 if hasattr(doc, 'url_valid_until') and doc.url_valid_until:
                     etree.SubElement(
                         ad, '{urn://augo/smev/uslugi/1.0.0}url_valid_until'
