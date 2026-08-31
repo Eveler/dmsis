@@ -10,8 +10,8 @@ soapfish2~=0.7.2
 holidays~=0.30
 numpy~=1.24.4
 #pywin32
-pyOpenSSL~=26.3.0
-cryptography~=49.0.0
+pyOpenSSL~=26.4.0
+cryptography~=50.0.0
 service-identity~=21.1.0
 boto3~=1.37.38
 psutil~=7.1.1
