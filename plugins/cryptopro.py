@@ -326,7 +326,8 @@ class Crypto:
             os.unlink(data_file)
 
         # 2. Формирование SignedInfo
-        signature = etree.Element(f"{{{Crypto.DS}}}Signature")
+        signature = etree.Element(f"{{{Crypto.DS}}}Signature", nsmap={None: Crypto.DS})
+        #signature = etree.Element("Signature", xmlns=Crypto.DS)
         signed_info = etree.SubElement(signature, f"{{{Crypto.DS}}}SignedInfo")
 
         etree.SubElement(signed_info, f"{{{Crypto.DS}}}CanonicalizationMethod", Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#")
@@ -334,9 +335,12 @@ class Crypto:
 
         reference = etree.SubElement(signed_info, f"{{{Crypto.DS}}}Reference", URI="#SIGNED_BY_CALLER")
         transforms = etree.SubElement(reference, f"{{{Crypto.DS}}}Transforms")
-        etree.SubElement(transforms, f"{{{Crypto.DS}}}Transform", Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature")
-        etree.SubElement(transforms, f"{{{Crypto.DS}}}Transform", Algorithm="urn://smev-gov-ru/xmldsig/transform")
+        # 1. Сначала каноникализация
         etree.SubElement(transforms, f"{{{Crypto.DS}}}Transform", Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#")
+        # 2. Затем SMEV трансформация
+        etree.SubElement(transforms, f"{{{Crypto.DS}}}Transform", Algorithm="urn://smev-gov-ru/xmldsig/transform")
+        # 3. И только потом удаление enveloped signature
+        etree.SubElement(transforms, f"{{{Crypto.DS}}}Transform", Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature")
 
         etree.SubElement(reference, f"{{{Crypto.DS}}}DigestMethod", Algorithm="urn:ietf:params:xml:ns:cpxmlsec:algorithms:gostr34112012-256")
         etree.SubElement(reference, f"{{{Crypto.DS}}}DigestValue").text = digest_value
@@ -358,7 +362,8 @@ class Crypto:
         x509_data = etree.SubElement(key_info, f"{{{Crypto.DS}}}X509Data")
         etree.SubElement(x509_data, f"{{{Crypto.DS}}}X509Certificate").text = self.get_cert_b64(thumbprint)
 
-        return etree.tostring(signature, encoding='unicode', pretty_print=True)
+        #return etree.tostring(signature, encoding='unicode', pretty_print=True)
+        return etree.tostring(signature, encoding='unicode')
 
     def sign_com(self, xml, sign_type=CADESCOM_XML_SIGNATURE_TYPE_ENVELOPED):
         self.log.debug(xml)
