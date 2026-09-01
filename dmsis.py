@@ -1,4 +1,4 @@
-# -*- encoding: utf-8 -*-
+# -*- coding: utf-8 -*-
 import datetime
 # Twisted reactor sends GetRequest by timer
 # Got requests stored in DB
@@ -626,7 +626,7 @@ class Integration:
                 cfg.set("main", "log_count", "7")
             handler = TimedRotatingFileHandler(
                 os.path.abspath(cfg.get("main", "logfile")), when='D',
-                backupCount=backupcount, encoding='cp1251')
+                backupCount=backupcount, encoding='cp1251' if "win32" in platform else "utf8")
             handler.setFormatter(logging.Formatter(
                 '%(asctime)s %(name)s:%(module)s(%(lineno)d): %(levelname)s: '
                 '%(message)s'))
