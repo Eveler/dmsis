@@ -678,37 +678,44 @@ class Db:
                 found = files.get(fn + '..zip')
                 ext = '.zip'
             if not found:
-                raise Exception("Cannot find file '%s' in %s" % (file_name, files))
-            fn, ext1 = path.splitext(found)
-            mime_type = guess_type(found + ext if not ext1 else '')[0]
-            file_name = found + ext
-            doc_data = None
-            file_path = None
-            if path.getsize(found) > 1000000 - 2048:
-                maxid = self.session.query(func.max(Documents.id)).first()
-                if not maxid or not maxid[0]:
-                    maxid = 1
-                elif isinstance(maxid, (tuple, list, Row)):
-                    maxid = maxid[0] + 1
-                else:
-                    maxid += 1
-                from os import makedirs
-                if not path.exists('storage'):
-                    makedirs('storage')
-                from shutil import copy2
-                if maxid > 10000:
-                    file_path = path.join('storage', str(maxid)[:-4])
-                    if not path.exists(file_path):
-                        makedirs(file_path)
-                    file_path = path.join(file_path, file_name)
-                else:
-                    file_path = path.join('storage', file_name)
-                copy2(found, file_path)
+                found = files.get(fn + '.txt')
+                ext = '.txt'
+            if not found:
+                #raise Exception("Cannot find file '%s' in %s" % (file_name, files))
+                doc_data = b"No file"
+                mime_type = "application/text"
+                file_path = None
             else:
-                with open(found, 'rb') as f:
-                    doc_data = f.read()
-                # from encodings.base64_codec import base64_encode
-                # doc_data = base64_encode(doc_data)
+                fn, ext1 = path.splitext(found)
+                mime_type = guess_type(found + ext if not ext1 else '')[0]
+                file_name = found + ext
+                doc_data = None
+                file_path = None
+                if path.getsize(found) > 1000000 - 2048:
+                    maxid = self.session.query(func.max(Documents.id)).first()
+                    if not maxid or not maxid[0]:
+                        maxid = 1
+                    elif isinstance(maxid, (tuple, list, Row)):
+                        maxid = maxid[0] + 1
+                    else:
+                        maxid += 1
+                    from os import makedirs
+                    if not path.exists('storage'):
+                        makedirs('storage')
+                    from shutil import copy2
+                    if maxid > 10000:
+                        file_path = path.join('storage', str(maxid)[:-4])
+                        if not path.exists(file_path):
+                            makedirs(file_path)
+                        file_path = path.join(file_path, file_name)
+                    else:
+                        file_path = path.join('storage', file_name)
+                    copy2(found, file_path)
+                else:
+                    with open(found, 'rb') as f:
+                        doc_data = f.read()
+                    # from encodings.base64_codec import base64_encode
+                    # doc_data = base64_encode(doc_data)
             doc = Documents(title=adoc.title, number=adoc.number,
                             date=datetime.strptime(
                                 adoc.date.strftime('%Y-%m-%d'), '%Y-%m-%d'),
