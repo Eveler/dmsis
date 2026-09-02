@@ -18,6 +18,62 @@ from soapfish import xsd
 from soapfish.xsd_types import XSDDate
 from translit import translate, generate_latin_variants
 
+# Save original odata __iter__ for use before Monkey-patch
+import odata.query
+_original_iter = odata.query.Query.__iter__
+def _patched_iter(self):
+    url = self._get_url()
+    options = self._get_options()
+    while True:
+        data = self.connection.execute_get(url, options)
+
+        # === ИСПРАВЛЕНИЕ БАГА: Обработка ответа 204 No Content ===
+        # Если сервер вернул None (из-за 204 No Content), считаем результат пустым
+        if data is None:
+            break
+        # =========================================================
+
+        if 'value' in data:
+            value = data.get('value', [])
+            for row in value:
+                yield self._create_model(row)
+
+            if '@odata.nextLink' in data and '$top' not in options.keys():
+                from urllib.parse import urljoin
+                url = urljoin(self.entity.__odata_url_base__, data['@odata.nextLink'])
+                options = {}
+            else:
+                break
+        elif self.entity.__odata_singleton__:
+            yield self._create_model(data)
+            break
+        else:
+            yield self._create_model(data)
+            break
+
+# Save original odata instances_from_data
+_original_instances_from_data = odata.navproperty.NavigationProperty.instances_from_data
+
+def _patched_instances_from_data(self, raw_data, connection, parent_navigation_url):
+    """
+    Исправляет баг python-odata 0.5.8: корректная обработка null в $expand
+    """
+    # Если сервер вернул null для навигационного свойства
+    if raw_data is None:
+        # Для коллекций возвращаем пустой список, для одиночных связей - None
+        return [] if self.is_collection else None
+
+    # Если это коллекция, фильтруем возможные null-элементы внутри списка
+    if self.is_collection:
+        return [
+            self.__populate_entity(d, connection, parent_navigation_url)
+            for d in raw_data
+            if d is not None
+        ]
+
+    # Для одиночной связи вызываем оригинальный метод
+    return self.__populate_entity(raw_data, connection, parent_navigation_url)
+
 
 def add_weekdays(start_date, days: int):
     import operator
@@ -184,9 +240,9 @@ class DirectumRX:
         oper_name = "Добавлено"
         data = self.search(
             "IMunicipalServicesServiceCases",
-            "(RegistrationNumber eq '%s' or SMEVNumber eq '%s') and MFCRegDate eq %s" %
-            (declar.declar_number, declar.declar_number,
-             declar.register_date.strftime("%Y-%m-%d")), raw=False)
+            f"(RegistrationNumber eq '{declar.declar_number}' or SMEVNumber eq '{declar.declar_number}')"\
+            #f" and MFCRegDate ge {declar.register_date.strftime('%Y-%m-%dT00:00:00Z')}"\
+            f" and MFCRegDate eq {declar.register_date.strftime('%Y-%m-%d')}", raw=False)
         if data:
             oper_name = "Обновлено"
             data = data[0]
@@ -476,7 +532,7 @@ class DirectumRX:
             name = self.__d_rx_ref_translate[name]
         return name
 
-    def search(self, code, criteria, tp=REF, order_by='', ascending=True, raw=True):
+    def search(self, code, criteria, tp=REF, order_by='', ascending=True, raw=True, expand=None):
         if isinstance(criteria, str):
             for key, val in self.__d_rx_crit_translate.items():
                 if key in criteria:
@@ -493,21 +549,44 @@ class DirectumRX:
             logging.debug(self._service.entities.keys())
             raise
         query = self._service.query(entity)
+        odata.query.Query.__iter__ = _original_iter
+        odata.navproperty.NavigationProperty.instances_from_data = _original_instances_from_data
         if raw:
-            query_params = {'$expand': '*'}
+            query_params = {}
+            if expand:
+                query_params['$expand'] = expand if isinstance(expand, (list, tuple,)) else [expand]
             if criteria:
                 query_params['$filter'] = criteria
             if order_by:
                 query_params['$orderby'] = order_by + (' asc' if ascending else ' desc')
-            return query.raw(query_params)
+            try:
+                return query.raw(query_params)
+            except TypeError as ex:
+                logging.warning(f"{str(ex)}. Use patched version.")
+                odata.query.Query.__iter__ = _patched_iter
+                return query.raw(query_params)
+            except AttributeError as ex:
+                logging.warning(f"{str(ex)}. Use patched version.")
+                odata.navproperty.NavigationProperty.instances_from_data = _patched_instances_from_data
+                return query.raw(query_params)
         else:
-            query.options['$expand'] = ['*']
+            if expand:
+                query.options['$expand'] = expand if isinstance(expand, (list, tuple,)) else [expand]
             if criteria:
                 query.options['$filter'] = [criteria]
             if order_by:
                 query.options['$orderby'] = [order_by] if isinstance(order_by, SortOrder) \
                     else [order_by + (' asc' if ascending else ' desc')]
-            return query.all()
+            try:
+                return query.all()
+            except TypeError as ex:
+                logging.warning(f"{str(ex)}. Use patched version.")
+                odata.query.Query.__iter__ = _patched_iter
+                return query.all()
+            except AttributeError as ex:
+                logging.warning(f"{str(ex)}. Use patched version.")
+                odata.navproperty.NavigationProperty.instances_from_data = _patched_instances_from_data
+                return query.all()
 
     def get_result_docs(self, directum_id, crt_name='Администрация Уссурийского городского округа',
                         zip_signed_doc=False, days_old=-3):
@@ -520,7 +599,7 @@ class DirectumRX:
             certs = None
 
         def make_doc(data):
-            data = self.search("IOfficialDocuments", "Id eq %s" % data['Id'], raw=False)
+            data = self.search("IOfficialDocuments", "Id eq %s" % data['Id'], raw=False, expand=("Versions","AssociatedApplication"))
             if data:
                 data = data[0]
             else:
@@ -558,7 +637,7 @@ class DirectumRX:
                 i -= 1
             return ad
 
-        declar = self.search("IMunicipalServicesServiceCases", "Id eq %s" % directum_id, raw=False)
+        declar = self.search("IMunicipalServicesServiceCases", "Id eq %s" % directum_id, raw=False, expand="ResultDocument")
         if not declar:
             return declar
         applied_docs = []
@@ -570,7 +649,7 @@ class DirectumRX:
         return applied_docs
 
     def get_declar_status_data(self, declar_id=None, fsuids: list = (), permanent_status='6'):
-        declar = self.search("IMunicipalServicesServiceCases", "Id eq %s" % declar_id, raw=False)
+        declar = self.search("IMunicipalServicesServiceCases", "Id eq %s" % declar_id, raw=False, expand=("UPAStatus","ServiceKind","Correspondent"))
         if declar:
             declar = declar[0]
         else:
@@ -600,11 +679,11 @@ class DirectumRX:
             return res
 
         service_kind = self.search("IMunicipalServicesServiceKinds",
-                                   "Id eq %s" % declar.ServiceKind.Id, raw=False)[0]
+                                   "Id eq %s" % declar.ServiceKind.Id, raw=False, expand="LeadServiceKind")[0]
         while (service_kind.LeadServiceKind and hasattr(service_kind.LeadServiceKind, "Id")
                and service_kind.LeadServiceKind.Id):
             srv = self.search('IMunicipalServicesServiceKinds',
-                              "Id eq %s" % service_kind.LeadServiceKind.Id, raw=False)
+                              "Id eq %s" % service_kind.LeadServiceKind.Id, raw=False, expand="LeadServiceKind")
             if srv:
                 service_kind = srv[0]
         if len(service_kind.Code) < 12: # Skip non federal services
@@ -612,58 +691,9 @@ class DirectumRX:
 
         # Get persons
         users = []
-        # for fl in declar.ApplicantsPP:
-        #     applicant = self._service.default_context.connection.execute_get(
-        #         "%s/ApplicantsPP(%s)?$expand=*" % (declar.__odata__.instance_url, fl.Id))
-        #     if applicant['Applicant']:
-        #         series = num = None
-        #         add_info = self.search(
-        #             "IAUGOPartiesPersonAddInfos", "Person/Id eq %s" % applicant['Applicant']['Id'], raw=False)
-        #         if add_info:
-        #             add_info = add_info[0]
-        #             series = add_info.Series
-        #             num = add_info.Number
-        #         if applicant['Applicant']['TIN'] or (series and num) or applicant['Applicant']['INILA']:
-        #             if series and num:
-        #                 user = {'userPersonalDoc': {
-        #                     'PersonalDocType': '1', 'series': series, 'number': num,
-        #                     'lastName': applicant['Applicant']['LastName'],
-        #                     'firstName': applicant['Applicant']['FirstName'],
-        #                     'middleName': applicant['Applicant']['MiddleName'], 'citizenship': '643'}}
-        #             elif applicant['Applicant']['INILA']: # SNILS
-        #                 if applicant['Applicant']['DateOfBirth']:
-        #                     user = {'userDocSnilsBirthDate': {
-        #                         'citizenship': '643', 'snils': applicant['Applicant']['INILA'].strip(),
-        #                         'birthDate': applicant['Applicant']['DateOfBirth'][:10]}}
-        #                 else:
-        #                     user = {'userDocSnils': {
-        #                         'snils': applicant['Applicant']['INILA'].strip(),
-        #                         'lastName': applicant['Applicant']['LastName'],
-        #                         'firstName': applicant['Applicant']['FirstName'],
-        #                         'middleName': applicant['Applicant']['MiddleName'], 'citizenship': '643'}}
-        #             elif applicant['Applicant']['TIN']: # INN
-        #                 user = {'userDocInn': {
-        #                     'INN': applicant['Applicant']['TIN'].strip(),
-        #                     'lastName': applicant['Applicant']['LastName'],
-        #                     'firstName': applicant['Applicant']['FirstName'],
-        #                     'middleName': applicant['Applicant']['MiddleName'], 'citizenship': '643'}}
-        #             else:
-        #                 raise DirectumRXException("User %s %s %s (%s) has no passport nor INN nor SNILS" % (
-        #                     applicant['Applicant']['LastName'],
-        #                     applicant['Applicant']['FirstName'],
-        #                     applicant['Applicant']['MiddleName'],
-        #                     applicant['Applicant']['Id']))
-        #             users.append(user)
+
         # Get organisations
         orgs = []
-        # for ul in declar.ApplicantsLE:
-        #     applicant = self._service.default_context.connection.execute_get(
-        #         "%s/ApplicantsLE(%s)?$expand=*" % (declar.__odata__.instance_url, ul.Id))
-        #     if applicant['Applicant']:
-        #         if applicant['Applicant']['TIN'] and len(applicant['Applicant']['TIN']) == 10:
-        #             orgs.append({'ogrn_inn_UL': {'inn_kpp': {'inn': applicant['Applicant']['TIN'].strip()}}})
-        #         elif applicant['Applicant']['PSRN']:
-        #             orgs.append({'ogrn_inn_UL': {'ogrn': applicant['Applicant']['PSRN'].strip()}})
 
         if declar.AppCategory == "LegPerson":
             # Get organization
@@ -827,19 +857,12 @@ class DirectumRX:
         try:
             res = self.search("IAssociatedApplications", "Extension eq '%s'" % data_format, raw=False)
             if not res:
-                self.search("IAssociatedApplications", "Extension eq 'txt'", raw=False)
-            ver_num = 0
-            while ver_num < 5:
-                ver_num += 1
-                doc.Versions = [{"Number": 1, "AssociatedApplication": {"Id": res[0].Id}}]
-                try:
-                    self._service.save(doc)
-                    ver_num = 5
-                except ODataError:
-                    if ver_num == 5:
-                        raise
-                    pass
-            doc = self.search("IAddendums", "Id eq %s" % doc.Id, raw=False)[0]
+                res = self.search("IAssociatedApplications", "Extension eq 'txt'", raw=False)
+            version = self._service.default_context.connection.execute_post(
+                f"{doc.__odata__.instance_url}/Versions",
+                #{"Number": 1, "AssociatedApplication": {"Id": res[0].Id}}
+                {"Number": 1, "AssociatedApplication@odata.bind": f"IAssociatedApplications({res[0].Id})"})
+            doc = self.search("IAddendums", "Id eq %s" % doc.Id, raw=False, expand="Versions")[0]
             self._service.default_context.connection.execute_post(
                 "%s/Versions(%s)/Body" % (doc.__odata__.instance_url, doc.Versions[0].Id),
                 {"Value": base64.b64encode(data).decode()})

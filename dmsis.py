@@ -281,7 +281,7 @@ class Integration:
                 result = 'FINAL'
 
                 if self.use_rx:
-                    declars = self.rx.search('ДПУ', 'ИД=%s' % request.directum_id, raw=False)
+                    declars = self.rx.search('ДПУ', 'ИД=%s' % request.directum_id, raw=False, expand="UPAStatus")
                     for declar in declars:
                         if declar.ServEndDateFact:
                             applied_docs = self.rx.get_result_docs(
