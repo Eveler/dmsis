@@ -495,7 +495,7 @@ class Adapter:
                         ad, '{urn://augo/smev/uslugi/1.0.0}file_name'
                     ).text = doc.file_name
                 etree.SubElement(
-                    ad, '{urn://augo/smev/uslugi/1.0.0}url').text = doc.url if hasattr(doc, 'url') else ''
+                    ad, '{urn://augo/smev/uslugi/1.0.0}url').text = doc.url if hasattr(doc, 'url') else 'http://nourl'
                 if hasattr(doc, 'url_valid_until') and doc.url_valid_until:
                     etree.SubElement(
                         ad, '{urn://augo/smev/uslugi/1.0.0}url_valid_until'
