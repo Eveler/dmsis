@@ -337,7 +337,12 @@ class DirectumRX:
                 msg = 'Cannot insert Entity that does not belong to EntitySet: {0}'.format(data)
                 raise ODataError(msg)
             es = data.__odata__
-            insert_data = es.data_for_insert()
+            try:
+                # python-odata-0.8.1 signature
+                insert_data = es.data_for_insert(self._service.server_flags)
+            except Exception:
+                # python-odata-0.5.4 signature
+                insert_data = es.data_for_insert()
 
             if len(apps_le) > 1:
                 insert_data["ApplicantsLE"] = [{"Id": a.Id} for a in apps_le if a != data.Correspondent]
