@@ -731,7 +731,7 @@ class Db:
                 doc.file_path = file_path
             self.session.add(doc)
             docs.append(doc)
-            remove(found)
+            if found: remove(found)
         for param in declar.Param:
             if not isinstance(param, (str, bytes, bytearray)):
                 p = Params(type=getattr(param, 'type', ''), param_id=getattr(param, 'id', ''),
