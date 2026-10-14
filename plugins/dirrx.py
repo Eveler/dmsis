@@ -401,12 +401,6 @@ class DirectumRX:
                       ('Doc_IDs', ';'.join(doc_ids))]
             res = self.run_script('notification_add_docs', params)
             logging.info('Отправлено уведомление ID = %s' % res)
-        elif files:
-            for file_name, file_path in files.items():
-                try:
-                    os.remove(file_path)
-                except:
-                    pass
         return data.Id
 
     def __try_found_file(self, f_n, file_list, extension):

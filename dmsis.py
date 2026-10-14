@@ -258,7 +258,13 @@ class Integration:
                             except Exception:
                                 logging.warning('Failed to send data to DIRECTUM. Saving locally.', exc_info=True)
                                 self.db.save_declar(declar, uuid, reply_to, files)
-                                self.smev.send_ack(uuid)
+                                #self.smev.send_ack(uuid)
+                            finally:
+                                for file_name, file_path in files.items():
+                                    try:
+                                        os.remove(file_path)
+                                    except:
+                                        pass
                         else:
                             # logging.warning("Получен пустой ответ")
                             # self.smev.send_ack(uuid, 'false')
