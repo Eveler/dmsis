@@ -184,10 +184,10 @@ class Integration:
                             sent = True
                         logging.info('Добавлено/обновлено дело с ID = %s' % res)
                         self.db.delete_declar(uuid)
-                        try:
-                            self.smev.send_ack(uuid)
-                        except:
-                            logging.warning('Failed to send AckRequest.', exc_info=True)
+                        # try:
+                        #     self.smev.send_ack(uuid)
+                        # except:
+                        #     logging.warning('Failed to send AckRequest.', exc_info=True)
                     except (IntegrationServicesException, DirectumRXException) as e:
                         if "Услуга не найдена" in e.message:
                             logging.warning(
