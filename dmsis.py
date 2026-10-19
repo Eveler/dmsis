@@ -256,8 +256,9 @@ class Integration:
                                 else:
                                     logging.warning('Failed to send data to DIRECTUM.', exc_info=True)
                             except Exception:
-                                logging.warning('Failed to send data to DIRECTUM. Saving locally.', exc_info=True)
-                                self.db.save_declar(declar, uuid, reply_to, files)
+                                pass
+                                # logging.warning('Failed to send data to DIRECTUM. Saving locally.', exc_info=True)
+                                # self.db.save_declar(declar, uuid, reply_to, files)
                                 #self.smev.send_ack(uuid)
                             finally:
                                 for file_name, file_path in files.items():

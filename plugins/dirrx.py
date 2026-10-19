@@ -869,8 +869,7 @@ class DirectumRX:
                                                                        requisites.date.strftime('%d.%m.%Y'), doc.Id))
         except ODataError:
             logging.error("Ошибка сохранения документа %s № %s от %s" % (requisites.title, requisites.number,
-                                                                         requisites.date.strftime('%d.%m.%Y')),
-                          exc_info=True)
+                                                                         requisites.date.strftime('%d.%m.%Y')))
             self._service.delete(doc)
             raise
         return doc.Id
