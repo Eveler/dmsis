@@ -382,7 +382,6 @@ class DirectumRX:
                 fn, ext = os.path.splitext(file_name)
                 with open(file_path, 'rb') as f:
                     doc_data = (f.read(), ext[1:].lower() if ext else 'txt')
-                os.remove(file_path)
                 doc = D()
                 doc.number = ''
                 doc.date = datetime.date.today()
@@ -478,7 +477,6 @@ class DirectumRX:
             try:
                 with open(found, 'rb') as f:
                     doc_data = (f.read(), ext[1:].lower() if ext else 'txt')
-                os.remove(found)
             except FileNotFoundError:
                 logging.warning("Cannot find file '%s'" % file_name, exc_info=True)
                 if not doc_data:
