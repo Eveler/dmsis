@@ -361,12 +361,16 @@ class DirectumRX:
             else:
                 return False
         doc_ids = []
+        was_error = False
         if hasattr(declar, "AppliedDocument") and declar.AppliedDocument:
             for doc in declar.AppliedDocument:
                 s_str = "contains(Name,'%s') and LeadingDocument/Id eq %s" % (doc.title[:249], data.Id)
                 res = self.search('IAddendums', s_str)
                 if not res:
-                    res = self.__upload_doc(None, doc, files, declar, lead_doc=data)
+                    try:
+                        res = self.__upload_doc(None, doc, files, declar, lead_doc=data)
+                    except:
+                        was_error = True
                     # doc_ids.append(str(res))
                 else:
                     file_name = doc.file_name if doc.file_name else doc.url
@@ -377,7 +381,6 @@ class DirectumRX:
         elif files:
             class D:
                 pass
-            was_error = False
             for file_name, file_path in files.items():
                 fn, ext = os.path.splitext(file_name)
                 with open(file_path, 'rb') as f:
@@ -391,8 +394,8 @@ class DirectumRX:
                 except:
                     was_error = True
                 # doc_ids.append(str(res))
-            if was_error:
-                raise DirectumRXException("Не все документы загружены")
+        if was_error:
+            raise DirectumRXException("Не все документы загружены")
 
         # TODO: Send notification about new docs
         if doc_ids:
