@@ -365,19 +365,12 @@ class DirectumRX:
         if hasattr(declar, "AppliedDocument") and declar.AppliedDocument:
             for doc in declar.AppliedDocument:
                 s_str = "contains(Name,'%s') and LeadingDocument/Id eq %s" % (doc.title[:249], data.Id)
-                res = self.search('IAddendums', s_str)
-                if not res:
-                    try:
-                        res = self.__upload_doc(None, doc, files, declar, lead_doc=data)
-                    except:
-                        was_error = True
-                    # doc_ids.append(str(res))
-                else:
-                    file_name = doc.file_name if doc.file_name else doc.url
-                    fn, ext = os.path.splitext(file_name)
-                    found, ext = self.__try_found_file(fn, files, ext)
-                    if found:
-                        os.remove(found)
+                res = self.search('IAddendums', s_str, raw=False)
+                try:
+                    res = self.__upload_doc(None, doc, files, declar, lead_doc=data, doc_id=res[0].Id if res else None)
+                except:
+                    was_error = True
+                # doc_ids.append(str(res))
         elif files:
             class D:
                 pass
@@ -390,7 +383,7 @@ class DirectumRX:
                 doc.date = datetime.date.today()
                 doc.title = fn
                 try:
-                    res = self.add_doc(doc, doc_data[1], doc_data[0], data)
+                    res = self.add_doc_version(doc, doc_data[1], doc_data[0], data)
                 except:
                     was_error = True
                 # doc_ids.append(str(res))
@@ -444,7 +437,7 @@ class DirectumRX:
                 return fnd, extension
         return fnd, extension
 
-    def __upload_doc(self, doc_getter, doc, files, declar, i=0, lead_doc=None):
+    def __upload_doc(self, doc_getter, doc, files, declar, i=0, lead_doc=None, doc_id=None):
         doc_data = ()
         if doc_getter:
             doc_data = doc_getter(doc.url, doc.file_name)
@@ -486,7 +479,7 @@ class DirectumRX:
                     doc_data = (b'No file', 'txt')
         else:
             doc_data = (b'No file', 'txt')
-        res = self.add_doc(doc, doc_data[1], doc_data[0], lead_doc)
+        res = self.add_doc_version(doc, doc_data[1], doc_data[0], lead_doc, doc_id=doc_id)
         return res
 
     def run_script(self, script_name, params=(), entity=None):
@@ -835,8 +828,9 @@ class DirectumRX:
                         self._service.save(r)
             index += 1
 
-    def add_doc(self, requisites, data_format, data, lead_doc=None):
-        doc = self._service.entities['IAddendums']()
+    def add_doc_version(self, requisites, data_format, data, lead_doc=None, doc_id=None):
+        doc = self._service.entities['IAddendums']() if not doc_id \
+            else self.search('IAddendums', f"Id eq {doc_id}", raw=False, expand="Versions")[0]
         doc_date = datetime.datetime(requisites.date.year, requisites.date.month, requisites.date.day) \
             if isinstance(requisites.date, (XSDDate, xsd.Date)) else requisites.date
         doc.Name = self.adopt_str("%s%s%s" % (
@@ -858,13 +852,22 @@ class DirectumRX:
             res = self.search("IAssociatedApplications", "Extension eq '%s'" % data_format, raw=False)
             if not res:
                 res = self.search("IAssociatedApplications", "Extension eq 'txt'", raw=False)
-            version = self._service.default_context.connection.execute_post(
+            ver_num = 1
+            if doc.HasVersions:
+                for ver in doc.Versions:
+                    if ver.Number >= ver_num: ver_num = ver.Number + 1
+            self._service.default_context.connection.execute_post(
                 f"{doc.__odata__.instance_url}/Versions",
                 #{"Number": 1, "AssociatedApplication": {"Id": res[0].Id}}
-                {"Number": 1, "AssociatedApplication@odata.bind": f"IAssociatedApplications({res[0].Id})"})
+                {"Number": ver_num, "AssociatedApplication@odata.bind": f"IAssociatedApplications({res[0].Id})"})
             doc = self.search("IAddendums", "Id eq %s" % doc.Id, raw=False, expand="Versions")[0]
+            idx = 0
+            if doc.HasVersions:
+                for ver in doc.Versions:
+                    if ver.Number >= ver_num: break
+                    idx += 1
             self._service.default_context.connection.execute_post(
-                "%s/Versions(%s)/Body" % (doc.__odata__.instance_url, doc.Versions[0].Id),
+                "%s/Versions(%s)/Body" % (doc.__odata__.instance_url, doc.Versions[idx].Id),
                 {"Value": base64.b64encode(data).decode()})
             logging.info('Добавлен документ: %s № %s от %s Id = %s' % (doc.Name, requisites.number,
                                                                        requisites.date.strftime('%d.%m.%Y'), doc.Id))
